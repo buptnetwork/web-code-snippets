@@ -11,3 +11,8 @@ components.d.ts
 snippets/lesson00/todos.json
 .uv-cache
 .uv-python
+
+# Python 运行缓存与字节码
+__pycache__/
+*.py[cod]
+.pytest_cache/

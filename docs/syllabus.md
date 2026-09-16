@@ -320,12 +320,12 @@
 
 | 层 | 工具 |
 |---|---|
-| 后端 | Python 3.12、uv、FastAPI、Pydantic v2、pydantic-settings、Jinja2、SQLAlchemy 2.0、Alembic、httpx、pytest |
-| 数据 | PostgreSQL（一键环境提供，学生不学运维） |
-| 前端 | Node 20、Vite、React 18、TypeScript（最小集）、React Router、TanStack Query、课程样式基线（Tailwind 可选） |
+| 后端 | Python 3.12+、uv、FastAPI、Pydantic v2、pydantic-settings、Jinja2、SQLAlchemy 2.0、Alembic、httpx、pytest |
+| 数据 | PostgreSQL 或 MySQL |
+| 前端 | Node 20+、Vite、React 18+、TypeScript（最小集）、React Router |
 | 质量门禁 | ruff、ESLint、`tsc --noEmit`、pytest、Playwright（1 条冒烟）、GitHub Actions、pip-audit / npm audit |
 | 观察 | Chrome DevTools（Network/Elements/Application/Performance）、React DevTools、VS Code Debugger、`psql`、`curl`、SQLAlchemy `echo`、rollup-plugin-visualizer |
-| AI | Copilot / Claude Code / Cursor（既是工具，也是全程受审对象） |
+| AI | Qoder / Codex / Claude Code / OpenCode |
 
 ---
 
