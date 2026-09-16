@@ -15,3 +15,41 @@
 [2m  remote control [22m     > [2mpass --remote to enable[22m
 
 [2m  shortcuts [22m          > [4mr[24m[2mestart | [22m[4mo[24m[2mpen | [22m[4me[24m[2mdit | [22m[4mq[24m[2muit[22m
+20:33:03 [vite] Internal server error: Element is missing end tag.
+  Plugin: vite:vue
+  File: /Users/wzl/PycharmProjects/web-development-slidev/pages/ch00/01-lecture-one.md__slidev_14.md:21:1
+  19 |  </div>
+  20 |  </div>
+  21 |  <div v-click class="mt-7 p-5 rounded-lg border-2 border-teal-500/40 bg-teal-500/5 text-center">
+     |   ^
+  22 |  <div class="text-xl font-bold leading-relaxed">生成不再是瓶颈，<span class="text-teal-700 dark:text-teal-300">驾驭成了瓶颈</span>。
+  23 |  </div>
+      at createCompilerError (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-core@3.5.42/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:1378:17)
+      at emitError (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-core@3.5.42/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:3035:5)
+      at Object.onclosetag (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-core@3.5.42/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:2402:13)
+      at Tokenizer.stateInClosingTagName (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-core@3.5.42/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:799:16)
+      at Tokenizer.parse (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-core@3.5.42/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:1157:16)
+      at Object.baseParse (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-core@3.5.42/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:3074:13)
+      at Object.parse (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-dom@3.5.42/node_modules/@vue/compiler-dom/dist/compiler-dom.cjs.js:913:23)
+      at Object.parse$1 [as parse] (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-sfc@3.5.42/node_modules/@vue/compiler-sfc/dist/compiler-sfc.cjs.js:1849:24)
+      at createDescriptor (file:///Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vitejs+plugin-vue@6.0.8_vite@8.2.2_@types+node@22.20.2_jiti@2.7.0_yaml@2.9.0__vue@3.5.42_typescript@6.0.3_/node_modules/@vitejs/plugin-vue/dist/index.mjs:50:42)
+      at transformMain (file:///Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vitejs+plugin-vue@6.0.8_vite@8.2.2_@types+node@22.20.2_jiti@2.7.0_yaml@2.9.0__vue@3.5.42_typescript@6.0.3_/node_modules/@vitejs/plugin-vue/dist/index.mjs:1352:33)
+20:33:03 [vite] Internal server error: Element is missing end tag.
+  Plugin: vite:vue
+  File: /Users/wzl/PycharmProjects/web-development-slidev/pages/ch00/01-lecture-one.md__slidev_14.md:21:1
+  19 |  </div>
+  20 |  </div>
+  21 |  <div v-click class="mt-7 p-5 rounded-lg border-2 border-teal-500/40 bg-teal-500/5 text-center">
+     |   ^
+  22 |  <div class="text-xl font-bold leading-relaxed">生成不再是瓶颈，<span class="text-teal-700 dark:text-teal-300">驾驭成了瓶颈</span>。
+  23 |  </div>
+      at createCompilerError (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-core@3.5.42/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:1378:17)
+      at emitError (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-core@3.5.42/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:3035:5)
+      at Object.onclosetag (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-core@3.5.42/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:2402:13)
+      at Tokenizer.stateInClosingTagName (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-core@3.5.42/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:799:16)
+      at Tokenizer.parse (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-core@3.5.42/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:1157:16)
+      at Object.baseParse (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-core@3.5.42/node_modules/@vue/compiler-core/dist/compiler-core.cjs.js:3074:13)
+      at Object.parse (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-dom@3.5.42/node_modules/@vue/compiler-dom/dist/compiler-dom.cjs.js:913:23)
+      at Object.parse$1 [as parse] (/Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vue+compiler-sfc@3.5.42/node_modules/@vue/compiler-sfc/dist/compiler-sfc.cjs.js:1849:24)
+      at createDescriptor (file:///Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vitejs+plugin-vue@6.0.8_vite@8.2.2_@types+node@22.20.2_jiti@2.7.0_yaml@2.9.0__vue@3.5.42_typescript@6.0.3_/node_modules/@vitejs/plugin-vue/dist/index.mjs:50:42)
+      at transformMain (file:///Users/wzl/PycharmProjects/web-development-slidev/node_modules/.pnpm/@vitejs+plugin-vue@6.0.8_vite@8.2.2_@types+node@22.20.2_jiti@2.7.0_yaml@2.9.0__vue@3.5.42_typescript@6.0.3_/node_modules/@vitejs/plugin-vue/dist/index.mjs:1352:33)
