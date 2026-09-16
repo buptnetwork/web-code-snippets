@@ -1,0 +1,8 @@
+{
+  "buildCommand": "pnpm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/web-2026b/ch00/:path*", "destination": "/web-2026b/ch00/index.html" },
+    { "source": "/web-2026b/ch01/:path*", "destination": "/web-2026b/ch01/index.html" }
+  ]
+}

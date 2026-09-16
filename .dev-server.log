@@ -1,0 +1,17 @@
+
+
+  [36m●[39m[34m■[39m[33m▲[39m
+[1m  Slidev[22m  [34mv52.19.1[39m 
+
+[2m  theme       [22m[32m@slidev/theme-seriph[39m
+[2m  css engine  [22m[34munocss[39m
+[2m  entry       [22m[2m/Users/wzl/PycharmProjects/web-development-slidev/[22mch00.md
+
+[2m  public slide show [22m  > [36mhttp://localhost:[1m3030[22m/[39m
+[2m  presenter mode [22m     > [34mhttp://localhost:[1m3030[22m/presenter/[39m
+[2m  slides overview [22m    > [34mhttp://localhost:[1m3030[22m/overview/[39m
+[2m  export slides[22m       > [34mhttp://localhost:[1m3030[22m/export/[39m
+[2m  mcp server    [22m     > [34mhttp://localhost:[1m3030[22m/__mcp[39m
+[2m  remote control [22m     > [2mpass --remote to enable[22m
+
+[2m  shortcuts [22m          > [4mr[24m[2mestart | [22m[4mo[24m[2mpen | [22m[4me[24m[2mdit | [22m[4mq[24m[2muit[22m

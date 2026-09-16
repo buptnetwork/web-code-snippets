@@ -1,0 +1,17 @@
+{
+  "name": "web-development-slidev",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "slidev ch00.md --open",
+    "dev:ch": "slidev --open",
+    "build": "node scripts/build-site.mjs",
+    "export": "slidev export ch00.md ch01.md"
+  },
+  "dependencies": {
+    "@slidev/cli": "^52.19.1",
+    "@slidev/theme-default": "latest",
+    "@slidev/theme-seriph": "latest",
+    "vue": "^3.5.33"
+  }
+}
