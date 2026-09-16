@@ -2,14 +2,14 @@
 layout: section
 ---
 
-# 讲一 · 协议报文与工具链
+# 讲一 · HTTP协议报文与工具链
 
 <div class="pt-3 text-sm opacity-60">
 0.1 跑在哪里 · 0.2 HTML·URL·HTTP 报文 · 0.3 JSON · 0.4 终端与工具链 · 0.5 读报错 · 0.6 调试器（高光）
 </div>
 
 <div class="mt-8 text-xs opacity-50">
-本讲 85 分钟 · 录播 · 标「暂停跟做」处务必动手
+本讲 60 分钟 · 标「暂停跟做」处务必动手
 </div>
 
 <!--

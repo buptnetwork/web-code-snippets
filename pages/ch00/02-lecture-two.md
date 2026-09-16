@@ -9,7 +9,7 @@ layout: section
 </div>
 
 <div class="mt-8 text-xs opacity-50">
-本讲 86 分钟 · 录播 · 每个语法点都标「对应第 1 次课」
+本讲 60 分钟 · 每个语法点都标「对应第 1 次课」
 </div>
 
 <!--
