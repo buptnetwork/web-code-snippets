@@ -1,2366 +1,1614 @@
-# 授课人与联系方式
+---
+layout: section
+---
 
-<div grid="~ cols-[1.1fr_1fr] gap-8" class="mt-5 items-center">
+# 第 1 次课
+## 数据结构的基本概念与 ADT 实现（含 C 回顾与引用语义）
+
+<!--
+本次课目标（学生下课时应该能做到五件事）：
+① 说出数据 / 数据对象 / 数据元素 / 数据项的层次，并在一张学生成绩表上指认；
+② 拿到任一名词（二叉树、邻接矩阵、队列、单链表……）能判断它属于逻辑结构还是存储结构；
+③ 说出 ADT 三要素，解释伪代码 InitComplex(&C, v1, v2) 里那个 & 是什么；
+④ 说出引用与指针的三条差别，并为一个给定接口选对形参形式（值 / 指针 / 引用 / 常量引用）；
+⑤ 照模板写出规范的 malloc 四步，认出六类内存错误。
+
+本课重点：逻辑结构 vs 存储结构；ADT 与信息隐藏；引用形参与指针形参的等价与差异；动态内存规范。
+本课难点：引用的绑定语义（必须初始化、不可改绑、无空引用）与生命周期（不可返回局部对象的引用）；next 为什么只能是指针。
+-->
+
+---
+
+# 在 10 亿个号码里查一个号
+
+<div class="pt-5 space-y-7 text-sm">
+
+<div v-click="1" class="flex items-center gap-5">
+
+<div class="w-48 shrink-0">
+  <div class="font-bold">无序 + 顺序查找</div>
+  <div class="text-xs opacity-60 pt-0.5">从头逐个比，平均翻到一半</div>
+</div>
+
+<div class="relative flex-1 h-14 rounded-md border border-gray-400/30 overflow-hidden" style="background-image:repeating-linear-gradient(90deg, rgba(128,128,128,0.25) 0 1px, transparent 1px 24px)">
+  <div class="absolute inset-y-0 left-0 bg-orange-400/45" style="width:50%"></div>
+  <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-red-500/90"></div>
+</div>
+
+<div class="w-24 shrink-0 text-right">
+  <b class="text-xl text-orange-500">5×10⁸</b><span class="text-xs opacity-60"> 次</span>
+</div>
+
+</div>
+
+<div v-click="2" class="flex items-center gap-5">
+
+<div class="w-48 shrink-0">
+  <div class="font-bold">有序 + 二分查找</div>
+  <div class="text-xs opacity-60 pt-0.5">排好序后，每比一次砍掉一半</div>
+</div>
+
+<div class="relative flex-1 h-14 rounded-md border border-gray-400/30 overflow-hidden" style="background-image:repeating-linear-gradient(90deg, rgba(128,128,128,0.25) 0 1px, transparent 1px 24px)">
+  <div class="absolute inset-x-1.5 inset-y-1 flex flex-col justify-center gap-1">
+    <div class="h-1.5 rounded-full bg-teal-500/30" style="width:100%"></div>
+    <div class="h-1.5 rounded-full bg-teal-500/40" style="width:50%"></div>
+    <div class="h-1.5 rounded-full bg-teal-500/50" style="width:25%"></div>
+    <div class="h-1.5 rounded-full bg-teal-500/65" style="width:12.5%"></div>
+    <div class="h-1.5 rounded-full bg-teal-600/80" style="width:6%"></div>
+  </div>
+</div>
+
+<div class="w-24 shrink-0 text-right">
+  <b class="text-xl text-teal-600 dark:text-teal-400">30</b><span class="text-xs opacity-60"> 次</span>
+</div>
+
+</div>
+
+<div v-click="3" class="flex items-center gap-5">
+
+<div class="w-48 shrink-0">
+  <div class="font-bold">哈希表</div>
+  <div class="text-xs opacity-60 pt-0.5">函数直接算出位置（第 9 章细讲）</div>
+</div>
+
+<div class="relative flex-1 h-14 rounded-md border border-gray-400/30 overflow-hidden" style="background-image:repeating-linear-gradient(90deg, rgba(128,128,128,0.25) 0 1px, transparent 1px 24px)">
+  <div class="absolute inset-y-1.5 bg-teal-500/30 border-x-2 border-teal-600/60" style="left:68%; width:24px"></div>
+  <div class="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-red-500/90" style="left:calc(68% + 11px)"></div>
+</div>
+
+<div class="w-24 shrink-0 text-right">
+  约 <b class="text-xl text-teal-600 dark:text-teal-400">1</b><span class="text-xs opacity-60"> 次</span>
+</div>
+
+</div>
+
+</div>
+
+<div v-click="4" class="pt-12 text-center text-lg">
+
+同一份数据、同一台机器、同一种语言 —— 差 <span class="text-teal-600 dark:text-teal-400 font-bold">10⁸ 倍</span>，只来自一件事：<b>数据怎么组织</b>。
+
+</div>
+
+<!--
+上课。先不讲定义，先做一件事。假设我给你一份全国的电话号码，十亿条，我说：帮我查一下 138 开头那个号在不在里面。你打算怎么查？
+（等一下）最老实的办法，从头挨着比。平均要比多少次？五亿次——你看这条格子带，橙色的是已经翻过的，平均翻到一半才碰上。
+现在我把这十亿个号码先排好序，你用二分查找。猜猜多少次？
+（让他们猜，一般会有人说"几千次"、"几万次"）三十次。三十。你看这排越来越短的横杠：每比一次，候选只剩一半，砍三十刀就只剩一个。因为 2 的 30 次方就已经十亿了。
+再换一种组织方式——哈希表。你把号码报出来，函数直接算出它该在哪一格，基本一次就拿到。什么是哈希表，第 9 章细讲；你现在只要记住这个感觉：它不是"找"到的，是"算"到的。
+数据一模一样，机器一模一样，代码都是你写的，差了一亿倍。差别在哪？不在算力，不在语言，在于数据是怎么摆的。
+这就是这门课全部的价值。这门课前八章讲怎么摆数据，后面讲怎么处理数据。今天这节课，是给整门课打地基。
+-->
+
+---
+
+# 这个等式，是一本书的名字
+
+<div grid="~ cols-[1fr_1.5fr] gap-6" class="pt-2">
+
+<div class="flex flex-col items-center justify-center">
+
+<img src="/images/ch01/swiss-computer-scientist-niklaus-wirth.webp" class="rounded-lg shadow-lg border border-gray-400/30 max-h-[240px]" />
+
+<div class="pt-2 text-center">
+  <div class="text-lg font-bold">Niklaus Emil Wirth</div>
+  <div class="text-sm opacity-70 pt-0.5">瑞士计算机科学家</div>
+  <div class="pt-1">
+    <span class="px-3 py-0.5 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 text-xs font-bold">1984 年图灵奖</span>
+  </div>
+</div>
+
+</div>
+
+<div class="flex items-center gap-5">
+
+<img src="/images/ch01/wirth-book.jpg" class="rounded-lg shadow-lg border border-gray-400/30 max-h-[240px]" />
+
+<div class="flex-1 space-y-3 text-sm">
+
+<div class="rounded-lg border p-3">
+  <div class="text-xs opacity-60">1976 · 首版</div>
+  <div class="font-bold pt-1">《算法 + 数据结构 = 程序》</div>
+  <div class="text-xs opacity-70 italic pt-1">Algorithms + Data Structures = Programs</div>
+</div>
+
+<div class="rounded-lg border p-3">
+  <div class="text-xs opacity-60">1986 · 2004 · 两次大幅修订</div>
+  <div class="font-bold pt-1">更名《算法与数据结构》</div>
+  <div class="text-xs opacity-70 italic pt-1">Algorithms and Data Structures</div>
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<div grid="~ cols-2 gap-4" class="pt-4">
+
+<div class="rounded-lg border px-4 py-2 text-center">
+  <div class="font-bold text-teal-600 dark:text-teal-400">数据结构</div>
+  <div class="text-sm opacity-80 pt-0.5">数据在计算机中如何有效地组织起来</div>
+</div>
+
+<div class="rounded-lg border px-4 py-2 text-center">
+  <div class="font-bold text-teal-600 dark:text-teal-400">算法</div>
+  <div class="text-sm opacity-80 pt-0.5">数据如何经过运算解决问题</div>
+</div>
+
+</div>
+
+<!--
+这门课为什么要两条腿走路？几十年前就有人把这层关系写成了一个等式，而且直接当成了书名。
+这个人叫 Niklaus Wirth，瑞士计算机科学家，1984 年图灵奖得主——计算机界的最高奖。
+1976 年他写了这本书，书名就是这个等式：《Algorithms + Data Structures = Programs》，算法加数据结构等于程序。他没有把它当口号喊，而是用一整本书去论证它。
+这本书获得了广泛认可，1986 年、2004 年两次大幅修订，新书名简化成《Algorithms and Data Structures》——算法与数据结构。
+所以你回头看开头那三种查法：同一份数据，摆法不同，快慢差一亿倍。这门课的两条腿——数据结构，管数据在计算机里怎么有效地组织起来；算法，管数据怎么经过运算解决问题。摆得好，算得快。
+-->
+
+---
+
+# 整个学期的骨架，就是这张表
+
+| <span class="text-teal-600 dark:text-teal-400 font-bold">逻辑结构</span> | <span class="text-teal-600 dark:text-teal-400 font-bold">顺序存储</span> | <span class="text-teal-600 dark:text-teal-400 font-bold">链式存储</span> |
+| -------- | -------- | -------- |
+| <span class="text-teal-600 dark:text-teal-400 font-bold">线性表</span> | 顺序表（第 2 章） | 单 / 双 / 循环链表（第 2 章） |
+| <span class="text-teal-600 dark:text-teal-400 font-bold">栈、队列</span> | 顺序栈、循环队列（第 3–4 章） | 链栈、链队（第 3–4 章） |
+| <span class="text-teal-600 dark:text-teal-400 font-bold">树 / 二叉树</span> | 顺序二叉树、堆（第 6 章） | 二叉链表（第 6 章） |
+| <span class="text-teal-600 dark:text-teal-400 font-bold">图</span> | 邻接矩阵（第 7 章） | 邻接表（第 7 章） |
+
+<div v-click class="pt-6">
+
+本章的任务：把这张表的**行标题**（逻辑结构）和**列标题**（顺序存储、链式存储）讲清楚。
+
+</div>
+
+<!--
+这张表你先拍照，整个学期我们会回来看它十几次。
+你看它的样子：竖着是行标题，线性表、栈队列、树、图，这一列叫逻辑结构；横着是列标题，顺序存储、链式存储。中间每一个格子，都是后面的某一章、某一节。
+所以这门课的骨架就是一句话：几种逻辑结构，各自配上几种存储方式，再看在这个组合下每种操作要花多少代价。
+今天我不讲任何一个格子。今天我讲行标题和列标题——什么是逻辑结构，什么是存储结构。把这两个词分清楚，这张表你自己就能填。
+-->
+
+---
+
+# 开写之前，先把规矩说清楚
+
+<div class="pt-1 space-y-3">
+
+<div class="rounded-lg border px-4 py-2">
+
+**① 编译**：统一用 `g++ -std=c++17 -Wall -Wextra`，源文件用 `.cpp`
+
+</div>
+<div class="rounded-lg border px-4 py-2">
+
+**② 语言子集** = C 语言核心 + **三样 C++ 特性**：引用形参、常量引用形参、返回引用
+
+</div>
+<div class="rounded-lg border px-4 py-2">
+
+**③ 动态内存**用 `malloc` / `free`，**不用** `new` / `delete`（为什么？1.7 回答）
+
+</div>
+<div class="rounded-lg border px-4 py-2">
+
+**④ 标准库容器**（`vector`、`list`、`map`……）只作对照阅读，**不用于实现**——我们要造的正是它们
+
+</div>
+<div class="rounded-lg border px-4 py-2">
+
+**⑤ IDE**：推荐 **CLion**（学生可免费申请授权）+ **Qoder** 或其它同类AI Coding插件
+
+</div>
+</div>
+
+<!--
+在写第一行代码之前，先把规矩说清楚，免得后面每节课都有人问。
+环境不用纠结：IDE 推荐 CLion，学生用学校邮箱就可以免费申请授权；AI Coding 插件用 Qoder 或其它同类都行——写代码时有 AI 帮你补全和查错。
+我们用 g++ 编译，文件后缀 .cpp。但注意，我们写的不是"完整的 C++"。我们写的是 C 语言，只额外借三样东西：引用形参、常量引用形参、返回引用。就三样，为什么借，这节课后半段你就知道了。
+内存分配我们用 malloc 和 free，不用 new 和 delete。为什么？留个悬念，一会儿讲动态内存的时候我专门回答。
+还有一条：STL 那些容器，vector、list、map，你们可以看，可以对照，但不许用来实现作业。原因很简单——这门课就是在造 vector 和 list。你直接调用它，等于考试时抄答案，抄完你还是不会。
+（这页快讲，不逐条展开——它的功能是"以后不许再争"，先让学生拍照。）
+-->
+
+---
+
+# 四个基本概念，一张成绩表就讲明白
+
+<div grid="~ cols-2 gap-8" class="pt-1">
+<div class="text-sm">
+
+| 概念 | 定义 |
+| ---- | ---- |
+| 数据 （Data）| 能被计算机处理的符号总称 |
+| 数据对象 （Data Object）| **性质相同**的数据元素的集合 |
+| 数据元素 （Data Element）| 数据的基本单位，一个数据元素可由若干个**数据项**组成 |
+| 数据项 （Data Item）| 组成元素的最小不可分单位 |
+
+<div class="pt-3">
+
+**层次关系**：数据 ⊃ 数据对象 ⊃ 数据元素 ⊃ 数据项
+
+</div>
+</div>
 <div>
 
-<div class="text-xs tracking-widest opacity-45 mb-2">授课教师</div>
-
-<div class="text-3xl font-bold mb-6">王尊亮</div>
-
-<div class="space-y-3 text-sm">
-  <div class="flex items-baseline gap-3">
-    <span class="opacity-50 w-10 shrink-0">邮箱</span>
-    <span class="font-mono">wangzl@bupt.edu.cn</span>
+<div class="rounded-lg border-2 border-dashed border-teal-500/70 p-3">
+  <div class="text-xs text-teal-600 dark:text-teal-400 pb-2">整张表 = 数据对象</div>
+  <table class="w-full text-xs text-center">
+    <thead class="opacity-60">
+      <tr><th class="py-1">学号</th><th>姓名</th><th>性别</th><th>成绩</th></tr>
+    </thead>
+    <tbody>
+      <tr class="bg-orange-500/15">
+        <td class="py-1">20230101</td><td>张三</td><td>男</td>
+        <td><span class="rounded border border-teal-500 px-1.5">92</span></td>
+      </tr>
+      <tr><td class="py-1">20230102</td><td>李四</td><td>女</td><td>88</td></tr>
+      <tr><td class="py-1">20230103</td><td>王五</td><td>男</td><td>76</td></tr>
+      <tr><td class="py-1">20230104</td><td>赵六</td><td>女</td><td>91</td></tr>
+      <tr><td class="py-1">20230105</td><td>钱七</td><td>男</td><td>85</td></tr>
+    </tbody>
+  </table>
+  <div class="flex justify-between pt-2 text-xs">
+    <span class="text-orange-500">高亮一行 = 一个数据元素（一条记录）</span>
+    <span class="text-teal-600 dark:text-teal-400">框住一格 = 一个数据项</span>
   </div>
-  <div class="flex items-baseline gap-3">
-    <span class="opacity-50 w-10 shrink-0">电话</span>
-    <span class="font-mono">138-1092-4936</span>
-  </div>
-</div>
-
-<div class="mt-7 p-4 rounded border border-teal-500/30 bg-teal-500/5 text-sm leading-relaxed">
-
-课程通知、作业发布、实验说明均通过 **QQ 群** 发布，请课后完成入群。
-
-</div>
-
-</div>
-<div class="flex flex-col items-center">
-
-<img src="/images/ch00/class-qr-code.png" alt="课程 QQ 群二维码 · 458839515" class="h-80 rounded shadow-lg" />
-
-<div class="mt-4 flex items-baseline gap-2">
-  <span class="opacity-50 text-sm">课程 QQ 群</span>
-  <span class="font-mono font-bold text-lg tracking-wide">458839515</span>
 </div>
 
 </div>
 </div>
 
 <!--
-开场不寒暄，直接进两则事实。这一节的目的不是讲新闻，是把"AI 在代码生成上已经领先人类"这个前提立住。
+四个基本概念：数据、数据对象、数据元素、数据项。听起来像绕口令，但看一张表就明白了。
+看这张成绩表。整张表，六十个学生，性质相同的一堆记录，这叫数据对象。
+拿出其中一行，张三，学号，性别，成绩——这一行我们通常整体地处理，比如"把张三这条记录插进去"、"把张三删掉"，不会说"把张三的性别插进去"。所以一行是一个基本单位，叫数据元素。
+再往里，一行里的每一格，学号、姓名、成绩，这叫数据项。
+问一句：score 是数据元素还是数据项？（停）对，数据项。
+这张表的三个标注要停一下，让学生用手指指："哪一行是数据元素，哪一格是数据项。"
+让学生用"班级花名册""图书馆藏书目录"再举一组例子，检查术语是否真的分清了。
 -->
 
 ---
 
-# 事件一 · OpenAI 的 Harness Engineering 实验
+# 这些名字，后面会一直换
 
-<div class="text-xs opacity-55 -mt-2 mb-4">
-《Harness Engineering: Leveraging Codex in an Agent-First World》· OpenAI · 2026 年 2 月
-</div>
+| 术语 | 又称 |
+| ---- | ---- |
+| 数据元素 | **结点** node（链表、树）· **顶点** vertex（图）· **记录** record（数据库、文件） |
+| 数据项 | **字段** field · **域** |
 
-<div grid="~ cols-[1.05fr_1fr] gap-8">
+<div grid="~ cols-2 gap-8" class="pt-12">
 <div>
 
-| 维度 | 事实 |
-|---|---|
-| 团队规模 | 3 人起步，后扩至 7 人 |
-| 硬性约束 | **全程禁止人工手写代码** |
-| 周期 | 5 个月 |
-| 产出 | **100 万行以上**代码，1,500 个 PR |
-| 效率变化 | 约 **10 倍** |
+**"最小不可分"是相对应用而言的**
 
-</div>
-<div class="flex items-center justify-center">
-
-<img src="/images/ch00/news-openai-harness-engineering.png" class="rounded shadow-lg max-h-80" />
-
-</div>
-</div>
-
-<div class="absolute bottom-10 left-14 right-14 flex items-center gap-3 text-xs">
-  <div class="flex-1 h-px bg-gray-400/30" />
-  <div class="px-3 py-1 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 font-bold whitespace-nowrap">2026.02 · Harness Engineering</div>
-  <div class="w-20 h-px bg-gray-400/30" />
-  <div class="px-3 py-1 rounded-full border border-gray-400/30 opacity-35 whitespace-nowrap">2026.09 · ?</div>
-  <div class="flex-1 h-px bg-gray-400/30" />
-</div>
-
-<!--
-今年二月，OpenAI 发了一篇工程博客。一个团队，最开始三个人，后来扩到七个人，给自己定了一条硬规矩：**一行代码都不许人手写**，全部交给 AI Agent。
-
-五个月，一百万行代码，合并了一千五百个 PR，他们自己估算效率提升大概十倍。
-
-我先不评价这件事好不好，我们只把它当一个事实记下来。
--->
-
----
-
-# 事件二 · GPT-6 Astra 发布
-
-<div class="text-xs opacity-55 -mt-2 mb-4">
-OpenAI · 2026 年 9 月 3 日
-</div>
-
-<div grid="~ cols-[1fr_1.05fr] gap-8">
-<div class="pt-2">
-
-<div class="p-4 rounded border border-amber-500/30 bg-amber-500/5">
-
-总裁 **Greg Brockman** 在发布前媒体简报会上：
-
-<div class="pt-2 text-xl font-bold">
-「我个人认为，我们已经到了 AGI」
-</div>
-
-</div>
-
-<div v-click class="mt-4 p-4 rounded border border-amber-500/30 bg-amber-500/5">
-
-发布会结语：
-
-<div class="pt-2 text-xl font-bold">
-「Welcome to the AGI era.」
-</div>
-
-</div>
-
-</div>
-<div class="flex items-center justify-center">
-
-<img src="/images/ch00/news-gpt6-agi-era.png" class="rounded shadow-lg max-h-64" />
-
-</div>
-</div>
-
-<div class="absolute bottom-10 left-14 right-14 flex items-center gap-3 text-xs">
-  <div class="flex-1 h-px bg-gray-400/30" />
-  <div class="px-3 py-1 rounded-full border border-gray-400/30 opacity-35 whitespace-nowrap">2026.02 · Harness Engineering</div>
-  <div class="w-20 h-px bg-gray-400/30" />
-  <div class="px-3 py-1 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 font-bold whitespace-nowrap">2026.09 · GPT-6 Astra</div>
-  <div class="flex-1 h-px bg-gray-400/30" />
-</div>
-
-<!--
-七个月之后，九月三号，OpenAI 发布新一代模型 Astra。他们的总裁 Greg Brockman 在媒体会上说了一句话，说他个人认为我们已经到了 AGI，
-
-[click] 然后用一句 Welcome to the AGI era 结束了整场发布。
-
-这句话争议很大，我不打算在这里下判断。但你们要注意，说这话的人，是掌握全部内部数据的人。
--->
-
----
-
-# 我自己的 AI Coding 经历
-
-<div class="text-xs opacity-55 -mt-2 mb-4">
-2023 年底 → 2026 下半年
-</div>
-
-<div grid="~ cols-4 gap-4 items-start" class="mt-14">
-<div class="mt-24 p-5 rounded border border-gray-400/25 bg-gray-400/5">
-<div class="text-xs font-bold tracking-wide opacity-45">2023 年底</div>
-<div class="mt-2 text-lg font-bold opacity-70">插件辅助</div>
-<div class="mt-2 text-sm leading-relaxed opacity-60">通义灵码等 IDE 插件；AI 做片段级代码推荐与补全</div>
-</div>
-<div class="mt-16 p-5 rounded border border-gray-400/25 bg-gray-400/5">
-<div class="text-xs font-bold tracking-wide opacity-45">2025 下半年</div>
-<div class="mt-2 text-lg font-bold opacity-70">AI IDE</div>
-<div class="mt-2 text-sm leading-relaxed opacity-60">Cursor、Qoder：<br>AI 做多文件级编辑与修改</div>
-</div>
-<div class="mt-8 p-5 rounded border border-gray-400/25 bg-gray-400/5">
-<div class="text-xs font-bold tracking-wide opacity-45">2026 上半年</div>
-<div class="mt-2 text-lg font-bold opacity-70">SPEC 驱动</div>
-<div class="mt-2 text-sm leading-relaxed opacity-60">编制 SPEC，AI 执行，<br>人机协同 review</div>
-</div>
-<div class="p-5 rounded border border-teal-500/40 bg-teal-500/10">
-<div class="flex items-center justify-between gap-2">
-<div class="text-xs font-bold tracking-wide text-teal-700 dark:text-teal-300">2026 下半年</div>
-<div class="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-700 dark:text-teal-300">现在</div>
-</div>
-<div class="mt-2 text-lg font-bold">设计主导</div>
-<div class="mt-2 text-sm leading-relaxed opacity-80">人基本不再 review 代码，重心转向确认设计方案</div>
-</div>
-</div>
-
-<div class="absolute bottom-10 left-14 right-14 text-center text-sm">
-<span class="opacity-55">这几年，我的重心逐级上移：</span>从<b>「写代码」</b>，到<b class="text-teal-700 dark:text-teal-300">「定方案」</b>。
-</div>
-
----
-
-# SPEC 样例 · 一份可执行的规格
-
-<div class="-mt-2 mb-4 flex items-center gap-2 text-xs">
-<span class="px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 font-bold">SPEC 驱动</span>
-<span class="opacity-55">一次真实会话：澄清问题 → 实施顺序 → 验证方案</span>
-</div>
-
-<img src="/images/ch00/spec-driven-coding-sample.png" class="block mx-auto max-h-96 rounded shadow-lg" />
-
----
-
-# 设计文档样例 · 后端
-
-<div class="-mt-2 mb-4 flex items-center gap-2 text-xs">
-<span class="px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 font-bold">设计主导</span>
-<span class="opacity-55">编号、关联文档、定位对比——先写成可评审的文档，再动手</span>
-</div>
-
-<img src="/images/ch00/backend-design-document-sample.png" class="block mx-auto max-h-96 rounded shadow-lg" />
-
----
-
-# 设计文档样例 · 前端
-
-<div class="-mt-2 mb-4 flex items-center gap-2 text-xs">
-<span class="px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 font-bold">设计主导</span>
-<span class="opacity-55">页面定位、布局分区、组件与接口字段，逐项定稿</span>
-</div>
-
-<img src="/images/ch00/frontend-design-document-sample-1.png" class="block mx-auto max-h-96 rounded shadow-lg" />
-
----
-
-# 从文档到实现
-
-<div class="-mt-2 mb-4 flex items-center gap-2 text-xs">
-<span class="px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 font-bold">设计主导</span>
-<span class="opacity-55">把前端设计文档交给 AI 执行，界面与方案逐条对应</span>
-</div>
-
-<img src="/images/ch00/frontend-design-document-sample-2.png" class="block mx-auto max-h-96 rounded shadow-lg" />
-
----
-
-# 代码的<b class="text-teal-700 dark:text-teal-300">生成方式与生命周期</b>正在重塑
-
-<div class="text-xs opacity-55 -mt-2 mb-6">
-从人工编写到 AI 生成，从静态维护到动态演化——软件开发范式迎来历史性转折
-</div>
-
-<div grid="~ cols-3 gap-4">
-
-<div class="p-6 rounded border border-gray-400/25 bg-gray-400/5">
-<div class="text-xs tracking-widest opacity-50">核心覆盖</div>
-<div class="mt-2 text-4xl font-bold text-teal-700 dark:text-teal-300">100%</div>
-<div class="mt-2 text-sm opacity-60">一切皆代码</div>
-</div>
-
-<div class="p-6 rounded border border-gray-400/25 bg-gray-400/5">
-<div class="text-xs tracking-widest opacity-50">生成变革</div>
-<div class="mt-2 text-4xl font-bold text-teal-700 dark:text-teal-300">AI First</div>
-<div class="mt-2 text-sm opacity-60">智能驱动创作</div>
-</div>
-
-<div class="p-6 rounded border border-gray-400/25 bg-gray-400/5">
-<div class="text-xs tracking-widest opacity-50">生命周期</div>
-<div class="mt-2 text-4xl font-bold text-teal-700 dark:text-teal-300">Dynamic</div>
-<div class="mt-2 text-sm opacity-60">持续自我演化</div>
-</div>
-
-</div>
-
-<div grid="~ cols-2 gap-4" class="mt-5">
-
-<div class="py-6 px-5 rounded border border-gray-400/25 bg-gray-400/5">
-<div class="text-xl font-bold mb-4">代码生成方式的革命</div>
-<div class="space-y-3">
-<div class="flex items-center gap-2 text-sm">
-<span class="px-1.5 py-1 rounded text-[10px] font-bold bg-teal-500/15 text-teal-700 dark:text-teal-300 shrink-0">过去</span>
-<span class="opacity-75">开发者逐行编写，依赖经验与记忆</span>
-</div>
-<div class="flex items-center gap-2 text-sm">
-<span class="px-1.5 py-1 rounded text-[10px] font-bold bg-teal-500/15 text-teal-700 dark:text-teal-300 shrink-0">现在</span>
-<span class="opacity-75">AI 理解意图，自动生成高质量代码</span>
-</div>
-<div class="flex items-center gap-2 text-sm">
-<span class="px-1.5 py-1 rounded text-[10px] font-bold bg-teal-500/15 text-teal-700 dark:text-teal-300 shrink-0">未来</span>
-<span class="opacity-75" v-mark.underline.orange="3">自然语言即代码，想法瞬间实现</span>
-</div>
-</div>
-</div>
-
-<div class="py-6 px-5 rounded border border-gray-400/25 bg-gray-400/5">
-<div class="text-xl font-bold mb-4">代码生命周期的重构</div>
-<div class="space-y-3">
-<div class="flex items-center gap-2 text-sm">
-<span class="px-1.5 py-1 rounded text-[10px] font-bold bg-teal-500/15 text-teal-700 dark:text-teal-300 shrink-0">过去</span>
-<span class="opacity-75">编写 → 测试 → 部署 → 维护（线性流程）</span>
-</div>
-<div class="flex items-center gap-2 text-sm">
-<span class="px-1.5 py-1 rounded text-[10px] font-bold bg-teal-500/15 text-teal-700 dark:text-teal-300 shrink-0">现在</span>
-<span class="opacity-75">AI 生成 → 自动测试 → 智能修复 → 持续优化</span>
-</div>
-<div class="flex items-center gap-2 text-sm">
-<span class="px-1.5 py-1 rounded text-[10px] font-bold bg-teal-500/15 text-teal-700 dark:text-teal-300 shrink-0">未来</span>
-<span class="opacity-75">代码自主进化，系统自我完善</span>
-</div>
-</div>
-</div>
-
-</div>
-
----
-layout: center
-class: text-center
----
-
-# 归结起来，只有一个结论
-
-<div class="mt-8 mb-6 p-6 rounded-lg border-2 border-rose-500/40 bg-rose-500/5 max-w-4xl mx-auto">
-
-<div class="text-2xl font-bold leading-relaxed">
-AI 的代码生成速度<span class="text-rose-600 dark:text-rose-400">远胜</span>人类，<br>代码质量也已<span class="text-rose-600 dark:text-rose-400">超过</span>许多初级甚至中级开发者。
-</div>
-
-<div class="mt-3 text-lg opacity-80">
-代码生成不再是人类的比较优势。
-</div>
-
-</div>
-
-<div v-click class="p-5 rounded-lg border-2 border-teal-500/40 bg-teal-500/5 max-w-4xl mx-auto">
-
-<div class="text-xs tracking-widest opacity-60 mb-2">边　界</div>
-
-<div class="text-xl leading-relaxed">
-AI 接管的是「<span class="font-bold">把方案变成代码</span>」，<br>
-人该练的是「<span class="font-bold text-teal-700 dark:text-teal-300">把问题变成方案</span>」
-</div>
-
-</div>
-
-<!--
-从这些事里我只提一个结论：在代码生成这件事上，AI 已经领先——速度远胜人类，代码质量也超过了许多初级甚至中级开发者。这一点上，我不跟你们绕弯子。
-
-[click] 但请你们把第二句话也记住：被 AI 接管的，是"把方案变成代码"这一整段执行工作——从生成到测试、修复；而"把问题变成方案"，才是你们要练的东西。
-
-这两句话中间的差别，就是我今天要讲的全部东西。如果你只记住第一句，你会得出"这门课没用"的结论；把第二句也想清楚，你会得出完全相反的结论。
--->
-
----
-
-# 「复现」归零，「理解与判断」升值
-
-<div grid="~ cols-2 gap-6" class="mt-6">
-
-<div class="p-5 rounded-lg border border-rose-500/30 bg-rose-500/5 flex flex-col">
-  <div class="text-xs tracking-widest opacity-60 mb-3">表述一</div>
-  <div class="text-lg leading-relaxed flex-1">
-    能背出红黑树 <code>rotateLeft</code> 的 12 行实现
-  </div>
-  <div class="mt-4 pt-3 border-t border-rose-500/20 text-3xl font-bold text-rose-600 dark:text-rose-400">
-    归零
-  </div>
-</div>
-
-<div v-click class="p-5 rounded-lg border border-teal-500/30 bg-teal-500/5 flex flex-col">
-  <div class="text-xs tracking-widest opacity-60 mb-3">表述二</div>
-  <div class="text-lg leading-relaxed flex-1">
-    知道存在一类结构可在 <span class="font-bold">O(log n)</span> 内维持有序性，并知道它与<span class="font-bold">跳表、B+ 树、哈希表</span>在什么场景下互相替代
-  </div>
-  <div class="mt-4 pt-3 border-t border-teal-500/20 text-3xl font-bold text-teal-600 dark:text-teal-400">
-    升值
-  </div>
-</div>
-
-</div>
-
-<div v-click class="mt-6 text-center text-lg">
-
-这两条之间的差别，就是<span v-mark.underline.orange="3">本课程内容重构的边界线</span>。
-
-</div>
-
-<!--
-刚才说的那条边界，用红黑树看得更清楚——归零的是"复现"，不是红黑树本身。
-
-你看这两句话。第一句：能背出 rotateLeft 那十二行——归零，彻底归零。
-
-[click] 第二句：你知道有这么一类结构，能用 O(log n) 的代价维持有序性，而且你知道它跟跳表、跟 B+ 树、跟哈希表在什么情况下可以互相换——这一句，升值。
-
-[click] 这两句话看起来讲的是同一个东西，其实差别巨大。这条界线，就是我这学期重新排课程内容的依据。
-
-最后补一个口径：归零的是"把复现当本事"；"当练法"，复现没有归零——亲手实现一遍，正是理解与判断的地基。这点澄清二会展开。
--->
-
----
-
-# 五条理由，说明「理解与判断」为何升值
-
-<div class="mt-8 space-y-3">
-
-<div v-click="1" class="flex items-center gap-5 p-3.5 rounded-lg border border-teal-500/25 bg-teal-500/5">
-  <div class="text-2xl font-bold text-teal-600 dark:text-teal-400 w-8">①</div>
-  <div class="flex-1"><span class="font-bold">技术史规律</span>　抽象层的知识存亡机制</div>
-</div>
-
-<div v-click="2" class="flex items-center gap-5 p-3.5 rounded-lg border border-teal-500/25 bg-teal-500/5">
-  <div class="text-2xl font-bold text-teal-600 dark:text-teal-400 w-8">②</div>
-  <div class="flex-1"><span class="font-bold">表达精度</span>　概念词汇是与 AI 沟通的接口</div>
-</div>
-
-<div v-click="3" class="flex items-center gap-5 p-3.5 rounded-lg border border-teal-500/25 bg-teal-500/5">
-  <div class="text-2xl font-bold text-teal-600 dark:text-teal-400 w-8">③</div>
-  <div class="flex-1"><span class="font-bold">判断与取舍</span>　AI 的失效模式是「正确但不合适」</div>
-</div>
-
-<div v-click="4" class="flex items-center gap-5 p-3.5 rounded-lg border border-teal-500/25 bg-teal-500/5">
-  <div class="text-2xl font-bold text-teal-600 dark:text-teal-400 w-8">④</div>
-  <div class="flex-1"><span class="font-bold">决策杠杆</span>　产出规模放大骨架决策的代价</div>
-</div>
-
-<div v-click="5" class="flex items-center gap-5 p-3.5 rounded-lg border border-teal-500/25 bg-teal-500/5">
-  <div class="text-2xl font-bold text-teal-600 dark:text-teal-400 w-8">⑤</div>
-  <div class="flex-1"><span class="font-bold">领域事实</span>　AI 系统本身由数据结构构成</div>
-</div>
-
-</div>
-
-<!--
-接下来我用五条理由来论证。
-
-[click] 第一条是技术史的规律，
-[click] 第二条是你怎么跟 AI 说话，
-[click] 第三条是我自己项目里踩的一个坑，
-[click] 第四条讲为什么 AI 写得越快人的判断越贵，
-[click] 第五条讲 AI 系统本身是用什么搭起来的。
-
-走完这五条，我们再回来谈这学期到底怎么上。
--->
-
----
-
-# 真问题不是「AI 能力有多强？」
-
-<div class="mt-8 max-w-4xl mx-auto">
-
-<div class="p-4 rounded-lg border border-gray-400/25 bg-gray-500/5 opacity-55">
-  <div class="text-xs tracking-widest mb-2">不是问题</div>
-  <div class="text-xl line-through decoration-2">AI 的能力到底有多强？</div>
-  <div class="text-xs mt-2">——它在快速进化：Agent 能力约每 7 个月翻一番（METR · Nature 报道）</div>
-</div>
-
-<div class="text-center text-2xl my-4 opacity-30">↓</div>
-
-<div v-click class="p-6 rounded-lg border-2 border-teal-500/40 bg-teal-500/5">
-  <div class="text-xs tracking-widest opacity-60 mb-3">真问题（一个技术史问题）</div>
-  <div class="text-2xl font-bold leading-relaxed">
-    抽象层每上升一次，都会消灭一批知识。<br>
-    <span class="text-teal-700 dark:text-teal-300">哪些会被吃掉？哪些不会？</span>
-  </div>
-</div>
-
-<div v-click class="mt-5 text-center text-sm opacity-75">
-这个问题有答案——因为它在我们这个专业里，已经发生过至少<span class="font-bold">三次</span>。
-</div>
-
-</div>
-
-<UnitNav :active="1" />
-
-<!--
-现在网上讨论 AI，绝大多数在争"AI 到底强不强"。我认为这是个假问题——答案的保质期太短。2025 年 3 月，Nature 报道了非营利机构 METR 的"智能体摩尔定律"：Agent 能力大约每 7 个月翻一番。你今天给出的任何答案，几个月后都会过时。
-
-[click] 真问题是一个技术史问题：**抽象层每往上升一次，都会消灭一批知识。哪些会被吃掉，哪些不会？**
-
-[click] 这个问题有答案，因为这件事在我们这个专业里已经发生过至少三次了，而且三次的答案惊人地一致。
--->
-
----
-
-# 三次历史跃迁的对照
-
-<div class="mt-5 text-sm">
-
-<div class="flex gap-4 pb-2 mb-1 border-b border-gray-400/30 text-xs tracking-wide opacity-60">
-  <div class="w-52 shrink-0">抽象层跃迁</div>
-  <div class="flex-1">被吃掉的知识</div>
-  <div class="flex-1">存活并升值的知识</div>
-</div>
-
-<div v-click="1" class="flex gap-4 py-2.5 border-b border-gray-400/15">
-  <div class="w-52 shrink-0 font-bold">汇编 → C<span class="opacity-50 font-normal">（编译器）</span></div>
-  <div class="flex-1 text-rose-600 dark:text-rose-400">手写汇编、手工分配寄存器</div>
-  <div class="flex-1 text-teal-700 dark:text-teal-300">内存布局、cache 局部性、指令代价</div>
-</div>
-
-<div v-click="2" class="flex gap-4 py-2.5 border-b border-gray-400/15">
-  <div class="w-52 shrink-0 font-bold">手动内存 → GC</div>
-  <div class="flex-1 text-rose-600 dark:text-rose-400"><code>malloc/free</code> 配对管理</div>
-  <div class="flex-1 text-teal-700 dark:text-teal-300">对象生命周期、GC 停顿调优、泄漏定位</div>
-</div>
-
-<div v-click="3" class="flex gap-4 py-2.5 border-b border-gray-400/15">
-  <div class="w-52 shrink-0 font-bold">裸写 → 框架</div>
-  <div class="flex-1 text-rose-600 dark:text-rose-400">样板代码、胶水代码</div>
-  <div class="flex-1 text-teal-700 dark:text-teal-300">数据流边界、状态归属、一致性模型</div>
-</div>
-
-<div v-click="4" class="flex gap-4 py-3 mt-1 rounded bg-amber-500/10 border border-amber-500/30">
-  <div class="w-52 shrink-0 font-bold pl-2">人写 → AI 生成</div>
-  <div class="flex-1 text-3xl font-bold text-amber-600 dark:text-amber-400 leading-none">？</div>
-  <div class="flex-1 text-3xl font-bold text-amber-600 dark:text-amber-400 leading-none">？</div>
-</div>
-
-</div>
-
-<div v-click="5" class="mt-4 text-center text-sm opacity-70">
-每一次跃迁，都是<span class="text-rose-600 dark:text-rose-400 font-bold">一批知识死</span>、<span class="text-teal-700 dark:text-teal-300 font-bold">一批知识变贵</span>
-</div>
-
-<UnitNav :active="1" />
-
-<!--
-我们一行一行看。
-
-[click] 第一行，编译器。编译器出来之后，绝大多数人不再手写汇编了。今天没人会因为不会手写汇编而找不到工作。**但是**——理解内存布局、理解 cache 局部性、理解一条指令要花多少代价的人，价值反而上去了。为什么？你们想一下：所有的性能问题、所有的并发 bug、所有的内存故障，恰好都发生在抽象漏水的地方。抽象没漏的时候你不用懂，抽象一漏，只有懂的人能救。
-
-[click] 第二行，垃圾回收。GC 出来之后，你不用再手动 free 了，malloc/free 配对这件事从大部分人的日常里消失了。但是 GC 停顿怎么调？内存为什么还在涨？这个对象什么时候该断引用？GC 不替你想，它只在你想错的时候让你的服务卡住两秒。
-
-[click] 第三行，框架。框架出来之后，样板代码没了，胶水代码没了。但"这个状态该归哪个模块""这两个模块之间数据流的边界在哪"——框架给不了你答案。
-
-[click] 现在看第四行。人写代码 → AI 生成代码。两个问号。这是我们今天要填的空。
--->
-
----
-layout: center
-class: text-center
----
-
-# 三次跃迁，一条规律
-
-<div class="mt-10 space-y-5 max-w-3xl mx-auto">
+`姓名` 在学籍系统里不可分；国际化系统里要拆成 `姓`/`名` 两项。
 
-<div class="p-6 rounded-lg border-2 border-rose-500/35 bg-rose-500/5">
-  <div class="text-3xl font-bold">
-    抽象<span class="text-rose-600 dark:text-rose-400">封得住</span>的地方，知识会<span class="text-rose-600 dark:text-rose-400">死</span>。
-  </div>
 </div>
-
-<div v-click class="p-6 rounded-lg border-2 border-teal-500/35 bg-teal-500/5">
-  <div class="text-3xl font-bold">
-    抽象<span class="text-teal-600 dark:text-teal-400">漏水</span>的地方，知识不死，<br>而且<span class="text-teal-600 dark:text-teal-400">变贵</span>。
-  </div>
-</div>
-
-</div>
-
-<div v-click class="mt-5 text-sm opacity-80">
-例：<span class="font-mono">0.1 + 0.2 = 0.30000000000000004</span>——连"数字"这层最基础的抽象，也在漏水。
-</div>
-
-<div v-click class="mt-4 text-sm opacity-70">
-所以要填第四行那两个问号，只需回答一件事：<span class="font-bold">AI 这层抽象，漏不漏？漏在哪儿？</span>
-</div>
-
-<UnitNav :active="1" />
-
-<!--
-三次跃迁，一条规律：**抽象封得住的地方，知识会死；**
-
-[click] **抽象漏水的地方，知识不死，而且变贵。**
-
-这句话请记一下，今天后面我会至少回到它三次。
-
-[click] 什么叫漏水？举一个你们现在就能亲手验证的例子：在浏览器控制台或者 Python 里输入 0.1 + 0.2——它不等于 0.3，等于 0.30000000000000004。"数字"，我们从小学信到大的这层抽象，也在漏。漏出来的是什么？浮点表示、二进制转换这些底层知识——抽象一漏，只有懂的人能救。
-
-[click] 因为要填第四行那两个问号，唯一的办法就是搞清楚一件事：AI 这层抽象，漏不漏？漏在哪儿？
-
-我不跟你们空谈，接下来我们做实验、看案例。
--->
-
----
-
-# 第四行的答案
-
-<div class="mt-8 flex gap-6">
-
-<div class="w-38 shrink-0 flex items-center">
-  <div class="p-4 rounded bg-amber-500/10 border border-amber-500/30 text-center w-full">
-    <div class="text-xs opacity-60 mb-1">抽象层跃迁</div>
-    <div class="font-bold">人写<br>↓<br>AI 生成</div>
-  </div>
-</div>
-
-<div class="flex-1 p-5 rounded-lg border border-rose-500/30 bg-rose-500/5">
-  <div class="text-xs tracking-widest opacity-60 mb-4">被吃掉的</div>
-  <div class="space-y-3 text-[15px]">
-    <div>语法细节</div>
-    <div>API 记忆</div>
-    <div>样板与模板代码</div>
-    <div>标准算法的手写实现</div>
-    <div>跨语言翻译</div>
-    <div>测试骨架</div>
-  </div>
-</div>
-
-<div v-click class="flex-1 p-5 rounded-lg border-2 border-teal-500/40 bg-teal-500/5">
-  <div class="text-xs tracking-widest opacity-60 mb-4">存活并升值的</div>
-  <div class="space-y-3 text-[15px]">
-    <div><span class="font-bold text-teal-600 dark:text-teal-400">①</span> 把模糊需求翻译成<span class="font-bold">带约束的规格说明</span></div>
-    <div><span class="font-bold text-teal-600 dark:text-teal-400">②</span> 数据结构与复杂度<span class="font-bold">选型</span></div>
-    <div><span class="font-bold text-teal-600 dark:text-teal-400">③</span> 对 AI 产出做<span class="font-bold">高密度验证</span></div>
-    <div><span class="font-bold text-teal-600 dark:text-teal-400">④</span> 系统级<span class="font-bold">取舍</span><span class="block text-xs opacity-70 mt-0.5 pl-5">（时间／空间／一致性／成本／可维护性）</span></div>
-    <div><span class="font-bold text-teal-600 dark:text-teal-400">⑤</span> 抽象漏水时的<span class="font-bold">故障定位</span></div>
-  </div>
-</div>
-
-</div>
-
-<UnitNav :active="1" />
-
-<!--
-我先把我的答案摆出来，然后用剩下的时间证明它。
-
-左边这一列，被吃掉的：语法细节、API 记忆、样板代码、标准算法的手写实现、跨语言翻译、测试骨架。这些我认，全部认。
-
-[click] 右边这一列，我认为不但没死，而且变贵了：第一，把一个模糊的需求翻译成带约束的规格说明；第二，数据结构和复杂度的选型；第三，对 AI 产出的高密度验证；第四，系统级的取舍；第五，抽象漏水时候的故障定位。
-
-[click] 接下来我们一条一条地证：先证第一条，再证后面四条。
--->
-
----
-layout: center
-class: text-center
----
-
-# 一个命题
-
-<div class="mt-10 p-8 rounded-lg border-2 border-teal-500/40 bg-teal-500/5 max-w-4xl mx-auto">
-
-<div class="text-3xl font-bold leading-relaxed">
-你能向 AI 表达的<span class="text-teal-700 dark:text-teal-300">精度上限</span><br>
-=<br>
-你掌握的<span class="text-teal-700 dark:text-teal-300">概念精度上限</span>
-</div>
-
-</div>
-
-<div v-click class="mt-8 text-lg opacity-75">
-你没有的概念，一个字也表达不出来。
-</div>
-
-<UnitNav :active="2" />
-
-<!--
-这一节我要证明一个命题：**你能向 AI 表达的精度上限，等于你自己掌握的概念精度上限。**
-
-[click] 你没有的概念，一个字也表达不出来。
--->
-
----
-
-# 对照实验：同一需求，两组 prompt
-
-<div class="mt-3 flex items-start gap-2 text-xs leading-relaxed opacity-80">
-  <span class="px-2 py-0.5 rounded bg-gray-500/15 font-bold shrink-0">场景</span>
-  <div>给网络爬虫做 URL 去重——每次从待抓队列取出 URL，抓之前先判断它是否已经抓过。<br>把已经抓过的当成没抓过，就会重复抓取、甚至陷入死循环；而队列里的 URL 还在源源不断地来。</div>
-</div>
-
-<div grid="~ cols-2 gap-6" class="mt-4">
-
-<div class="p-4 rounded-lg border border-gray-400/30 bg-gray-500/5">
-  <div class="text-xs tracking-widest opacity-60 mb-3">PROMPT A</div>
-  <div class="font-mono text-base leading-relaxed">
-    写个函数，判断一个列表里有没有重复元素。
-  </div>
-  <div class="mt-6 pt-3 border-t border-gray-400/20 text-xs opacity-50">
-    约 90% 的人会这样问
-  </div>
-</div>
-
-<div v-click class="p-4 rounded-lg border-2 border-teal-500/40 bg-teal-500/5">
-  <div class="text-xs tracking-widest opacity-60 mb-3">PROMPT B</div>
-  <div class="font-mono text-sm leading-relaxed">
-    判断 <span class="bg-amber-400/25 rounded px-1">10^7 个 64 位整数</span>中是否存在重复。<br>
-    约束：数据<span class="bg-amber-400/25 rounded px-1">流式到达，只允许单遍扫描</span>；<br>
-    进程<span class="bg-amber-400/25 rounded px-1">内存上限 100MB</span>；<br>
-    可容忍 <span class="bg-amber-400/25 rounded px-1">0.1% 假阳性</span>，<br>
-    但<span class="bg-amber-400/25 rounded px-1">不允许假阴性</span>。
-  </div>
-  <div class="mt-3 pt-3 border-t border-teal-500/20 text-xs opacity-60">
-    同一个需求，换了一种说法 · 高亮处共 <span class="font-bold">5</span> 个约束成分
-  </div>
-</div>
-
-</div>
-
-<div v-click class="mt-6 text-center text-xl font-bold">
-你们觉得这两个 prompt，AI 会给出<span v-mark.circle.orange="3">同一个答案</span>吗？
-</div>
-
-<UnitNav :active="2" />
-
-<!--
-先交代这个实验的需求场景：网络爬虫的 URL 去重。爬虫从待抓队列里一条条取出 URL，抓之前先判断：这个 URL 之前是不是已经抓过？把抓过的当成没抓过，就会重复抓取，顺着环状链接还会陷入死循环——而队列里的 URL 是源源不断进来的。
-
-面对同一个场景，我准备了两段 prompt，问的是同一件事：判断有没有重复元素。
-
-第一段，Prompt A，我猜是你们百分之九十的人会写的那种：「写个函数，判断一个列表里有没有重复元素。」——不懂数据结构的人，看到这个爬虫场景，能写出来的也只有这一句。
-
-[click] 第二段，Prompt B，是一位高阶开发者会写出来的。同一个场景，他先把需求提炼成几个问题，再逐条落实：规模多少？——千万级；数据怎么来？——流式到达，只能顺着过一遍；内存给多少？——这个模块的预算是一百兆；判错了会怎样？——抓过的绝不能漏，漏一个就会重复抓取、甚至死循环；没抓过的误判无所谓，不过是少抓一个页面，千分之一以内可以接受。把这五条翻译成约束词，就是这段 prompt：「判断一千万个 64 位整数里有没有重复。约束：数据是流式到达的，只允许单遍扫描；进程内存上限一百兆；可以容忍千分之一的假阳性，但不允许假阴性。」
-
-[click] 先别看答案。我问你们一个问题——你们觉得这两个 prompt，AI 会给出同一个答案吗？
-
-（举手，等 10 秒）好，我们看。
--->
-
----
-layout: full
-class: px-10 py-6
----
-
-<div class="flex items-center gap-3 mb-3">
-  <div class="text-2xl font-bold">实验结果</div>
-  <div class="text-xs opacity-50">同一个 AI · 同一天 · 间隔不到一分钟</div>
-</div>
-
-<div grid="~ cols-2 gap-5">
-
-<div>
-  <div class="flex items-baseline gap-2 mb-1.5">
-    <span class="text-xs px-2 py-0.5 rounded bg-gray-500/15 font-bold">A</span>
-    <span class="text-sm font-bold">set 去重比长度</span>
-    <span class="text-xs opacity-60">空间约 600 MB</span>
-  </div>
-  <img src="/images/ch00/demo_prompt_a_response.png" class="rounded border border-gray-400/20 shadow" />
-</div>
-
-<div>
-  <div class="flex items-baseline gap-2 mb-1.5">
-    <span class="text-xs px-2 py-0.5 rounded bg-teal-500/20 text-teal-700 dark:text-teal-300 font-bold">B</span>
-    <span class="text-sm font-bold">Bloom filter</span>
-    <span class="text-xs opacity-60">空间 17.1 MB</span>
-  </div>
-  <img src="/images/ch00/demo_prompt_b_response_crop.png" class="rounded border border-teal-500/25 shadow" />
-</div>
-
-</div>
-
-<div v-click="1" class="mt-5 text-center">
-  <div class="text-2xl font-bold">AI 在这两次里，有哪一次<span v-mark.circle.red="2">答错了</span>吗？</div>
-</div>
-
-<div v-click="3" class="mt-4 flex items-center justify-center gap-8">
-  <div class="text-3xl font-bold text-teal-600 dark:text-teal-400">没有。两次都对。</div>
-  <div class="text-4xl font-black">差别 <span class="text-rose-600 dark:text-rose-400">100%</span> 来自提问的人。</div>
-</div>
-
-<UnitNav :active="2" />
-
-<!--
-左边，Prompt A 的回答。三行，一个 set，转成集合比长度。干净、正确、可读。
-
-右边，Prompt B 的回答。它给了我一个 Bloom filter，位数组开多大、用几个哈希函数、假阳性率怎么控制，全都算了出来。注意它自己列的方案表——HashSet 那一行，它算的是超过 160 兆。这个数字我们下一页会自己推一遍。
-
-同一个 AI，同一天，间隔不到一分钟。
-
-[click] 现在我问一个关键问题，你们认真想三秒钟：**AI 在这两次里面，有哪一次答错了吗？**
-
-[click] （停，等学生答）
-
-[click] 没有。两次都是对的。Prompt A 那三行代码，在"一个列表、几百个元素"这个语境下，是最优解，我挑不出毛病。
-
-所以差别在哪儿？**百分之百在提问的人身上。**
-
-这一点我希望你们今天带走。你们以为我要讲"AI 不行、所以还得靠你们"——不是。我要讲的是：**AI 全对，问题在你。** 这比"AI 不行"可怕得多，因为"AI 不行"是它的问题，会随着版本迭代解决；"你不知道该问什么"是你的问题，不会随着任何模型升级而自动解决。
--->
-
----
-
-# 五个约束词，各锁掉了什么
-
-<div class="mt-5 text-sm">
-
-<div class="flex gap-4 pb-2 mb-1 border-b border-gray-400/30 text-xs tracking-wide opacity-60">
-  <div class="w-56 shrink-0">约束词</div>
-  <div class="flex-1">锁定的技术决策</div>
-  <div class="w-40 shrink-0">对应课程内容</div>
-</div>
-
-<div v-click="1" class="flex gap-4 py-2.5 border-b border-gray-400/15 items-center">
-  <div class="w-56 shrink-0 font-mono text-xs bg-amber-400/20 rounded px-2 py-1">10^7 个 64 位整数</div>
-  <div class="flex-1">数据量级 → 排除 <span class="font-bold">O(n²)</span></div>
-  <div class="w-40 shrink-0 text-xs opacity-70">复杂度分析</div>
-</div>
-
-<div v-click="2" class="flex gap-4 py-2.5 border-b border-gray-400/15 items-center">
-  <div class="w-56 shrink-0 font-mono text-xs bg-amber-400/20 rounded px-2 py-1">流式到达、单遍扫描</div>
-  <div class="flex-1">访问模式 → 排除排序、排除随机访问</div>
-  <div class="w-40 shrink-0 text-xs opacity-70">线性表</div>
-</div>
-
-<div v-click="3" class="flex gap-4 py-2.5 border-b border-gray-400/15 items-center">
-  <div class="w-56 shrink-0 font-mono text-xs bg-amber-400/20 rounded px-2 py-1">内存上限 100MB</div>
-  <div class="flex-1">空间预算 → 排除<span class="font-bold text-rose-600 dark:text-rose-400">全部精确去重结构</span></div>
-  <div class="w-40 shrink-0 text-xs opacity-70">空间复杂度、散列</div>
-</div>
-
-<div v-click="4" class="flex gap-4 py-2.5 border-b border-gray-400/15 items-center">
-  <div class="w-56 shrink-0 font-mono text-xs bg-amber-400/20 rounded px-2 py-1">容忍 0.1% 假阳性</div>
-  <div class="flex-1">允许近似 → <span class="font-bold text-teal-700 dark:text-teal-300">打开概率型结构的可行域</span></div>
-  <div class="w-40 shrink-0 text-xs opacity-70">散列／Bloom filter</div>
-</div>
-
-<div v-click="5" class="flex gap-4 py-2.5 border-b border-gray-400/15 items-center">
-  <div class="w-56 shrink-0 font-mono text-xs bg-amber-400/20 rounded px-2 py-1">不允许假阴性</div>
-  <div class="flex-1">误差单边 → <span class="font-bold text-teal-700 dark:text-teal-300">精确指向 Bloom filter</span></div>
-  <div class="w-40 shrink-0 text-xs opacity-70">散列</div>
-</div>
-
-</div>
-
-<div v-click="6" class="mt-5 text-center text-lg">
-五个词，<span v-mark.underline.orange="6">全部来自这门课的词汇表</span>。
-</div>
-
-<UnitNav :active="2" />
-
-<!--
-我们把 Prompt B 拆开，看我到底用了哪些词。
-
-[click] 第一个，"一千万个 64 位整数"。这是数据量级。这个词一说出口，所有 O(n²) 的方案当场出局——双重循环在一千万上要跑十的十四次方次，跑到明年。
-
-[click] 第二个，"流式到达、只允许单遍扫描"。这是访问模式。这个词一出，排序类方案出局了，因为排序要么得把数据全拿到手，要么得多趟 I/O；随机访问的方案也出局了。
-
-[click] 第三个，"内存上限一百兆"。这个我们下一页详细算。
-
-[click] 正因为精确方案全灭，第四个词才有意义——"可以容忍千分之一的假阳性"。这一句话打开了一个全新的可行域：概率型结构。
-
-[click] 第五个词，"不允许假阴性"。这是给误差指方向：允许我把没见过的说成见过，不允许我把见过的说成没见过。这个单边性一说出来，答案就唯一了，就是 Bloom filter。
-
-[click] 现在你回头看这五个词——数据量级、单遍扫描、内存上限、假阳性、假阴性——**五个词，全部来自这门课的词汇表。**
--->
-
----
-
-# 内存预算核算 · 上限 100MB
-
-<div class="mt-4 space-y-2.5 text-sm">
-
-<div class="flex items-center gap-3 text-xs">
-  <div class="w-56 shrink-0" />
-  <div class="flex-1 relative h-4">
-    <div class="absolute inset-y-0 left-0 border-r-2 border-dashed border-rose-500/60 flex items-end justify-end pr-1" style="width: 16.67%">
-      <span class="font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">100MB 预算线</span>
-    </div>
-  </div>
-  <div class="w-60 shrink-0" />
-</div>
-
-<div v-click="1" class="flex items-center gap-3">
-  <div class="w-56 shrink-0 text-right">裸数据本身 <span class="text-xs opacity-60">8 B／元素</span></div>
-  <div class="flex-1 relative h-7">
-    <div class="absolute inset-y-0 left-0 border-r-2 border-dashed border-rose-500/40 bg-rose-500/5" style="width: 16.67%" />
-    <div class="absolute inset-y-0 left-0 rounded-r bg-gray-400/50" style="width: 13.3%" />
-  </div>
-  <div class="w-60 shrink-0 flex items-center gap-2">
-    <span class="font-mono">80 MB</span>
-    <span class="text-xs px-1.5 py-0.5 rounded bg-gray-500/15 opacity-80">不是可查询结构</span>
-  </div>
-</div>
-
-<div v-click="2" class="flex items-center gap-3">
-  <div class="w-56 shrink-0 text-right">最紧凑的开放地址哈希表 <span class="text-xs opacity-60">16 B</span></div>
-  <div class="flex-1 relative h-7">
-    <div class="absolute inset-y-0 left-0 border-r-2 border-dashed border-rose-500/40 bg-rose-500/5" style="width: 16.67%" />
-    <div class="absolute inset-y-0 left-0 rounded-r bg-rose-500/50" style="width: 26.7%" />
-  </div>
-  <div class="w-60 shrink-0 flex items-center gap-2">
-    <span class="font-mono font-bold">160 MB</span>
-    <span class="text-xs px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 dark:text-rose-300 font-bold">超 · 已是理论下限</span>
-  </div>
-</div>
-
-<div v-click="3" class="flex items-center gap-3">
-  <div class="w-56 shrink-0 text-right">C++ <code class="text-xs">unordered_set</code> <span class="text-xs opacity-60">≈25 B</span></div>
-  <div class="flex-1 relative h-7">
-    <div class="absolute inset-y-0 left-0 border-r-2 border-dashed border-rose-500/40 bg-rose-500/5" style="width: 16.67%" />
-    <div class="absolute inset-y-0 left-0 rounded-r bg-rose-500/50" style="width: 41.7%" />
-  </div>
-  <div class="w-60 shrink-0 flex items-center gap-2">
-    <span class="font-mono font-bold">250 MB</span>
-    <span class="text-xs px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 dark:text-rose-300">超</span>
-  </div>
-</div>
-
-<div v-click="3" class="flex items-center gap-3">
-  <div class="w-56 shrink-0 text-right">Python <code class="text-xs">set</code> 存 int 对象 <span class="text-xs opacity-60">≈60 B</span></div>
-  <div class="flex-1 relative h-7">
-    <div class="absolute inset-y-0 left-0 border-r-2 border-dashed border-rose-500/40 bg-rose-500/5" style="width: 16.67%" />
-    <div class="absolute inset-y-0 left-0 rounded-r bg-rose-500/60" style="width: 100%" />
-  </div>
-  <div class="w-60 shrink-0 flex items-center gap-2">
-    <span class="font-mono font-bold">600 MB</span>
-    <span class="text-xs px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-700 dark:text-rose-300 font-bold">超 6 倍</span>
-  </div>
-</div>
-
-<div v-click="4" class="flex items-center gap-3 pt-1">
-  <div class="w-56 shrink-0 text-right font-bold">Bloom filter <span class="text-xs opacity-60 font-normal">14.4 bit ≈ 1.8 B</span></div>
-  <div class="flex-1 relative h-7">
-    <div class="absolute inset-y-0 left-0 border-r-2 border-dashed border-rose-500/40 bg-rose-500/5" style="width: 16.67%" />
-    <div class="absolute inset-y-0 left-0 rounded-r bg-teal-500/70" style="width: 3%" />
-  </div>
-  <div class="w-60 shrink-0 flex items-center gap-2">
-    <span class="font-mono font-bold text-teal-700 dark:text-teal-300">18 MB</span>
-    <span class="text-xs px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-700 dark:text-teal-300 font-bold">可行 · 用了预算 1/5</span>
-  </div>
-</div>
-
-</div>
-
-<div v-click="5" class="mt-5 text-center text-sm">
-<span class="opacity-70">精确方案全部出局，才轮到</span>「<span class="font-bold">容忍 0.1% 假阳性</span>」<span class="opacity-70">这个词发挥作用</span>
-</div>
-
-<UnitNav :active="2" />
-
-<!--
-（板书口算）一千万个整数，每个 8 字节，一乘，八千万字节，**80 兆**。一百兆够用啊，老师你是不是搞错了？
-
-[click] 没搞错。80 兆是**裸数据本身**的大小，而裸数据不是一个能做查重的结构。你要判断"来了一个数，之前见过没有"，你得有个可查询的结构。
-
-[click] 我们算最好的情况：一个最紧凑的开放地址哈希表，只存 key、不存别的，装填因子撑到 0.5，那就是每个元素 16 字节——**160 兆**，超了。这已经是理论下限了。刚才那张截图里 AI 自己算的也是 160 兆。
-
-[click] 你要是用 C++ 的 unordered_set，链地址加每节点的 malloc 开销，两百五十兆。你要是用 Python 的 set，每个整数是一个对象，二十多字节额外开销加指针加装填因子，六百兆——超了六倍。
-
-[click] Bloom filter 要多少？千分之一假阳性，每个元素大约 14.4 个比特，一千万个元素，一亿四千四百万比特，**十八兆**。一百兆的预算，用了不到五分之一。
-
-[click] 请注意这个顺序：不是我一开始就想用 Bloom filter，是因为精确方案全部出局，"容忍千分之一假阳性"这个词才有了意义。
--->
-
----
-layout: center
----
-
-# 这一节的结论
-
-<div class="mt-8 space-y-4 max-w-4xl mx-auto">
-
-<div class="p-5 rounded-lg border-2 border-amber-500/40 bg-amber-500/5">
-  <div class="text-2xl font-bold leading-relaxed">
-    缺少某个概念词，AI 会自动把对应约束<span class="text-amber-600 dark:text-amber-400">设为默认值</span>。
-  </div>
-</div>
-
-<div v-click class="p-5 rounded-lg border-2 border-rose-500/40 bg-rose-500/5">
-  <div class="text-2xl font-bold leading-relaxed">
-    被默认掉的约束<span class="text-rose-600 dark:text-rose-400">不会报错</span>，<br>
-    会在上线后以 <span class="font-mono">OOM</span>、<span class="font-mono">超时</span>、<span class="font-mono">数据倾斜</span> 的形式返还。
-  </div>
-</div>
-
-<div v-click class="p-4 rounded-lg bg-gray-500/10 border-l-4 border-gray-400">
-  <div class="text-lg">
-    这<span class="font-bold">不是</span>提示词技巧问题。<br>
-    <span class="opacity-80">提示词技巧解决不了「这个词根本不在你脑子里」。</span>
-  </div>
-</div>
-
-</div>
-
-<UnitNav :active="2" />
-
-<!--
-结论是这样：**你缺哪一个词，AI 就替你把那条约束默认掉。**
-
-[click] 而它默认掉的东西不会报错——它会给你一段能跑、能过测试、看起来还挺漂亮的代码，然后在你上线之后，以 OOM、以超时、以某个分片突然打爆的形式还给你。
-
-这里我要停一下问你们一句：**你们平时用 AI 写代码的时候，有几个人告诉过它「我的数据有多大」？** （等，观察反应）我猜很少。那就意味着，你们过去每一次都在接受它的默认假设。
-
-[click] 最后，请不要把这一节理解成"我去报个提示词课就好了"。提示词技巧能帮你把话说得更清楚，但它解决不了一件事：**那个词根本不在你脑子里。** 你想不到"假阳性"这三个字，任何提示词模板都救不了你。
--->
-
----
-
-# 课程定位之一：这首先是一门<span class="text-teal-600 dark:text-teal-400">词汇课</span>
-
-<div class="text-sm opacity-70 mt-1 mb-6">它提供一套描述<span class="font-bold">计算成本</span>的语言。</div>
-
-<div grid="~ cols-2 gap-6">
-
-<div class="p-5 rounded-lg border border-rose-500/30 bg-rose-500/5">
-  <div class="text-xs tracking-widest opacity-60 mb-3">没有这套语言</div>
-  <div class="text-lg leading-relaxed">
-    只能说「帮我写个函数」，<br>
-    <span class="font-bold text-rose-600 dark:text-rose-400">被动接受 AI 的全部默认假设</span>
-  </div>
-</div>
-
-<div v-click class="p-5 rounded-lg border-2 border-teal-500/40 bg-teal-500/5">
-  <div class="text-xs tracking-widest opacity-60 mb-3">有这套语言</div>
-  <div class="text-lg leading-relaxed">
-    能输出<span class="font-bold text-teal-700 dark:text-teal-300">规格说明</span>（specification），<br>
-    而 AI 是极高效的<span class="font-bold">规格执行器</span>
-  </div>
-</div>
-
-</div>
-
-<div v-click class="mt-8 text-center">
-  <div class="inline-flex items-center gap-4 text-2xl font-bold">
-    <span class="px-4 py-2 rounded bg-gray-500/10 opacity-60 line-through">实现者</span>
-    <span class="text-3xl opacity-40">→</span>
-    <span class="px-4 py-2 rounded bg-teal-500/15 text-teal-700 dark:text-teal-300">规格作者</span>
-  </div>
-  <div class="mt-3 text-sm opacity-60">今天第一个要记住的角色变化</div>
-</div>
-
-<UnitNav :active="2" />
-
-<!--
-所以这门课的第一重定位，是一门**词汇课**。它给你一套描述"计算成本"的语言。
-
-没有这套语言，你只能说"帮我写个函数"，然后 AI 帮你把所有你没提的事全默认掉。
-
-[click] 有了这套语言，你能写出规格说明——而 AI 恰好是这个世界上执行规格效率最高的东西。
-
-[click] **你的角色从"实现者"上移到"规格作者"。** 这是今天第一个要记的角色变化。
--->
-
----
-
-# 案例：气象网格数据 → 区县尺度聚合
-
-<div class="text-xs opacity-60 -mt-1 mb-4">案例来源：授课教师实际项目 · 不是教材例题</div>
-
-<div grid="~ cols-[1fr_1.1fr] gap-7">
-<div>
-
-**业务需求**
-
-把气象网格数据（如 0.05° 格点的降水、气温）聚合成<span class="font-bold">区县尺度</span>的统计量，用于逐日报表。
-
-<div class="mt-4 space-y-2 text-sm">
-  <div class="flex items-center gap-3 p-2 rounded bg-gray-500/8">
-    <div class="w-28 opacity-70">网格点数 N</div>
-    <div class="font-bold font-mono">数十万级</div>
-  </div>
-  <div class="flex items-center gap-3 p-2 rounded bg-gray-500/8">
-    <div class="w-28 opacity-70">区县数 M</div>
-    <div class="font-bold font-mono">约 3,000</div>
-  </div>
-  <div class="flex items-center gap-3 p-2 rounded bg-amber-500/10">
-    <div class="w-28 opacity-70">执行频次</div>
-    <div class="font-bold">逐日 × 多要素，反复执行</div>
-  </div>
-</div>
-
-</div>
-<div class="flex items-center justify-center">
-
-<svg viewBox="0 0 400 260" class="w-full max-h-56">
-  <defs>
-    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.25" />
-    </pattern>
-  </defs>
-  <rect width="400" height="260" fill="url(#grid)" />
-  <g fill="currentColor" opacity="0.3">
-    <template v-for="r in 12" :key="r">
-      <circle v-for="c in 19" :key="c" :cx="c * 20" :cy="r * 20" r="1.6" />
-    </template>
-  </g>
-  <path d="M 30 40 L 150 30 L 175 120 L 90 150 L 25 110 Z" fill="rgb(20,184,166)" fill-opacity="0.14" stroke="rgb(13,148,136)" stroke-width="2.5" />
-  <path d="M 175 120 L 150 30 L 280 45 L 310 130 L 200 165 Z" fill="rgb(244,63,94)" fill-opacity="0.12" stroke="rgb(225,29,72)" stroke-width="2.5" />
-  <path d="M 90 150 L 175 120 L 200 165 L 160 230 L 60 205 Z" fill="rgb(245,158,11)" fill-opacity="0.12" stroke="rgb(217,119,6)" stroke-width="2.5" />
-  <text x="70" y="90" style="font-size:18px" fill="rgb(13,148,136)" font-weight="bold">区县 A</text>
-  <text x="205" y="100" style="font-size:18px" fill="rgb(225,29,72)" font-weight="bold">区县 B</text>
-  <text x="100" y="190" style="font-size:18px" fill="rgb(217,119,6)" font-weight="bold">区县 C</text>
-</svg>
-
-</div>
-</div>
-
-<div class="mt-4 text-center text-sm opacity-75">
-格点与区县是<span class="font-bold">多对一</span>关系；这个归属关系<span class="font-bold">一天都不会变</span>。
-</div>
-
-<UnitNav :active="3" />
-
-<!--
-下面这个案例是我自己项目里的事，不是教材上的例题。
-
-需求很朴素：气象数据是网格的，比如 0.05 度一个格点，铺满全国。但报表要的是行政单位——每个区县今天平均降水多少、平均气温多少。所以要把网格尺度的数据聚合成区县尺度。
-
-三个数字你们记一下：网格点数十万级，区县数大概三千，而且这个事要**每天**跑、**每个要素**都跑。
-
-我把这个需求丢给 AI。
--->
-
----
-
-# AI 的初始方案
+<div class="text-sm">
 
-```python
-for 每个区县 c in 全部区县:            # 外层 M 次
-    bucket = []
-    for 每个网格点 g in 全部网格:       # 内层 N 次
-        if g 落在 c 内:                # 空间归属判断
-            bucket.append(g.value)
-    result[c] = mean(bucket)
+```c
+typedef struct {
+    char  id[13];    /* 数据项 */
+    char  name[21];  /* 数据项 */
+    char  sex;       /* 数据项 */
+    float score;     /* 数据项 */
+} Student;           /* Student 变量 = 一个数据元素 */
+Student cls[60];     /* 数据对象 */
 ```
 
-<div v-click="1" class="mt-4 text-sm">
-  <div class="text-xs tracking-widest opacity-60 mb-2">复杂度审计</div>
-  <div class="grid grid-cols-4 gap-3">
-    <div class="p-3 rounded border border-teal-500/30 bg-teal-500/5">
-      <div class="text-xs opacity-60 mb-1">正确性</div>
-      <div class="font-bold text-teal-700 dark:text-teal-300">完全正确</div>
-    </div>
-    <div class="p-3 rounded border border-teal-500/30 bg-teal-500/5">
-      <div class="text-xs opacity-60 mb-1">可读性</div>
-      <div class="font-bold text-teal-700 dark:text-teal-300">清晰、直观</div>
-    </div>
-    <div class="p-3 rounded border border-rose-500/40 bg-rose-500/8">
-      <div class="text-xs opacity-60 mb-1">时间复杂度</div>
-      <div class="font-bold text-rose-600 dark:text-rose-400">O(M × N)</div>
-      <div class="text-xs opacity-70 mt-0.5">内层含几何判断，常数极大</div>
-    </div>
-    <div class="p-3 rounded border border-rose-500/40 bg-rose-500/8">
-      <div class="text-xs opacity-60 mb-1">重复成本</div>
-      <div class="font-bold text-rose-600 dark:text-rose-400">每日 × 每要素</div>
-      <div class="text-xs opacity-70 mt-0.5">完整重跑一遍 M×N</div>
-    </div>
-  </div>
-</div>
+<div class="pt-2 text-xs opacity-70">
 
-<div v-click="2" class="mt-4 p-3 rounded bg-amber-500/10 border-l-4 border-amber-500 text-sm">
-这段代码<span class="font-bold">完全正确</span>。逻辑没问题，结果没问题，可读性甚至比我后来的版本还好。<span class="font-bold">它只是慢得离谱。</span>
-</div>
+你在 C 课里写过的东西，在这门课里都有了名字。
 
-<UnitNav :active="3" />
+</div>
+</div>
+</div>
 
 <!--
-这是 AI 给我的第一版。我先不说好不好，你们自己读三十秒，然后告诉我这段代码的时间复杂度。
-
-（停 30 秒，点一两个学生回答）
-
-[click] 对，O(M 乘 N)。外层三千个区县，内层几十万个格点，乘出来是十亿次量级。而且注意内层那一句——"g 落在 c 内"，这不是一次整数比较，这是一次几何判断，要做点在多边形内的测试，常数项非常大。
-
-再补一刀：这个东西要**每天跑、每个要素跑**。你今天算了一遍格点属于哪个区县，明天数据换了，你又从头算一遍——而**格点和区县的空间关系一天都没变过**。
-
-[click] 但是我要强调一件事：**这段代码是完全正确的。** 逻辑没问题，结果没问题，可读性甚至比我后来的版本还好。它跑得出来，只是慢得离谱。
+顺便打个招呼：这个"数据元素"，换个结构就换个名字——链表、树里叫结点，图里叫顶点，到了数据库、文件里叫记录。别以为是新东西，还是那个概念，只是叫法变了。数据项也一样，以后你会听到字段、域，都是它。
+最后一句要注意：数据项说是"最小不可分"，可它不是绝对的。姓名，在我们学籍系统里就是一格，不可分。可你要做一个国际化的系统，姓和名的排列顺序不一样，你就得拆成两项。谁决定拆不拆？应用需求决定。这句话你现在觉得是废话，等你自己设计结构的时候会想起来。
+落到代码上就很自然了：一个 struct 就是一个数据元素，struct 里的成员就是数据项，struct 数组就是数据对象。
 -->
 
 ---
 
-# 改进方案：展平 → merge → groupby
+# 数据结构的广义定义
 
-<div grid="~ cols-2 gap-6" class="mt-3">
+<div class="pt-6 text-center text-2xl">
 
-<div class="p-4 rounded-lg border border-rose-500/30 bg-rose-500/5">
-  <div class="text-xs tracking-widest opacity-60 mb-3">原方案 · 嵌套循环</div>
-  <div class="space-y-1.5 text-sm">
-    <div class="flex items-center gap-2">
-      <div class="w-20 text-xs px-2 py-1 rounded bg-rose-500/15 text-center">区县 1</div>
-      <div class="opacity-40">→</div>
-      <div class="flex-1 px-2 py-1 rounded bg-gray-500/10 text-xs">扫描全部 N 个格点 + 几何判断</div>
-    </div>
-    <div class="flex items-center gap-2">
-      <div class="w-20 text-xs px-2 py-1 rounded bg-rose-500/15 text-center">区县 2</div>
-      <div class="opacity-40">→</div>
-      <div class="flex-1 px-2 py-1 rounded bg-gray-500/10 text-xs">扫描全部 N 个格点 + 几何判断</div>
-    </div>
-    <div class="flex items-center gap-2 opacity-50">
-      <div class="w-20 text-xs px-2 py-1 rounded bg-rose-500/15 text-center">⋮</div>
-      <div class="opacity-40">→</div>
-      <div class="flex-1 px-2 py-1 rounded bg-gray-500/10 text-xs">⋮</div>
-    </div>
-    <div class="flex items-center gap-2">
-      <div class="w-20 text-xs px-2 py-1 rounded bg-rose-500/15 text-center">区县 3000</div>
-      <div class="opacity-40">→</div>
-      <div class="flex-1 px-2 py-1 rounded bg-gray-500/10 text-xs">扫描全部 N 个格点 + 几何判断</div>
-    </div>
-  </div>
-  <div class="mt-3 pt-2 border-t border-rose-500/20 text-center">
-    <span class="font-bold text-rose-600 dark:text-rose-400">同一批格点被扫了 3,000 遍</span>
-  </div>
+数据结构 ＝ <span class="text-teal-600 dark:text-teal-400">逻辑结构</span> ＋ <span class="text-orange-500">存储结构</span> ＋ <span class="opacity-80">运算</span>
+
 </div>
 
-<div v-click="1" class="p-4 rounded-lg border-2 border-teal-500/40 bg-teal-500/5">
-  <div class="text-xs tracking-widest opacity-60 mb-3">新方案 · 三步，各一遍</div>
-  <div class="space-y-2 text-sm">
-    <div class="flex items-center gap-2">
-      <div class="w-6 h-6 rounded-full bg-teal-500/25 text-xs flex items-center justify-center font-bold shrink-0">1</div>
-      <div class="flex-1"><span class="font-bold">展平</span> 成一维长表 <code class="text-xs">(grid_id, value)</code></div>
-      <div class="font-mono text-xs text-teal-700 dark:text-teal-300">O(N)</div>
-    </div>
-    <div class="flex items-center gap-2">
-      <div class="w-6 h-6 rounded-full bg-teal-500/25 text-xs flex items-center justify-center font-bold shrink-0">2</div>
-      <div class="flex-1"><span class="font-bold">merge</span> 按编号查对照表</div>
-      <div class="font-mono text-xs text-teal-700 dark:text-teal-300">O(N)</div>
-    </div>
-    <div class="flex items-center gap-2">
-      <div class="w-6 h-6 rounded-full bg-teal-500/25 text-xs flex items-center justify-center font-bold shrink-0">3</div>
-      <div class="flex-1"><span class="font-bold">groupby</span> 按区县编码聚合</div>
-      <div class="font-mono text-xs text-teal-700 dark:text-teal-300">O(N)</div>
-    </div>
-  </div>
-  <div v-click="2" class="mt-3 p-2 rounded bg-amber-500/12 text-xs">
-    <span class="font-bold">grid_id → 区县编码</span> 对照表：<span class="font-bold text-amber-700 dark:text-amber-400">预计算，一辈子只算一次</span>
-  </div>
+<div class="pt-4 text-center opacity-80">
+
+其中，**逻辑结构** $= (D, S)$ —— $D$ 是数据元素的有限集，$S$ 是 $D$ 上关系的有限集。
+
+</div>
+
+<div v-click class="pt-4">
+
+<div grid="~ cols-[1.3fr_1fr] gap-6" class="items-center">
+
+<div class="text-sm">
+
+设有数据结构 $B = (D, S)$：
+
+- $D = \{d_1, d_2, d_3, d_4, d_5, d_6\}$
+- $S = \{\langle d_1,d_2\rangle, \langle d_1,d_3\rangle, \langle d_1,d_4\rangle, \langle d_3,d_5\rangle, \langle d_3,d_6\rangle\}$
+
+</div>
+
+<div class="text-center">
+
+```mermaid {theme: 'neutral', scale: 0.5}
+graph TD
+  d1((d1)) --> d2((d2)) & d3((d3)) & d4((d4))
+  d3 --> d5((d5)) & d6((d6))
+```
+
+<div class="text-xs -mt-2 opacity-70">逻辑结构图</div>
+
 </div>
 
 </div>
 
-<div v-click="3" class="mt-5 flex items-center justify-center gap-6">
-  <div class="text-2xl font-bold">
-    <span class="text-rose-600 dark:text-rose-400">O(M × N)</span>
-    <span class="mx-3 opacity-40">→</span>
-    <span class="text-teal-600 dark:text-teal-400">O(N)</span>
-  </div>
-  <div class="text-sm opacity-75">实测提升约 <span class="font-bold text-lg">两个数量级</span>；区县越多、要素越多，收益越大</div>
 </div>
 
-<UnitNav :active="3" />
+<div v-click class="pt-5 text-center">
+
+**逻辑结构是抽象的** —— 与存储无关、与机器无关、与语言无关
+
+<div class="pt-2 text-lg">
+
+它只回答两件事：**有哪些元素**，它们之间**是什么关系**。
+
+</div>
+</div>
 
 <!--
-我给 AI 的提示只有三句话。
-
-[click] 第一，先把网格数据**展平**——从二维数组变成一条长表，每行是「格点编号，数值」，这一步 O(N)。第二，跟一张事先算好的对照表做 **merge**——那张表就一列格点编号、一列区县编码，按编号查一次就对上，O(N)。第三，按区县编码 **groupby** 聚合，O(N)。
-
-[click] 注意那张对照表：它是预计算的，一辈子只算一次。
-
-[click] 三步都是 O(N)，整体从 O(M×N) 掉到 O(N)。实测快了两个数量级，远不止十倍。而且要注意，这个收益是随规模放大的——区县越多、要素越多，差距越大。
+现在给这门课下定义。注意，这是广义的定义：三样都算。数据结构等于什么？逻辑结构、存储结构、运算。有的教材说得窄，只把逻辑结构叫数据结构，那是狭义的说法。
+先说逻辑结构。逻辑结构只管两件事：有哪些元素、它们之间是什么关系。数学上写成 D 和 S 一对集合：D 是元素，S 是元素之间的关系。注意，这对集合只是三样里的第一样，存储结构和运算，后面分别细讲。
+来，看一个具体的例子。设有数据结构 B = (D, S)：D 里是六个元素，d1 到 d6；S 里是五组关系——d1 分别连到 d2、d3、d4，d3 又连到 d5、d6。你拿笔按这五组关系画一下，就是右边这张图：一棵树，d1 在顶上，d2、d3、d4 在第二层，d5、d6 挂在 d3 下面。
+你看，这一路下来，没提内存，也没提用什么语言。它只回答两件事：有哪些元素、它们之间是什么关系——与存储无关、与机器无关、与语言无关。这就是逻辑结构。
 -->
 
 ---
 
-# 慢动作：6 个格点走完三步
+# 数据元素之间的关系，一共就四种
 
-<div class="text-xs opacity-60 -mt-1 mb-2">2×3 网格 · 2 个区县 · 格内为气温值，左上角小字为格点编号（行优先）</div>
+<div grid="~ cols-2 gap-6" class="pt-1">
+<div class="text-sm">
 
-<div class="flex items-stretch gap-2.5 min-h-[318px]">
+| 逻辑结构 | 关系 | 生活实例 |
+| -------- | ---- | -------- |
+| 集合 | 同属一个集合 | 关键字去重 |
+| 线性结构 | 一对一 | 排队、通讯录 |
+| 树形结构 | 一对多 | 文件目录、族谱 |
+| 图形结构 | 多对多 | 路网、社交关系 |
 
-<div class="shrink-0">
-  <div class="text-[11px] font-bold opacity-60 mb-1">原始网格</div>
-  <div class="grid grid-cols-3 gap-1.5 w-[144px]">
-    <div v-for="c in [[1, '7.0', 'A'], [2, '8.0', 'A'], [3, '9.0', 'B'], [4, '4.0', 'A'], [5, '5.0', 'A'], [6, '6.0', 'B']]" :key="c[0]"
-         class="relative h-11 rounded-md border flex items-center justify-center"
-         :class="c[2] === 'A' ? 'border-teal-500/40 bg-teal-500/12' : 'border-rose-500/35 bg-rose-500/10'">
-      <span class="absolute top-0.5 left-1 text-[8px] font-mono opacity-50">{{ c[0] }}</span>
-      <span class="text-sm font-mono font-bold">{{ c[1] }}</span>
-    </div>
+<div class="pt-3 text-xs opacity-80">
+
+线性结构的严格描述（第 2 章埋线）：有且仅有一个开始结点、一个终端结点；除开始结点外每个结点有唯一前驱；除终端结点外每个结点有唯一后继。
+
+</div>
+</div>
+<div grid="~ cols-2 gap-2" class="items-center">
+
+<div v-click class="text-center">
+
+```mermaid {theme: 'neutral', scale: 0.45}
+graph LR
+  A((a)) ~~~ B((b)) ~~~ C((c)) ~~~ D((d)) ~~~ E((e))
+```
+<div class="text-xs -mt-2">集合 · 无关系</div>
+</div>
+
+<div v-click class="text-center">
+
+```mermaid {theme: 'neutral', scale: 0.45}
+graph LR
+  A((a)) --> B((b)) --> C((c)) --> D((d))
+```
+<div class="text-xs -mt-2">线性 · 一对一</div>
+</div>
+
+<div v-click class="text-center">
+
+```mermaid {theme: 'neutral', scale: 0.45}
+graph TD
+  A((a)) --> B((b)) & C((c))
+  B --> D((d))
+  C --> E((e))
+```
+<div class="text-xs -mt-2">树形 · 一对多</div>
+</div>
+
+<div v-click class="text-center">
+
+```mermaid {theme: 'neutral', scale: 0.45}
+graph LR
+  A((a)) --- B((b))
+  B --- C((c))
+  C --- D((d))
+  D --- E((e))
+  E --- A
+```
+<div class="text-xs -mt-2">图形 · 多对多</div>
+</div>
+
+</div>
+</div>
+
+<div v-click class="pt-3 text-xs opacity-70">
+
+另一种常见二分法：**线性结构 vs 非线性结构（树、图、集合）**。
+
+</div>
+
+<!--
+关系一共能有几种花样？其实就四种。
+第一种，最松的：除了"我们都在这个集合里"，元素之间什么关系都没有。这叫集合。就像一袋子豆子，你说不出哪颗在哪颗前面。
+第二种，一对一：每个元素最多一个前面的、一个后面的，串成一条线。排队、通讯录、一行文本，都是这个。这是我们第二到第四章的全部内容。
+第三种，一对多：一个爸爸可以有好几个孩子，但每个孩子只有一个爸爸。文件目录就是这样，C 盘下面很多文件夹，但每个文件夹只在一个上级里。这叫树。
+第四种，多对多：谁跟谁都能连。地图上的路网，社交关系。这叫图。
+四张图一张一张给，每给一张就问一个生活实例。
+最后补一句，线性结构的严格定义我念一遍，你们第二章会天天用到：有且仅有一个开始结点，有且仅有一个终端结点，除了开头，每个结点有唯一前驱；除了末尾，每个结点有唯一后继。"有且仅有一个"、"唯一"，这些词都不是废话，第二章讲循环链表的时候你会回来抠这几个字。
+-->
+
+---
+
+# 三个场景，判断属于哪种关系
+
+<div class="pt-10 grid grid-cols-3 gap-6 text-center">
+
+<div class="rounded-xl border p-6">
+  <div class="text-xl">微信好友关系</div>
+  <div v-click class="pt-4 text-teal-600 dark:text-teal-400">图 —— 好友是互相的、任意的</div>
+</div>
+
+<div class="rounded-xl border p-6">
+  <div class="text-xl">Ctrl+Z 撤销历史</div>
+  <div v-click class="pt-4 text-teal-600 dark:text-teal-400">线性 —— 只能一端进出，那是栈（第 3 章）</div>
+</div>
+
+<div class="rounded-xl border p-6">
+  <div class="text-xl">家族族谱</div>
+  <div v-click class="pt-4 text-teal-600 dark:text-teal-400">树 —— 一对多</div>
+</div>
+
+</div>
+
+<!--
+（图给完之后）来，考你们三个。微信好友关系，是哪种？举手。……对，图，因为好友是互相的、任意的。Ctrl+Z 的撤销历史？线性，而且是很特殊的线性，只能从一头进出，那叫栈，第三章讲。族谱？树。
+举手表决，不要我自己念答案。
+-->
+
+---
+
+# 同一个逻辑结构，两种内存映像
+
+<div class="pt-1 text-center text-sm opacity-80">
+
+同一个逻辑结构：$a_1 \to a_2 \to a_3 \to a_4$
+
+**存储结构**，也叫**物理结构** —— 抽象的逻辑关系在内存中的表示
+
+</div>
+
+<div grid="~ cols-2 gap-6" class="pt-4">
+<div>
+
+<div class="text-center">
+  <div class="pb-3 text-sm font-bold text-teal-600 dark:text-teal-400">顺序存储 · 地址连续</div>
+  <div class="flex justify-center">
+    <div class="w-14 h-12 border border-teal-500 flex items-center justify-center bg-teal-500/10">a₁</div>
+    <div class="w-14 h-12 border border-teal-500 border-l-0 flex items-center justify-center bg-teal-500/10">a₂</div>
+    <div class="w-14 h-12 border border-teal-500 border-l-0 flex items-center justify-center bg-teal-500/10">a₃</div>
+    <div class="w-14 h-12 border border-teal-500 border-l-0 flex items-center justify-center bg-teal-500/10">a₄</div>
   </div>
-  <div class="mt-1.5 flex items-center gap-2.5 text-[10px] opacity-70">
-    <span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-teal-500/40"></span>区县 A</span>
-    <span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-rose-500/40"></span>区县 B</span>
+  <div class="flex justify-center font-mono text-xs text-teal-600/80">
+    <div class="w-14 text-center">100</div>
+    <div class="w-14 text-center">104</div>
+    <div class="w-14 text-center">108</div>
+    <div class="w-14 text-center">112</div>
   </div>
+  <div class="pt-3 text-xs opacity-80">地址相邻 ⇒ 逻辑相邻（关系被位置隐含）</div>
+  <div class="pt-1 font-mono text-xs">LOC(aᵢ) = LOC(a₁) + (i−1) × sizeof(elem)</div>
 </div>
 
-<div v-click="1" class="flex-1 min-w-[70px] flex flex-col items-center justify-center gap-0.5">
-  <div class="text-xs font-bold text-teal-600 dark:text-teal-400">① 展平</div>
-  <div class="text-[10px] opacity-50">把网格拉直</div>
-  <div class="text-xl opacity-25">→</div>
 </div>
+<div>
 
-<div v-click="1" class="shrink-0">
-  <div class="text-[11px] font-bold opacity-60 mb-1">一维长表</div>
-  <div class="w-[124px] rounded-md border border-gray-500/25 overflow-hidden text-xs font-mono leading-tight">
-    <div class="grid grid-cols-2 bg-gray-500/10 text-[10px] font-bold">
-      <div class="py-0.5 text-center opacity-70">grid_id</div>
-      <div class="py-0.5 text-center opacity-70">value</div>
-    </div>
-    <div v-for="r in [[1, '7.0'], [2, '8.0'], [3, '9.0'], [4, '4.0'], [5, '5.0'], [6, '6.0']]" :key="r[0]"
-         class="grid grid-cols-2 border-t border-gray-500/15">
-      <div class="py-[3px] text-center">{{ r[0] }}</div>
-      <div class="py-[3px] text-center">{{ r[1] }}</div>
-    </div>
-  </div>
-</div>
-
-<div v-click="2" class="flex-1 min-w-[70px] flex flex-col items-center justify-center gap-0.5">
-  <div class="text-xs font-bold text-teal-600 dark:text-teal-400">② merge</div>
-  <div class="text-[10px] opacity-50">按编号查对照表</div>
-  <div class="text-xl opacity-25">→</div>
-</div>
-
-<div v-click="2" class="shrink-0 flex flex-col">
-  <div class="text-[11px] font-bold opacity-60 mb-1">合并表</div>
-  <div class="w-[156px] rounded-md border border-gray-500/25 overflow-hidden text-xs font-mono leading-tight">
-    <div class="grid grid-cols-[52px_52px_52px] bg-gray-500/10 text-[10px] font-bold">
-      <div class="py-0.5 text-center opacity-70">grid_id</div>
-      <div class="py-0.5 text-center opacity-70">value</div>
-      <div class="py-0.5 text-center opacity-70">区县</div>
-    </div>
-    <div v-for="r in [[1, '7.0', 'A'], [2, '8.0', 'A'], [3, '9.0', 'B'], [4, '4.0', 'A'], [5, '5.0', 'A'], [6, '6.0', 'B']]" :key="r[0]"
-         class="grid grid-cols-[52px_52px_52px] border-t border-gray-500/15 items-center">
-      <div class="py-[3px] text-center">{{ r[0] }}</div>
-      <div class="py-[3px] text-center">{{ r[1] }}</div>
-      <div class="py-[3px] flex justify-center">
-        <span class="px-1.5 rounded text-[10px] font-bold leading-4" :class="r[2] === 'A' ? 'bg-teal-500/25 text-teal-700 dark:text-teal-300' : 'bg-rose-500/20 text-rose-700 dark:text-rose-300'">{{ r[2] }}</span>
+<div class="text-center">
+  <div class="pb-3 text-sm font-bold text-orange-500">链式存储 · 结点散布</div>
+  <div class="flex items-end justify-center gap-1 font-mono">
+    <div class="flex flex-col items-center">
+      <div class="flex border border-orange-500 rounded overflow-hidden bg-orange-500/10">
+        <div class="w-9 h-11 flex items-center justify-center border-r border-orange-500/50">a₁</div>
+        <div class="w-12 h-11 flex items-center justify-center text-xs">800</div>
       </div>
+      <div class="pt-1 text-xs opacity-70">@100</div>
     </div>
-  </div>
-  <div class="mt-1.5 mb-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">对照表 · 预计算</div>
-  <div class="w-[124px] rounded-md border border-amber-500/35 overflow-hidden text-xs font-mono leading-tight self-center">
-    <div class="grid grid-cols-2 bg-amber-500/10 text-[10px] font-bold">
-      <div class="py-0.5 text-center text-amber-700 dark:text-amber-400">grid_id</div>
-      <div class="py-0.5 text-center text-amber-700 dark:text-amber-400">区县</div>
-    </div>
-    <div v-for="r in [[1, 'A'], [2, 'A'], [3, 'B'], [4, 'A'], [5, 'A'], [6, 'B']]" :key="r[0]"
-         class="grid grid-cols-2 border-t border-amber-500/20">
-      <div class="py-[3px] text-center">{{ r[0] }}</div>
-      <div class="py-[3px] text-center font-bold" :class="r[1] === 'A' ? 'text-teal-700 dark:text-teal-300' : 'text-rose-700 dark:text-rose-300'">{{ r[1] }}</div>
-    </div>
-  </div>
-</div>
-
-<div v-click="3" class="flex-1 min-w-[70px] flex flex-col items-center justify-center gap-0.5">
-  <div class="text-xs font-bold text-teal-600 dark:text-teal-400">③ groupby</div>
-  <div class="text-[10px] opacity-50">分组求平均</div>
-  <div class="text-xl opacity-25">→</div>
-</div>
-
-<div v-click="3" class="shrink-0">
-  <div class="text-[11px] font-bold opacity-60 mb-1">区县尺度结果</div>
-  <div class="w-[136px] rounded-md border-2 border-teal-500/40 overflow-hidden text-xs font-mono leading-tight">
-    <div class="grid grid-cols-2 bg-teal-500/10 text-[10px] font-bold">
-      <div class="py-0.5 text-center text-teal-700 dark:text-teal-300">区县</div>
-      <div class="py-0.5 text-center text-teal-700 dark:text-teal-300">均值</div>
-    </div>
-    <div v-for="r in [['A', '6.0'], ['B', '7.5']]" :key="r[0]"
-         class="grid grid-cols-2 border-t border-teal-500/20">
-      <div class="py-1 flex justify-center">
-        <span class="px-1.5 rounded text-[10px] font-bold leading-4" :class="r[0] === 'A' ? 'bg-teal-500/25 text-teal-700 dark:text-teal-300' : 'bg-rose-500/20 text-rose-700 dark:text-rose-300'">{{ r[0] }}</span>
+    <div class="pb-5 text-orange-500">→</div>
+    <div class="flex flex-col items-center">
+      <div class="flex border border-orange-500 rounded overflow-hidden bg-orange-500/10">
+        <div class="w-9 h-11 flex items-center justify-center border-r border-orange-500/50">a₂</div>
+        <div class="w-12 h-11 flex items-center justify-center text-xs">302</div>
       </div>
-      <div class="py-1 text-center font-bold">{{ r[1] }}</div>
+      <div class="pt-1 text-xs opacity-70">@800</div>
+    </div>
+    <div class="pb-5 text-orange-500">→</div>
+    <div class="flex flex-col items-center">
+      <div class="flex border border-orange-500 rounded overflow-hidden bg-orange-500/10">
+        <div class="w-9 h-11 flex items-center justify-center border-r border-orange-500/50">a₃</div>
+        <div class="w-12 h-11 flex items-center justify-center text-xs">912</div>
+      </div>
+      <div class="pt-1 text-xs opacity-70">@302</div>
+    </div>
+    <div class="pb-5 text-orange-500">→</div>
+    <div class="flex flex-col items-center">
+      <div class="flex border border-orange-500 rounded overflow-hidden bg-orange-500/10">
+        <div class="w-9 h-11 flex items-center justify-center border-r border-orange-500/50">a₄</div>
+        <div class="w-12 h-11 flex items-center justify-center text-xs opacity-60">NULL</div>
+      </div>
+      <div class="pt-1 text-xs opacity-70">@912</div>
     </div>
   </div>
-  <div class="mt-1.5 text-[10px] opacity-60 text-center">6 行 → 2 行</div>
+  <div class="pt-3 text-xs opacity-80">每个结点 = [ 数据 | 指针 ]；地址不连续，关系靠指针显式记录</div>
+  <div class="pt-1 text-xs opacity-80">最后一个指针为 NULL —— 表示"没有下一个"</div>
 </div>
 
 </div>
-
-<div v-click="4" class="mt-3 p-2 rounded-lg bg-teal-500/8 border-l-4 border-teal-500 text-sm text-center">
-  三步全是「把表从头扫到尾」——<span class="font-bold">没有几何判断、没有回头重扫</span>，总代价 3 × O(N)
 </div>
 
-<UnitNav :active="3" />
+<div v-click class="pt-5 text-center">
+
+它们是**同一个逻辑结构**，却是两种不同的**存储结构**。
+
+</div>
 
 <!--
-有些词得停下来抠清楚——"展平、merge、groupby"，光听名字是没画面的。我们用一个 6 个格点的小例子，慢动作走一遍。
-
-看左边：2 乘 3 的网格，格子里是气温值，左上角小字是格点编号，行优先、从 1 数到 6；颜色就是区县的划分——A 区四个格点，B 区两个。
-
-[click] 第一步，展平：把这张二维网格"拉直"，按编号顺序铺成一条长表——每个格点一行，两列：编号、数值。注意，这时候数据里还看不到任何区县信息。这一步就是顺序读一遍内存，O(N)。
-
-[click] 第二步，merge：拿长表跟右边这张对照表做连接。对照表就两列——编号、区县编码，预计算，只算一次。连接的动作很朴素：长表的每一行，拿编号去对照表里查一次，把区县编码贴到行尾。查一次 O(1)，六行就查六次，合并表就出来了。看最后一列，A、A、B——全是查出来的。注意：这一步里没有任何几何计算。
-
-[click] 第三步，groupby：按最后一列分组——A 组四行、B 组两行，每组求平均：A 区 (7+8+4+5)/4 = 6.0，B 区 (9+6)/2 = 7.5。六行变两行，报表要的数就出来了。
-
-[click] 回头看整条流水线：每一站都只是把表从头到尾扫一遍，没有一步回头重扫，也没有一步做几何判断。这就是"三步都是 O(N)"的画面——最贵的那件事，早就被固化进对照表了。
+逻辑结构讲完了，它是抽象的。可计算机内存是实的，一格一格的字节。所以必须回答第二个问题：这个抽象的关系，在内存里怎么落地？这就是存储结构，也叫物理结构。
+存储结构要表示两样东西。第一样好办：元素本身，一个 struct 存进去就完了。难的是第二样：关系怎么存？"a1 在 a2 前面"这句话，内存里怎么写下来？
+只有两种办法。
+第一种办法：我把它们摆在挨着的地方。a1 在 100 号地址，a2 就在 104，a3 在 108。谁在谁前面？看地址就知道了。关系没有被显式地存下来，它是被位置隐含着的。这叫顺序存储，载体就是数组。
+第二种办法：我不管它们摆在哪儿，可能 a1 在 100 号，a2 在 800 号，a3 在 302 号，乱七八糟。但我在 a1 里额外留一个格子，写上"下一个在 800"。关系被显式地存下来了，存在指针里。这叫链式存储。
+（指两幅图）来，看这两幅图。你们告诉我，它们是不是同一个数据结构？
+（等）它们是同一个逻辑结构，都是线性表 a1 到 a4，逻辑上都是一条链。但它们是两种不同的存储结构。
+这一页我会同时在左板画图并保留整节课，后面讲 next、讲 malloc 都要回指它。两幅图必须并排同屏对峙。
 -->
 
 ---
 
-# 这个案例底下压着<span class="text-teal-600 dark:text-teal-400">四层</span>知识
+# 顺序 vs 链式：一张表看清全部差别
 
-<div grid="~ cols-[1.35fr_1fr] gap-6" class="mt-3">
+<div class="pt-1 text-sm">
 
-<div class="space-y-2 text-sm">
-
-<div class="p-2 rounded bg-gray-500/8 border-l-4 border-gray-400/50 opacity-70">
-  <div class="text-xs tracking-widest mb-0.5">表面</div>
-  <div>「改用 merge + groupby 就快了」</div>
-</div>
-
-<div v-click="1" class="p-2 rounded bg-teal-500/8 border-l-4 border-teal-500">
-  <div class="text-xs tracking-widest opacity-70 mb-0.5">数据结构层</div>
-  <div>同一个需求，换一种<span class="font-bold">数据组织方式</span>——「每次都从头翻」变成「查一次对照表」，代价完全不在一个量级。数据库每天都在自动做这种判断。</div>
-</div>
-
-<div v-click="2" class="p-2 rounded bg-teal-500/8 border-l-4 border-teal-500">
-  <div class="text-xs tracking-widest opacity-70 mb-0.5">算法层</div>
-  <div>格点属于哪个区县，跟「今天几号」「算什么要素」无关——既然不变，就<span class="font-bold">别放在循环里天天算</span>，拎出来只算一次。那张对照表就是这么来的。</div>
-</div>
-
-<div v-click="3" class="p-2 rounded bg-teal-500/8 border-l-4 border-teal-500">
-  <div class="text-xs tracking-widest opacity-70 mb-0.5">内存层</div>
-  <div>展平后数据在内存里<span class="font-bold">连续成一条，从头扫到尾</span>——「抽象漏水的地方，知识不死，而且变贵」，说的就是这一层。</div>
-</div>
-
-<div v-click="4" class="p-3 rounded bg-rose-500/10 border-l-4 border-rose-500">
-  <div class="text-xs tracking-widest opacity-70 mb-0.5">抽象漏水点</div>
-  <div class="font-bold">AI 默认了一个我从未说出口的前提：<br>「数据规模不大，而且只跑一次」</div>
-</div>
+| 维度 | 顺序存储 | 链式存储 |
+| ---- | ---- | ---- |
+| <span class="text-orange-500 font-bold">关系如何表示</span> | 靠**物理位置相邻**隐含表示 | 靠**指针**显式表示 |
+| 逻辑相邻 ⇒ 物理相邻？ | 是 | 不要求 |
+| 典型载体 | 数组 | 带指针域的结点 |
+| <span class="text-orange-500 font-bold">随机访问</span> | **O(1)**，一次乘法加法算出地址 | 不支持，需从头遍历 O(n) |
+| 插入 / 删除 | 需移动元素，平均 O(n) | 改指针即可 O(1)（已定位） |
+| 空间 | 需预分配，可能浪费或溢出 | 按需分配，但每结点多耗指针空间 |
+| 缓存友好性 | 好（连续） | 差（跳转）→ 下次课再谈 |
 
 </div>
 
-<div v-click="1" class="flex items-center">
-<div class="w-full space-y-3 text-xs">
+<div class="pt-4 text-sm opacity-80">
 
-<div class="p-3 rounded border border-rose-500/30 bg-rose-500/5">
-  <div class="font-bold mb-2 text-rose-600 dark:text-rose-400">老办法</div>
-  <div class="flex gap-1.5">
-    <div class="flex flex-col gap-1">
-      <div class="px-2 py-1 rounded bg-rose-500/15 text-center">c₁</div>
-      <div class="px-2 py-1 rounded bg-rose-500/15 text-center">c₂</div>
-      <div class="px-2 py-1 rounded bg-rose-500/15 text-center">c₃</div>
-    </div>
-    <div class="flex flex-col justify-around opacity-40 text-[10px]">
-      <div>→→→</div><div>→→→</div><div>→→→</div>
-    </div>
-    <div class="flex-1 p-2 rounded bg-gray-500/10 flex items-center justify-center text-center">
-      每次都从头翻一遍<br>N 个格点
-    </div>
-  </div>
-  <div class="mt-2 text-center font-mono font-bold">M × N</div>
-</div>
-
-<div class="p-3 rounded border-2 border-teal-500/40 bg-teal-500/5">
-  <div class="font-bold mb-2 text-teal-700 dark:text-teal-300">新办法</div>
-  <div class="flex items-center gap-1.5">
-    <div class="flex-1 p-2 rounded bg-gray-500/10 text-center">格点<br>扫一遍</div>
-    <div class="opacity-40">→</div>
-    <div class="p-2 rounded bg-teal-500/20 text-center font-bold">查对照表<br>一次就定位</div>
-    <div class="opacity-40">→</div>
-    <div class="flex-1 p-2 rounded bg-gray-500/10 text-center">区县<br>编码</div>
-  </div>
-  <div class="mt-2 text-center font-mono font-bold">N</div>
-</div>
+另外两种存储方法：**索引存储**、**散列存储**——后续查找章节展开。
 
 </div>
-</div>
-
-</div>
-
-<UnitNav :active="3" />
 
 <!--
-现在最重要的部分来了。如果你们从这个案例里学到的只是"哦，以后用 merge 和 groupby"，那这十分钟就浪费了。这个案例底下压着四层知识。
-
-[click] **第一层，数据结构层。** 右边这两张卡片，是同一个需求的两套数据组织方式：上面是老办法——每一行都从头翻一遍全表；下面是新办法——备一张对照表，查一次就定位。这个变换在行业里有正经名字，今天先不展开——你们先记住这个画面：**数据库每天都在自动做这种判断**。换句话说，学了这门课，你就是你自己的优化器。
-
-[click] **第二层，算法层。** 关键在于看出一个事实：格点属于哪个区县，跟今天几号、跟你算的是气温还是降水，**完全无关**。既然无关，它就不该待在循环里——把它拎出来、算一次、存下来。你们刚才在"慢动作"里看到的那张对照表，就是这个动作的产物。就这一下，几何判断的成本从"每天十亿次"变成"一辈子几十万次"。
-
-[click] **第三层，内存层。** 展平之后，数据在内存里连续成一条，从头扫到尾；老办法是东一块、西一块地翻。你们回想一下前面编译器那一段——编译器吃掉了手写汇编，但懂"数据在内存里怎么摆"的人，反而更值钱了。**就是这一格。** 三十年前的道理，在 2026 年的 pandas 代码里原封不动地生效。
-
-[click] **第四层，也是最要命的一层：抽象漏在哪儿。** AI 默认了一个我从来没说过的前提——**"你的数据不大，而且你只跑一次。"** 它不是猜错了，它是在缺信息的时候必须猜，而它猜的方向永远是最普通的那个方向。
-
-最后收一句：今天不要求你们听懂每一层——只需要看出：一个"就快了"的改动底下，压着这门课要一段一段教给你们的骨架。以后每学一章，都可以回来重看这个案例——它会越来越清楚。
+这个差别的后果非常大，我只讲两条，其他你自己看表——只需重点讲"关系如何表示"和"随机访问"这两行，其余行让学生自己扫。
+第一条，顺序存储支持随机访问：我要第 1000 个元素，一个乘法一个加法直接算出地址，O(1)。链式不行，你只能从头一个个跳过去，O(n)。
+第二条反过来，插入删除，顺序存储要挪一大堆元素，链式只要改两个指针。
+还有一行叫缓存友好性，我先不讲，下次课讲复杂度的时候会拿实测数据打你们的脸——你会发现理论上一样快的两个东西，实际能差好几倍。
+最后点个名，除了这两种，教材还提索引存储和散列存储，那是查找那一章的事，今天不管。
 -->
 
 ---
 
-# AI 的典型失效模式
+# 三句常听到的话，每一句都不对
 
-<div class="mt-3 p-5 rounded-lg border-2 border-rose-500/40 bg-rose-500/5 text-center">
-  <div class="text-xl opacity-80">不是语法错误，也不是逻辑错误，而是</div>
-  <div class="text-3xl font-bold mt-2">
-    「<span class="text-teal-600 dark:text-teal-400">语义正确</span>、<span class="text-rose-600 dark:text-rose-400">复杂度错误</span>」
-  </div>
+<div class="pt-2 space-y-3 text-sm">
+
+<div class="rounded-lg border p-3">
+  <div class="text-base">"<span class="text-red-500">✗</span> 链表是一种逻辑结构。" —— 对吗？</div>
+  <div v-click class="pt-1 text-teal-600 dark:text-teal-400">✓ 错。链表是<b>链式存储的线性表</b>——"链"这个字说的是存储方式。</div>
 </div>
 
-<div grid="~ cols-[1fr_1.15fr] gap-6" class="mt-5">
-
-<div>
-  <div class="text-xs tracking-widest opacity-60 mb-2">四道防线，三道失效</div>
-  <div class="space-y-1.5 text-sm">
-    <div v-click="1" class="flex items-center gap-3 p-2 rounded bg-rose-500/8">
-      <div class="flex-1">编译器</div>
-      <div class="text-rose-600 dark:text-rose-400 font-bold">否</div>
-    </div>
-    <div v-click="2" class="flex items-center gap-3 p-2 rounded bg-rose-500/8">
-      <div class="flex-1">单元测试（小数据）</div>
-      <div class="text-rose-600 dark:text-rose-400 font-bold">否</div>
-    </div>
-    <div v-click="3" class="flex items-center gap-3 p-2 rounded bg-rose-500/8">
-      <div class="flex-1">只看可读性的 code review</div>
-      <div class="text-rose-600 dark:text-rose-400 font-bold">否</div>
-    </div>
-    <div v-click="4" class="flex items-center gap-3 p-2.5 rounded bg-teal-500/12 border border-teal-500/40">
-      <div class="flex-1 font-bold">有复杂度直觉的人，扫一眼循环嵌套</div>
-      <div class="text-teal-700 dark:text-teal-300 font-bold text-lg">是</div>
-    </div>
-  </div>
+<div class="rounded-lg border p-3">
+  <div class="text-base">"<span class="text-red-500">✗</span> 栈是顺序存储的。" —— 对吗？</div>
+  <div v-click class="pt-1 text-teal-600 dark:text-teal-400">✓ 错。栈是<b>逻辑结构</b>（受限线性表）——既可以顺序存储（顺序栈），也可以链式存储（链栈），第 3 章两种都写。</div>
 </div>
 
-<div>
-<svg viewBox="0 0 360 200" class="w-full">
-  <rect x="45" y="12" width="52" height="150" fill="rgb(148,163,184)" fill-opacity="0.14" />
-  <line x1="45" y1="162" x2="345" y2="162" stroke="currentColor" stroke-width="1.2" opacity="0.5" />
-  <line x1="45" y1="162" x2="45" y2="12" stroke="currentColor" stroke-width="1.2" opacity="0.5" />
-  <path d="M 45 160 Q 150 150 240 110 T 330 20" fill="none" stroke="rgb(225,29,72)" stroke-width="2.8" />
-  <path d="M 45 161 L 330 140" fill="none" stroke="rgb(13,148,136)" stroke-width="2.8" />
-  <text x="248" y="42" style="font-size:17px" fill="rgb(225,29,72)" font-weight="bold">O(M × N)</text>
-  <text x="272" y="134" style="font-size:17px" fill="rgb(13,148,136)" font-weight="bold">O(N)</text>
-  <text fill="rgb(71,85,105)" x="52" y="182" style="font-size:13px">测试数据规模</text>
-  <text fill="rgb(71,85,105)" x="52" y="192" style="font-size:13px">两条线几乎重合</text>
-  <text fill="rgb(71,85,105)" x="285" y="182" style="font-size:13px">生产规模</text>
-  <text fill="rgb(120,133,153)" x="178" y="196" style="font-size:13px">数据规模 N →</text>
-  <circle cx="330" cy="20" r="3.5" fill="rgb(225,29,72)" />
-  <circle cx="330" cy="140" r="3.5" fill="rgb(13,148,136)" />
-  <line x1="336" y1="20" x2="336" y2="140" stroke="currentColor" stroke-width="1" opacity="0.4" stroke-dasharray="3 2" />
-  <text fill="rgb(71,85,105)" x="332" y="104" text-anchor="end" style="font-size:14px" font-weight="bold">100×+</text>
-</svg>
-<div class="text-center text-xs opacity-70 -mt-1">
-灰色区间正是<span class="font-bold">单元测试查不出来</span>的原因
-</div>
+<div class="rounded-lg border p-3">
+  <div class="text-base">"<span class="text-red-500">✗</span> 二叉树只能用链表实现。" —— 对吗？</div>
+  <div v-click class="pt-1 text-teal-600 dark:text-teal-400">✓ 错。完全二叉树用数组实现更省——那就是后续章节要学习的<b>堆</b>。</div>
 </div>
 
 </div>
-
-<UnitNav :active="3" />
 
 <!--
-从这个案例我要提炼出一句话，我认为这是今天整节课最有实用价值的一句：
-
-**AI 的典型失效模式，不是语法错误，也不是逻辑错误，而是"语义正确、复杂度错误"。**
-
-你们体会一下这有多难防。
-
-[click] 语法错了，编译器报——这里编译器不报，因为语法完全合法。
-[click] 逻辑错了，测试报——这里测试也不报，因为测试数据就一百行，跑得飞快。你看右边这张图，小数据那一段，两条曲线几乎是重合的。
-[click] code review 呢？也不报，因为代码可读性甚至比正确答案还好。
-
-[click] 四道防线，三道失效。剩下唯一一道，是**有复杂度直觉的人，扫一眼循环嵌套结构就知道不对**。
-
-这个直觉，就是这门课要给你们的东西。
+接下来三句话，你们判断对不对。每条先问"这句话对不对"，等学生表态，再揭示纠正。
+第一句："链表是一种逻辑结构。"对吗？（等）错。链表是链式存储的线性表，"链"这个字说的是存储方式。
+第二句："栈是顺序存储的。"（等）错。栈是逻辑结构，是一种受限的线性表，只允许一端进出。它既可以顺序存储——那叫顺序栈；也可以链式存储——那叫链栈。第三章两种都写一遍。
+第三句："二叉树只能用链表实现。"错，第六章见。
 -->
 
 ---
 
-# 他们不写代码，但<span class="text-teal-600 dark:text-teal-400">定义骨架</span>
+# 数据类型 = 值集合 + 操作集合
 
-<div class="mt-3 grid grid-cols-2 gap-4 text-sm">
-  <div class="p-3 rounded bg-gray-500/8 opacity-60">
-    <div class="text-xs tracking-widest mb-1">常见误读</div>
-    <div class="line-through">三到七个人对 AI 说「给我写个系统」，然后等结果</div>
-  </div>
-  <div class="p-3 rounded bg-amber-500/10 border-l-4 border-amber-500">
-    <div class="text-xs tracking-widest opacity-70 mb-1">事实</div>
-    <div class="font-bold">他们是整个项目中最累、脑力密度最高的人</div>
-  </div>
-</div>
-
-<div class="mt-5 text-xs tracking-widest opacity-60 mb-2">100 万行代码必须回答的结构性问题</div>
-
-<div class="space-y-2 text-sm">
-
-<div v-click="1" class="flex items-center gap-4 p-2.5 rounded border border-teal-500/25 bg-teal-500/5">
-  <div class="flex-1">核心数据流用什么<span class="font-bold">数据结构</span>组织</div>
-  <div class="w-64 text-xs opacity-75">线性表、树、图、散列</div>
-</div>
-
-<div v-click="2" class="flex items-center gap-4 p-2.5 rounded border border-teal-500/25 bg-teal-500/5">
-  <div class="flex-1">缓存策略选 <span class="font-bold">LRU</span> 还是 <span class="font-bold">LFU</span>，容量多大，怎么失效</div>
-  <div class="w-64 text-xs opacity-75">哈希表 + 双向链表、优先队列</div>
-</div>
-
-<div v-click="3" class="flex items-center gap-4 p-2.5 rounded border border-teal-500/25 bg-teal-500/5">
-  <div class="flex-1">并发控制用<span class="font-bold">锁</span>还是<span class="font-bold">无锁队列</span></div>
-  <div class="w-64 text-xs opacity-75">队列、原子操作</div>
-</div>
-
-<div v-click="4" class="flex items-center gap-4 p-2.5 rounded border border-teal-500/25 bg-teal-500/5">
-  <div class="flex-1">索引建在哪一列，用 <span class="font-bold">B+ 树</span>还是<span class="font-bold">哈希</span></div>
-  <div class="w-64 text-xs opacity-75">树、散列、范围查询</div>
-</div>
-
-</div>
-
-<div v-click="5" class="mt-4 text-center">
-右边这一列，<span v-mark.underline.orange="5">没有一项在这门课之外</span>。
-</div>
-
-<UnitNav :active="4" />
-
-<!--
-我们回到开头 OpenAI 那个案例。很多人看完那篇文章的第一反应是：那三到七个人肯定爽得不行，对 AI 说一句"给我写个系统"，然后喝咖啡等结果。
-
-恰恰相反。那篇文章通篇在讲的是：他们是整个项目里最累、脑力密度最高的人。他们的累法变了，不是手累，是脑子累。
-
-他们不写代码，但他们定义骨架。AI 生成了一百万行代码，但这一百万行代码——
-
-[click] 核心数据流用什么结构组织？
-[click] 缓存策略选 LRU 还是 LFU、容量开多大、怎么失效？
-[click] 并发控制用锁还是无锁队列？
-[click] 索引建在哪一列、用 B+ 树还是哈希？
-
-这些决定系统生死的骨架，全部由人类工程师基于数据结构功底做出。
-
-[click] 你看右边这一列——LRU 是哈希表加双向链表，LFU 要用优先队列，索引选型是树和散列的取舍。**没有一项在这门课之外。**
--->
-
----
-
-# 角色转变
-
-<div class="mt-6 flex items-center justify-center gap-6">
-  <div class="px-5 py-3 rounded-lg bg-gray-500/10 text-xl opacity-60 line-through">代码编写者</div>
-  <div class="text-3xl opacity-40">→</div>
-  <div class="px-5 py-3 rounded-lg bg-teal-500/15 text-teal-700 dark:text-teal-300 text-xl font-bold">高密度的技术决策者与验证者</div>
-</div>
-
-<div grid="~ cols-[1fr_1.2fr] gap-8" class="mt-8 items-center">
-
-<div class="space-y-3">
-  <div class="p-4 rounded-lg border-2 border-teal-500/40 bg-teal-500/8">
-    <div class="text-xs tracking-widest opacity-60 mb-1">人</div>
-    <div class="text-xl font-bold text-teal-700 dark:text-teal-300">数据结构与算法策略</div>
-    <div class="text-sm mt-1">＝ 这 100 万行代码的<span class="font-bold">灵魂</span></div>
-  </div>
-  <div class="p-4 rounded-lg border border-gray-400/30 bg-gray-500/8">
-    <div class="text-xs tracking-widest opacity-60 mb-1">AI</div>
-    <div class="text-xl font-bold">肌肉与手脚</div>
-    <div class="text-sm mt-1 opacity-75">效率极高，永不疲倦</div>
-  </div>
-</div>
-
+<div grid="~ cols-2 gap-8" class="pt-2">
 <div>
 
-<div class="w-[62%] mx-auto py-2 rounded-lg border-2 border-teal-500/50 bg-teal-500/15 text-center font-bold text-teal-700 dark:text-teal-300">
-  人类决策层 · 数据结构与算法策略
-</div>
+先看一个你已经熟了的东西：C 里的 `int`
 
-<div class="text-center text-2xl leading-none text-teal-600 dark:text-teal-400 py-1">↓</div>
+- 一个<b class="text-teal-600 dark:text-teal-400">取值范围</b>（32 位机上 −2³¹ ~ 2³¹−1）
+- 一组<b class="text-teal-600 dark:text-teal-400">允许的运算</b>（`+ - * / %`、比较……）
 
-<div class="w-[80%] mx-auto py-3 rounded-lg border border-gray-400/40 bg-gray-500/12 text-center font-bold">
-  AI 生成层
-</div>
+<div class="pt-3 opacity-80">
 
-<div class="text-center text-2xl leading-none opacity-40 py-1">↓</div>
-
-<div class="w-full py-5 rounded-lg border border-gray-400/30 bg-gray-500/8 text-center text-xl font-bold opacity-75">
-  100 万行代码
-</div>
-
-<div class="text-center text-xs opacity-65 mt-3">上层薄、下层厚，但方向自上而下决定</div>
-</div>
+你不能对 `int` 做取子串——它的操作集合里没这一项。
 
 </div>
+</div>
+<div v-click>
 
-<UnitNav :active="4" />
+<b class="text-teal-600 dark:text-teal-400">抽象数据类型 ADT</b>：一个数学模型，及定义在该模型上的一组操作。
+
+$$ ADT = ({\color{#0d9488}D, S}, P) $$
+
+<span class="text-teal-600 dark:text-teal-400">$D$ 数据对象、$S$ 数据关系</span>、$P$ 基本操作。
+
+<div class="pt-2">
+
+核心：只规定"<b class="text-teal-600 dark:text-teal-400">能做什么</b>"，不规定"<b class="text-orange-500">怎么实现</b>"——"抽象"抽掉的正是实现。
+
+</div>
+
+<div class="pt-2">
+
+**ADT 也叫做数据结构的定义**——$D, S$ 就是<b class="text-teal-600 dark:text-teal-400">逻辑结构</b>，$P$ 就是运算的定义。
+
+</div>
+</div>
+</div>
 
 <!--
-所以本质的转变是：从"代码编写者"变成"高密度的技术决策者与验证者"。
-
-AI 是肌肉和手脚，效率极高，永不疲倦。而人提供的数据结构与算法策略，才是这一百万行代码的灵魂。
-
-你看右边这张图：人类决策层很薄，AI 生成层厚一些，产出的一百万行代码最厚。但箭头方向是自上而下的——最薄的那一层决定了最厚那一层长什么样。
+ADT 三个字母听着挺玄，其实你早就用过了。
+C 里的 int，是什么？（等）它是两样东西的打包：一个取值范围，加一组允许的运算。你不能对 int 做取子串，因为 int 的操作集合里没这一项。所以：数据类型等于值集合加操作集合。
+现在把这个想法往上抬一层。我不说 int 了，我说"复数"、"栈"、"队列"——这些东西也有值集合，也有操作集合，只不过语言没给你，得你自己造。当我只描述"值集合长什么样、有哪些操作"，而故意不说它在内存里怎么摆时，这份描述就叫抽象数据类型。
+抽象抽掉了什么？抽掉了实现。ADT 只回答"能做什么"，绝不回答"怎么做"。这一点是今天后半节课的全部动机。
+再补一句，接回今天的主线：抽象数据类型也叫做数据结构的定义——D、S 是逻辑结构，P 是运算，就差一个存储结构。以后课本每讲一个数据结构，先给的往往就是它的 ADT。
 -->
 
 ---
 
-# 杠杆效应：实现越便宜，决策错误越贵
+# 复数 ADT：一份不涉及内存的规格说明
 
-<div grid="~ cols-[1.25fr_1fr] gap-7" class="mt-5">
+<div grid="~ cols-2 gap-6" class="pt-1">
+<div>
 
-<div class="space-y-3">
-
-<div class="p-4 rounded-lg border border-gray-400/30 bg-gray-500/8">
-  <div class="text-xs tracking-widest opacity-60 mb-2">AI 之前 · 架构选错</div>
-  <div class="text-sm">手写<span class="font-bold">三个月</span>才发现问题</div>
-  <div class="mt-2 pt-2 border-t border-gray-400/20 text-sm">
-    沉没成本 ＝ <span class="font-bold">三个月人力</span>
-    <span class="text-xs opacity-60 ml-1">很痛，但可控</span>
-  </div>
-</div>
-
-<div v-click="1" class="p-4 rounded-lg border-2 border-rose-500/40 bg-rose-500/8">
-  <div class="text-xs tracking-widest opacity-60 mb-2">AI 之后 · 架构选错</div>
-  <div class="text-sm"><span class="font-bold">三天</span>生成 10 万行基于错误架构的代码，<span class="opacity-80">而且全都能跑、能过测试</span></div>
-  <div class="mt-2 pt-2 border-t border-rose-500/20 text-sm">
-    沉没成本 ＝ <span class="font-bold text-rose-600 dark:text-rose-400">10 万行代码 + 已建立在其上的全部依赖</span>
-  </div>
-</div>
+```c
+ADT Complex {
+    数据对象：两个实数 e1、e2
+              （e1 作实部，e2 作虚部）
+    数据关系：有序对 <e1, e2>
+              两个分量次序不可交换
+    基本操作：
+        InitComplex(&C, v1, v2)  构造复数
+        GetReal(C)               取实部
+        GetImag(C)               取虚部
+        Add(c1, c2)              两复数相加
+        Multiply(c1, c2)         两复数相乘
+        Equal(c1, c2)            判等
+} ADT Complex
+```
 
 </div>
+<div>
 
-<div class="flex items-center">
-<svg viewBox="0 0 300 200" class="w-full">
-  <line x1="40" y1="170" x2="285" y2="170" stroke="currentColor" stroke-width="1.2" opacity="0.5" />
-  <line x1="40" y1="170" x2="40" y2="15" stroke="currentColor" stroke-width="1.2" opacity="0.5" />
-  <path d="M 40 165 Q 150 155 210 95 T 275 20" fill="none" stroke="rgb(225,29,72)" stroke-width="3" />
-  <circle cx="105" cy="158" r="4.5" fill="rgb(148,163,184)" />
-  <text fill="rgb(71,85,105)" x="112" y="154" style="font-size:14px">AI 之前</text>
-  <circle cx="258" cy="35" r="4.5" fill="rgb(225,29,72)" />
-  <text x="196" y="30" style="font-size:14px" fill="rgb(225,29,72)" font-weight="bold">AI 之后</text>
-  <text fill="rgb(71,85,105)" x="95" y="188" style="font-size:14px">实现速度 →</text>
-  <text fill="rgb(71,85,105)" x="-158" y="15" style="font-size:12px" transform="rotate(-90)">决策错误的沉没成本</text>
-</svg>
+<div v-click>
+
+这份规格说明里**没有一个字**提到内存——没有数组、没有指针、没有 `malloc`。
+
+<div class="pt-4 text-sm">
+
+<div class="rounded-lg border p-2.5"><code>InitComplex(&amp;C, v1, v2)</code> 里的那个 <code>&amp;</code>——<b>不是取地址</b>，是"把对象本身交给操作"的记法；先记下，后面讲引用形参时展开。</div>
+
 </div>
 
 </div>
 
-<div v-click="2" class="mt-5 p-4 rounded-lg border-2 border-amber-500/40 bg-amber-500/8 text-center">
-  <div class="text-2xl font-bold">写得越快，选错的代价越高。</div>
-  <div class="text-sm mt-1.5 opacity-80">这是「选型与验证」在 AI 时代<span class="font-bold">升值而非降值</span>的根本原因。</div>
+<div v-click="+1" class="pt-4">
+
+<div class="rounded-lg border border-teal-500/60 bg-teal-500/10 p-2.5"><b>信息隐藏</b>：使用者只需要知道"能加能乘"，不需要知道内部是直角坐标还是极坐标——实现可以整体替换。</div>
+
 </div>
 
-<UnitNav :active="4" />
+</div>
+</div>
 
 <!--
-最后这一点，我希望你们想清楚，因为它反直觉。
-
-AI 之前，架构选错了怎么样？你手写三个月，写到一半发现不对，回头改。损失三个月，很痛，但可控。
-
-[click] AI 之后，架构选错了怎么样？三天之内，AI 帮你把这个错误架构生成了十万行代码，而且这十万行全都能跑、能过测试。等你发现不对的时候，已经有一堆东西建在它上面了。
-
-[click] **实现变得几乎免费，于是决策错误的代价被放大了。写得越快，选错的代价越高。**
-
-这就是为什么在 AI 时代，"选型"和"验证"这两件事的价值是上升的，不是下降的。这跟很多人的直觉相反，但这是杠杆的基本性质：杠杆放大的是你推的方向，方向错了它一样放大。
--->
-
----
-layout: center
-class: text-center
----
-
-# 最后一条理由
-
-<div class="mt-10 p-8 rounded-lg border-2 border-teal-500/40 bg-teal-500/5 max-w-4xl mx-auto">
-
-<div class="text-2xl font-bold leading-relaxed">
-LLM 训练与推理栈的每一次关键性能突破，<br>背后都站着一个<span class="text-teal-700 dark:text-teal-300">经典数据结构问题</span>。
-</div>
-
-</div>
-
-<div v-click class="mt-6 text-xl">
-数据结构在 AI 领域不是<span class="line-through decoration-rose-500 decoration-2 opacity-60">外围课程</span>，而是<span class="font-bold text-teal-700 dark:text-teal-300">核心课程</span>。
-</div>
-
-<UnitNav :active="5" />
-
-<!--
-最后一条理由。有同学觉得，数据结构是一门很老的课，跟 AI 是两个世界的事——AI 那边是矩阵、是梯度、是 Transformer，跟树跟图有什么关系。
-
-[click] 我这一节就讲一件事：**大模型训练与推理栈的每一次关键性能突破，背后都站着一个经典数据结构问题。** 你想做 AI，数据结构不是外围，是核心。
--->
-
----
-
-# 推理侧 · 新闻里的名词，背后都是<span class="text-teal-600 dark:text-teal-400">经典问题</span>
-
-<div grid="~ cols-2 gap-x-5 gap-y-2.5" class="mt-4 text-sm">
-
-<div v-click="1" class="p-2.5 rounded border border-gray-400/25 bg-gray-500/5">
-  <div class="font-bold">KV Cache 分页管理<span class="text-xs opacity-60 font-normal"> · PagedAttention / vLLM</span></div>
-  <div class="text-xs mt-1 text-teal-700 dark:text-teal-300">分页 + 间接索引表　<span class="opacity-70">与内存分配器、OS 页表同源</span></div>
-</div>
-
-<div v-click="2" class="p-2.5 rounded border border-gray-400/25 bg-gray-500/5">
-  <div class="font-bold">前缀复用<span class="text-xs opacity-60 font-normal"> · Prefix Caching</span></div>
-  <div class="text-xs mt-1 text-teal-700 dark:text-teal-300">Trie／压缩基数树 + 引用计数 + LRU</div>
-</div>
-
-<div v-click="3" class="p-2.5 rounded border border-gray-400/25 bg-gray-500/5">
-  <div class="font-bold">向量检索 / RAG<span class="text-xs opacity-60 font-normal"> · 亿级 top-k</span></div>
-  <div class="text-xs mt-1 text-teal-700 dark:text-teal-300">HNSW（多层图，跳表式分层导航）、IVF 倒排、乘积量化</div>
-</div>
-
-<div v-click="4" class="p-2.5 rounded border border-gray-400/25 bg-gray-500/5">
-  <div class="font-bold">采样<span class="text-xs opacity-60 font-normal"> · top-k / top-p</span></div>
-  <div class="text-xs mt-1 text-teal-700 dark:text-teal-300">全排序 O(V log V) ｜ 堆 O(V log k) ｜ 快速选择 O(V)</div>
-</div>
-
-<div v-click="5" class="p-2.5 rounded border border-gray-400/25 bg-gray-500/5">
-  <div class="font-bold">投机解码 / Beam Search</div>
-  <div class="text-xs mt-1 text-teal-700 dark:text-teal-300">优先队列；草稿构成 token 树，验证是树上批量匹配</div>
-</div>
-
-<div v-click="5" class="p-2.5 rounded border border-gray-400/25 bg-gray-500/5">
-  <div class="font-bold">连续批处理<span class="text-xs opacity-60 font-normal"> · continuous batching</span></div>
-  <div class="text-xs mt-1 text-teal-700 dark:text-teal-300">调度队列、优先级队列、抢占与公平性</div>
-</div>
-
-<div v-click="5" class="p-2.5 rounded border border-gray-400/25 bg-gray-500/5">
-  <div class="font-bold">结构化解码<span class="text-xs opacity-60 font-normal"> · JSON／正则约束</span></div>
-  <div class="text-xs mt-1 text-teal-700 dark:text-teal-300">有限状态自动机 + Trie，在词表上生成掩码</div>
-</div>
-
-<div v-click="6" class="p-2.5 rounded border-2 border-amber-500/45 bg-amber-500/10">
-  <div class="font-bold">FlashAttention</div>
-  <div class="text-xs mt-1 text-amber-700 dark:text-amber-300">分块 tiling + cache／SRAM 局部性 —— <span class="font-bold">即「知识不死，而且变贵」的又一次应验</span></div>
-</div>
-
-</div>
-
-<div v-click="7" class="mt-4 text-center text-sm opacity-80">
-2022 年的顶级论文，用的是 <span class="font-bold">1980 年代</span>的道理。
-</div>
-
-<UnitNav :active="5" />
-
-<!--
-快速看一眼，因为这些内容不是几分钟内能讲清楚的。
-
-[click] 第一条，KV Cache 分页。大模型推理最吃显存的就是 KV cache，而且每个请求长度不一样，显存会碎掉。vLLM 的解法叫 PagedAttention——把 KV cache 切成固定大小的块，用一张块表把逻辑上的序列映射到物理块上。听着熟悉吗？这就是操作系统的页表，就是内存分配器解决碎片的老办法，原封不动地搬到显存上。（此处可板书手画：逻辑块 → 块表 → 物理块）
-
-[click] 第二条，前缀复用。很多请求前面挂着同一段 system prompt，几千个 token 一模一样，重复算就是浪费。解法是把所有请求的 token 序列组织成一棵压缩基数树，共同前缀共享同一份 KV，加引用计数，加 LRU 淘汰。一棵 Trie 加一个 LRU——两个都是这门课的内容。
-
-[click] 第三条，向量检索。RAG 要在上亿个向量里找最近邻，主流方案叫 HNSW，全称 Hierarchical Navigable Small World。它是一个多层图，上层稀疏、下层密集，从上往下逐层缩小搜索范围。它的分层导航思想，跟跳表是一回事。
-
-[click] 第四条，采样。top-k 采样，从几万个词里挑前 k 个。你要是全排序，O(V log V)；用堆，O(V log k)；用快速选择，O(V)。这三个复杂度我们在排序和选择那一章讲。大模型每生成一个 token 都要做这个决定，一秒钟做几十次。
-
-[click] 中间这三条你们自己看，投机解码是优先队列加 token 树，连续批处理是调度队列，结构化解码是自动机加 Trie。
-
-[click] 最后一条，FlashAttention——这个是近几年最有名的推理优化之一，它的核心思想就是分块，让数据待在 SRAM 里别来回搬。**这就是 cache 局部性。**
-
-[click] 我在前面说过，编译器吃掉了手写汇编，但 cache 局部性反而变贵了。这是 2022 年的顶级论文，用的是 1980 年代的道理。
--->
-
----
-
-# 训练侧 · 流水线上的每一步，背后都是<span class="text-teal-600 dark:text-teal-400">经典问题</span>
-
-<div class="mt-4 text-sm">
-
-<div class="flex gap-4 pb-1.5 mb-1 border-b border-gray-400/30 text-xs tracking-wide opacity-55">
-  <div class="w-64 shrink-0">AI 系统技术</div>
-  <div class="flex-1">底层数据结构与算法</div>
-</div>
-
-<div class="flex gap-4 py-2 rounded border-2 border-amber-500/45 bg-amber-500/10 my-1">
-  <div class="w-64 shrink-0 font-bold pl-2">训练语料去重<span class="text-xs opacity-60 font-normal"> · 万亿 token 级</span></div>
-  <div class="flex-1 text-amber-700 dark:text-amber-300 font-bold">MinHash + LSH、<span v-mark.circle.orange="1">Bloom filter</span>、SimHash</div>
-</div>
-
-<div class="flex gap-4 py-1.5 border-b border-gray-400/15 opacity-65">
-  <div class="w-64 shrink-0">Tokenizer / BPE 训练与编码</div>
-  <div class="flex-1">优先队列 + 双向链表；Trie／Aho-Corasick 最长匹配</div>
-</div>
-
-<div class="flex gap-4 py-2 rounded border-2 border-amber-500/45 bg-amber-500/10 my-1">
-  <div class="w-64 shrink-0 font-bold pl-2">自动微分 / 反向传播</div>
-  <div class="flex-1 text-amber-700 dark:text-amber-300 font-bold">计算图是 <span v-mark.circle.orange="2">DAG</span>；反向传播 = 拓扑排序的逆序遍历</div>
-</div>
-
-<div class="flex gap-4 py-1.5 border-b border-gray-400/15 opacity-65">
-  <div class="w-64 shrink-0">梯度检查点</div>
-  <div class="flex-1">典型时间-空间权衡；最优重算策略可用动态规划求解</div>
-</div>
-
-<div class="flex gap-4 py-1.5 border-b border-gray-400/15 opacity-65">
-  <div class="w-64 shrink-0">稀疏张量 / 图神经网络</div>
-  <div class="flex-1">CSR／CSC 稀疏格式、邻接表、图遍历</div>
-</div>
-
-<div class="flex gap-4 py-1.5 border-b border-gray-400/15 opacity-65">
-  <div class="w-64 shrink-0">MoE 路由</div>
-  <div class="flex-1">top-k 选择 + 负载均衡（分配／装箱问题）</div>
-</div>
-
-<div class="flex gap-4 py-1.5 border-b border-gray-400/15 opacity-65">
-  <div class="w-64 shrink-0">分布式 All-Reduce</div>
-  <div class="flex-1">Ring／树形归约；通信复杂度由树结构决定</div>
-</div>
-
-<div class="flex gap-4 py-1.5 opacity-65">
-  <div class="w-64 shrink-0">Embedding 表 / 特征哈希</div>
-  <div class="flex-1">哈希函数设计、冲突处理、hash trick</div>
-</div>
-
-</div>
-
-<UnitNav :active="5" />
-
-<!--
-训练这一侧我快速扫过，你们回去自己看，我只点两行。
-
-[click] **第一行，训练语料去重。** 万亿 token 级的语料，要判断这段文本之前有没有见过。用什么？MinHash 加 LSH、SimHash，还有——Bloom filter。请你们回想一下前面那次对照实验，Prompt B 的答案是什么？就是这个东西。
-
-[click] **自动微分那一行。** 反向传播是怎么实现的？前向的时候把所有运算记成一张有向无环图，反向的时候按拓扑排序的逆序遍历这张图，逐个节点传梯度。所以你每次调 loss.backward()，PyTorch 在底下做的就是一次图的拓扑遍历。DAG 和拓扑排序，我们图那一章讲。（可板书手画：计算图 DAG + 拓扑逆序回传）
-
-[click] 我当时出那道题不是编的，那是大模型训练流水线里每天在跑的真实生产问题。你们今天已经会问这道题了。其余几行你们自己对着课程目录看。
--->
-
----
-layout: center
-class: text-center
----
-
-# 一句话收
-
-<div class="mt-8 space-y-4 max-w-4xl mx-auto">
-
-<div class="p-5 rounded-lg border border-gray-400/30 bg-gray-500/5">
-  <div class="text-xl">
-    大模型的<span class="font-bold">能力上限</span>　←　由<span class="font-bold">算法研究</span>决定
-  </div>
-</div>
-
-<div v-click class="p-6 rounded-lg border-2 border-teal-500/45 bg-teal-500/8">
-  <div class="text-xl leading-relaxed">
-    它能否<span class="font-bold">跑得起来、跑得便宜、跑得稳定</span><br>
-    ←　几乎完全由<span class="font-bold text-teal-700 dark:text-teal-300">数据结构与系统实现</span>决定
-  </div>
-</div>
-
-</div>
-
-<div v-click class="mt-6 text-sm opacity-75">
-今天这个行业里工资最高的一批工程师，做的就是<span class="font-bold">后面这件事</span>。
-</div>
-
-<UnitNav :active="5" />
-
-<!--
-一句话收：大模型的能力上限，由算法研究决定；
-
-[click] 但它能不能跑起来、跑得便不便宜、稳不稳定，几乎完全由数据结构和系统实现决定。
-
-[click] 今天这个行业里工资最高的一批工程师，做的就是后面这件事。
-
-（如现场有时间，可对着课程目录点几个结构名，说明本课覆盖率；不必逐条展开。）
+我们拿复数当第一个例子。为什么不用栈？两个原因说给你们听：复数的数学模型你们高数里已经滚瓜烂熟了，我不用花时间解释"什么是复数相加"，你们的注意力可以百分之百放在"接口长什么样"上；栈要到第三章才讲，现在借来用，等于欠账。
+（念一遍 ADT）看这份说明书：数据对象是两个实数，数据关系是有序对——注意"有序"，实部虚部不能换位置；然后是六个操作。
+这份东西里有没有一个字提到内存？有没有提数组、指针、malloc？没有。这就叫规格说明：只说能做什么。
+操作表里有个符号先带一眼：InitComplex 的括号里，C 前面有个 &。先说半句——它不是取地址运算符；为什么、怎么用，后面讲引用形参的时候整页展开，现在不用管它。
+最后体会这份"说明书"对使用者的意义：信息隐藏。用这个复数库的人，只需要会调 Add、Multiply，不需要知道你内部是直角坐标还是极坐标；哪天你把内部整个换掉，他也不用知道。接口把实现挡在外面——这就是为什么先写 ADT、再写代码。
 -->
 
 ---
 layout: section
 ---
 
-# 那么这学期，我到底该练什么
+# C 回顾与引用语义
 
 <div class="pt-4 text-sm opacity-60">
-五条理由走完，回答最实际的那个问题
+为后面每一章打地基——不背结论，到调试器里看内存
 </div>
 
 <!--
-走完五条理由，现在回答那个最实际的问题：既然有的贬值有的升值，这学期我到底该把时间花在哪儿？
-
-我用布鲁姆教育目标分类法来说。这是教育学里描述认知层次的经典框架，六层，从记忆、理解、应用，到分析、评价、创造。
--->
-
----
-layout: full
----
-
-<div class="h-full flex flex-col px-10 py-6">
-
-<div class="text-center shrink-0">
-  <div class="text-2xl font-bold">布鲁姆六层能力 · AI 前后的权重变化</div>
-  <div class="text-xs opacity-55 mt-1">下三层缩，上三层涨</div>
-</div>
-
-<div class="flex-1 flex mt-4 min-h-0">
-
-<div class="flex-1 text-sm min-h-0 flex flex-col justify-center gap-2">
-
-<div class="flex gap-3 px-1 pb-1 border-b border-gray-400/30 text-xs tracking-wide opacity-55">
-  <div class="w-14 shrink-0">层次</div>
-  <div class="flex-1">典型行为</div>
-  <div class="w-28 shrink-0 text-center">权重</div>
-</div>
-
-<div v-click="1" class="flex gap-3 items-center px-1 py-2">
-  <div class="w-14 shrink-0 font-bold">6 创造</div>
-  <div class="flex-1">把模糊业务问题形式化成带约束的规格；设计组合型结构</div>
-  <div class="w-28 shrink-0 text-center text-xs"><span class="opacity-45">★</span> <span class="text-teal-600 dark:text-teal-400 font-bold">→ ★★★★★</span></div>
-</div>
-
-<div v-click="1" class="flex gap-3 items-center px-1 py-2">
-  <div class="w-14 shrink-0 font-bold">5 评价</div>
-  <div class="flex-1">在多个可行方案间取舍：时间／空间／精度／一致性／成本</div>
-  <div class="w-28 shrink-0 text-center text-xs"><span class="opacity-45">★</span> <span class="text-teal-600 dark:text-teal-400 font-bold">→ ★★★★★</span></div>
-</div>
-
-<div v-click="1" class="flex gap-3 items-center px-1 py-2">
-  <div class="w-14 shrink-0 font-bold">4 分析</div>
-  <div class="flex-1">复杂度分析、瓶颈定位、识别 AI 方案中的 O(n²)</div>
-  <div class="w-28 shrink-0 text-center text-xs"><span class="opacity-45">★★</span> <span class="text-teal-600 dark:text-teal-400 font-bold">→ ★★★★★</span></div>
-</div>
-
-<div v-click="2" class="flex gap-3 items-center px-1 py-2 rounded bg-amber-500/10 border border-amber-500/30">
-  <div class="w-14 shrink-0 font-bold">3 应用</div>
-  <div class="flex-1">从「照实现写代码」转为「选型 + 委托 + 验证」</div>
-  <div class="w-28 shrink-0 text-center text-xs"><span class="opacity-45">★★★★</span> <span class="text-rose-600 dark:text-rose-400 font-bold">→ ★★</span></div>
-</div>
-
-<div v-click="3" class="flex gap-3 items-center px-1 py-2 rounded bg-teal-500/12 border border-teal-500/35">
-  <div class="w-14 shrink-0 font-bold">2 理解</div>
-  <div class="flex-1">解释不变量、解释复杂度成因 —— <span class="font-bold">不降反升</span></div>
-  <div class="w-28 shrink-0 text-center text-xs"><span class="opacity-45">★★★</span> <span class="text-teal-600 dark:text-teal-400 font-bold">→ ★★★★</span></div>
-</div>
-
-<div v-click="2" class="flex gap-3 items-center px-1 py-2 rounded bg-amber-500/10 border border-amber-500/30">
-  <div class="w-14 shrink-0 font-bold">1 记忆</div>
-  <div class="flex-1">背 API、背旋转代码 —— 但保留最小集：<span class="font-bold">概念名词表</span></div>
-  <div class="w-28 shrink-0 text-center text-xs"><span class="opacity-45">★★★★</span> <span class="text-rose-600 dark:text-rose-400 font-bold">→ ★</span></div>
-</div>
-
-<div v-click="4" class="mt-2 p-2.5 rounded-lg bg-teal-500/12 border-2 border-teal-500/40 text-center">
-  <div class="text-lg font-bold">从「熟练工」往「决策者」转型</div>
-  <div class="text-xs mt-0.5 opacity-80">理论联系实践，在课后实践中培养判断能力</div>
-</div>
-
-</div>
-</div>
-</div>
-
-<!--
-（对着权重列讲：箭头左边是 AI 之前的星级，右边是 AI 之后。）
-
-[click] **上面三层，涨，而且是大涨。** 分析从两星涨到五星，评价从一星涨到五星，创造从一星涨到五星。
-
-[click] **下面三层，缩。** 记忆从四星掉到一星，应用从四星掉到两星。为什么？因为 AI 就是干这个的。你花二十个小时练手写红黑树，练出来的能力，AI 三秒钟给你。
-
-[click] 理解那一层我要单独说：它从三星涨到四星，**不降反升**。为什么？因为你不理解，你就没法审计 AI。你不知道 O(M×N) 是怎么来的，你就永远看不出那段区县循环有问题。理解是分析的地基，地基不能拆。
-
-[click] 我把这张表的意思说白了：**这学期，从"熟练工"往"决策者"转型——理论联系实践，在课后实践中培养判断能力。**
+先把这半节定个性：这是一节地基课。后面每一章——链表、栈、树——代码脚下踩的都是这三样：指针、内存、引用。地基不牢，后面每一章都会晃。
+指针这块，我不打算只念四条结论。你们在 C 课都学过指针，但大多数人是"会用"而不是"看过"——变量住哪、指针里装的是什么，脑子里没有画面。我准备了一个小演示程序，这一节我们会把它在调试器里跑一遍，打开 Memory 窗口一字节一字节地看：变量的地址、指针的值、*p 改内存的时候字节怎么变。
+看完内存再讲引用——它是后面所有接口形参的主线；最后收在动态内存规范和工程习惯上。这一节走完，后面每一章的代码就读得懂、写得出。
 -->
 
 ---
 
-# 澄清一 · 记忆层不归零，是换内容
+# 演示程序 · 两个变量，一根指针
 
-<div grid="~ cols-2 gap-6" class="mt-6">
+<div class="pt-2">
 
-<div class="p-5 rounded-lg border border-rose-500/30 bg-rose-500/5">
-  <div class="text-xs tracking-widest opacity-60 mb-2">归零的记忆</div>
-  <div class="text-base">代码怎么写</div>
-  <div class="text-xs mt-2 opacity-70 font-mono">rotateLeft 的 12 行<br>std::lower_bound 的参数顺序</div>
-  <div class="mt-3 pt-2 border-t border-rose-500/20 text-sm font-bold text-rose-600 dark:text-rose-400">可完全外包给 AI</div>
-</div>
+<<< @/snippets/ch01/memory-insight.cpp#vars
 
-<div v-click="1" class="p-5 rounded-lg border-2 border-teal-500/40 bg-teal-500/5">
-  <div class="text-xs tracking-widest opacity-60 mb-2">升值的记忆</div>
-  <div class="text-base font-bold">概念名词及其适用条件</div>
-  <div class="text-xs mt-2 opacity-70">「有这么个东西，它在什么情况下该用」</div>
-  <div class="mt-3 pt-2 border-t border-teal-500/20 text-sm font-bold text-teal-600 dark:text-teal-400">不可外包</div>
-</div>
-
-</div>
-
-<div v-click="2" class="mt-6 p-4 rounded-lg bg-amber-500/10 border-l-4 border-amber-500">
-
-<div class="text-xs tracking-widest opacity-60 mb-2">为什么不可外包 —— 回到那次对照实验</div>
-
-<div class="text-lg leading-relaxed">
-认知库里没有 <span class="font-mono font-bold">Bloom filter</span> 这个词，就<span class="font-bold">不可能提出 Prompt B</span>。<br>
-<span class="text-base opacity-85">AI 能给答案，但不能替你想到「应该提这个问题」。</span>
-</div>
+<<< @/snippets/ch01/memory-insight.cpp#ptr
 
 </div>
 
 <!--
-这里有个地方极容易被误读，我必须澄清：**我说的不是"记忆没用了"，我说的是"要记的东西换了"。**
-
-归零的是"代码怎么写"——rotateLeft 那十二行，lower_bound 的参数顺序，忘了就忘了，问 AI。
-
-[click] 升值的是"概念名词，以及它的适用条件"。这个不能外包。
-
-[click] 理由回到那次对照实验：**你脑子里没有 Bloom filter 这个词，你就永远问不出 Prompt B。** AI 能给你答案，但它不能替你想到"我应该问这个问题"。想到问题是你的活。
+这是演示程序的关键代码——完整程序六步，在页面上先盯两处。
+第一处：两个 int，值故意选得有特征——0x11223344、0x55667788，就是为了在内存窗口里一眼认出哪个字节属于 a、哪个属于 b；往下几行 printf，把值和地址一起打出来。
+第二处：一句 int *p = &a——指针的定义；跟着 printf 把 p 和 &a 并排打出来比较。就这两处。接下来两张调试器截图，就围着这一页的代码看。
 -->
 
 ---
 
-# 我们要理解的知识，长这个样子
+# 证据一 · 内存里是字节
 
-<div class="mt-3 text-sm">
+<div class="pt-3">
 
-<div class="flex gap-4 pb-1.5 mb-1 border-b border-gray-400/30 text-xs tracking-wide opacity-55">
-  <div class="flex-[1.5]">需求特征</div>
-  <div class="w-52 shrink-0">首选结构</div>
-  <div class="flex-1">关键代价</div>
-</div>
+<img src="/images/ch01/memory-insight-a.png" class="block mx-auto max-h-[390px] rounded-lg shadow-lg border border-gray-400/30" />
 
-<div v-click="1" class="flex gap-4 py-2 rounded border-2 border-amber-500/40 bg-amber-500/10 my-1">
-  <div class="flex-[1.5] pl-2">只判断存在性，允许极小误判，内存紧张</div>
-  <div class="w-52 shrink-0 font-bold">Bloom filter</div>
-  <div class="flex-1 text-rose-600 dark:text-rose-400">假阳性；不支持删除</div>
-</div>
+<div class="pt-3 text-sm opacity-85">
 
-<div v-click="2" class="flex gap-4 py-2 border-b border-gray-400/15">
-  <div class="flex-[1.5] pl-2">需要有序 + 范围查询</div>
-  <div class="w-52 shrink-0 font-bold">平衡树／跳表／B+ 树</div>
-  <div class="flex-1 text-rose-600 dark:text-rose-400">O(log n)；常数大于哈希</div>
-</div>
-
-<div v-click="3" class="flex gap-4 py-2 rounded border-2 border-amber-500/40 bg-amber-500/10 my-1">
-  <div class="flex-[1.5] pl-2">只按 key 精确查找</div>
-  <div class="w-52 shrink-0 font-bold">哈希表</div>
-  <div class="flex-1 text-rose-600 dark:text-rose-400">无序；最坏 O(n)；扩容抖动</div>
-</div>
-
-<div v-click="4" class="flex gap-4 py-2 border-b border-gray-400/15">
-  <div class="flex-[1.5] pl-2">反复取极值 + 动态插入</div>
-  <div class="w-52 shrink-0 font-bold">堆／优先队列</div>
-  <div class="flex-1 text-rose-600 dark:text-rose-400">不支持高效查找任意元素</div>
-</div>
-
-<div v-click="4" class="flex gap-4 py-2 border-b border-gray-400/15">
-  <div class="flex-[1.5] pl-2">大量前缀共享的字符串集合</div>
-  <div class="w-52 shrink-0 font-bold">Trie／基数树</div>
-  <div class="flex-1 text-rose-600 dark:text-rose-400">内存开销大；指针跳转不利于 cache</div>
-</div>
-
-<div v-click="4" class="flex gap-4 py-2 border-b border-gray-400/15">
-  <div class="flex-[1.5] pl-2">数据超出内存、只能顺序读</div>
-  <div class="w-52 shrink-0 font-bold">外部排序／流式算法</div>
-  <div class="flex-1 text-rose-600 dark:text-rose-400">多趟 I/O</div>
-</div>
-
-<div v-click="4" class="flex gap-4 py-2">
-  <div class="flex-[1.5] pl-2">关系是多对多连接</div>
-  <div class="w-52 shrink-0 font-bold">图 + 邻接表</div>
-  <div class="flex-1 text-rose-600 dark:text-rose-400">遍历顺序决定复杂度</div>
-</div>
+**Memory View**：在 `&b` 处看 8 个字节——`88 77 66 55` 是 `b`、`44 33 22 11` 是 `a`（小端序，低位字节在前）。
 
 </div>
 
-<div v-click="5" class="mt-3 p-3 rounded-lg bg-teal-500/12 border-2 border-teal-500/40 flex items-center gap-4">
-  <div class="text-lg font-bold flex-1">这张表就是你和 AI 对话的<span class="text-teal-700 dark:text-teal-300">接口协议</span>。</div>
-  <div class="text-sm opacity-80 shrink-0">期末考这张表，<span class="font-bold">不考任何一行具体代码</span>。</div>
 </div>
 
 <!--
-所以这学期我们要理解的知识，长这个样子——你们看这张表。左边是需求的特征，中间是首选结构，右边是它的代价。
-
-[click] 我举一行：第一行，只要判断存在性、允许极小误判、内存紧——你脑子里就要立刻蹦出 Bloom filter，同时立刻想到它的代价：有假阳性、而且不能删除。
-
-[click] 第二行，要有序、要范围查询，平衡树、跳表、B+ 树。
-
-[click] 第三行，只按 key 精确查——哈希表，代价是无序、最坏 O(n)、还有扩容抖动。
-
-[click] 剩下四行你们自己看。这张表会跟着课程一章一章加行，每讲完一章我们就往上补。
-
-[click] **这张表就是你跟 AI 对话的接口协议。** 你手上有这张表，你才能给出规格；你没有，你只能说"帮我写个函数"。期末我考这张表，不考任何一行具体代码。
+先看第一个证据——变量到底是什么？别急着背结论，到内存里看。
+调试器里，我在 Memory 窗口输入 &b，也就是 b 的地址，它把那一段内存摊成一格一格的字节：88 77 66 55 是 b，紧挨着的 44 33 22 11 是 a，两个 int 背靠背，一个占 4 格。注意字节是倒着放的，低位在前——这就叫小端序。
+内存不是比喻，变量的值就是一行看得见的字节。
 -->
 
 ---
 
-# 澄清二 · 那我一行都不写行不行？
+# 证据二 · 指针里是地址
 
-<div class="mt-4 p-4 rounded-lg bg-rose-500/8 border-l-4 border-rose-500">
+<div class="pt-3">
 
-<div class="text-base leading-relaxed">
-未经亲手实现，对复杂度的判断只是<span class="font-bold">背下来的字符串</span>，无法转化为可用直觉。<br>
-由此产生<span class="font-bold text-rose-600 dark:text-rose-400">能力幻觉</span>（illusion of competence）：<span class="font-bold">读得懂，但判断不了。</span>
-</div>
+<img src="/images/ch01/memory-insight-b.png" class="block mx-auto max-h-[390px] rounded-lg shadow-lg border border-gray-400/30" />
 
-</div>
+<div class="pt-3 text-sm opacity-85">
 
-<div class="mt-5 text-sm">
-
-<div class="flex items-baseline gap-3 mb-2">
-  <div class="font-bold text-base">最小必要手写清单</div>
-  <div class="text-xs opacity-65">四项，每项只做一次 · 目标是建立体感，不追求熟练度</div>
-</div>
-
-<div class="flex gap-4 pb-1.5 mb-1 border-b border-gray-400/30 text-xs tracking-wide opacity-55">
-  <div class="w-6 shrink-0">#</div>
-  <div class="flex-1">手写内容</div>
-  <div class="flex-1">要获得的体感</div>
-</div>
-
-<div v-click="1" class="flex gap-4 py-2.5 border-b border-gray-400/15">
-  <div class="w-6 shrink-0 font-bold opacity-45">1</div>
-  <div class="flex-1 font-bold">链表<span class="font-normal opacity-70">（插入、删除、反转）</span></div>
-  <div class="flex-1 text-teal-700 dark:text-teal-300">「O(1) 插入」的代价：随机访存与边界处理</div>
-</div>
-
-<div v-click="2" class="flex gap-4 py-2.5 border-b border-gray-400/15">
-  <div class="w-6 shrink-0 font-bold opacity-45">2</div>
-  <div class="flex-1 font-bold">递归在二叉树中的应用</div>
-  <div class="flex-1 text-teal-700 dark:text-teal-300">树的问题 = 左子树 + 右子树 + 一步</div>
-</div>
-
-<div v-click="3" class="flex gap-4 py-2.5 border-b border-gray-400/15">
-  <div class="w-6 shrink-0 font-bold opacity-45">3</div>
-  <div class="flex-1 font-bold">哈希表<span class="font-normal opacity-70">（含冲突处理与扩容）</span></div>
-  <div class="flex-1 text-teal-700 dark:text-teal-300">「O(1) 平均」背后的代价与最坏情况</div>
-</div>
-
-<div v-click="4" class="flex gap-4 py-2.5 border-b border-gray-400/15">
-  <div class="w-6 shrink-0 font-bold opacity-45">4</div>
-  <div class="flex-1 font-bold">堆／优先队列 + top-k 应用</div>
-  <div class="flex-1 text-teal-700 dark:text-teal-300">O(n log n) 与 O(n log k) 的实际差距</div>
-</div>
+**Console**：`&a`、`&b` 相差正好 4 字节；`p` 的值和 `&a` 一模一样。
 
 </div>
 
-<div v-click="5" class="mt-4 p-3 rounded bg-amber-500/10 border-l-4 border-amber-500 text-sm">
-<span class="font-bold">平衡树：旋转不用写，但要理解。</span>　重点是它维持什么不变量、为什么长成这样。
 </div>
 
 <!--
-有同学听到这里会问：既然不考代码，那我一行都不写行不行？
+再看第二个证据：指针里装的是什么？
+这是 Console 的输出：第 1 步打出 &a 和 &b——就是刚才内存页摊开的那两个位置，两个地址正好差 4 字节，一个 int 的宽度；第 2 步，p 的值和 &a 一模一样。指针里装的是不是地址？不用背了，值就在屏幕上。
+（编辑器里 p = &a 那一行，CLion 已经把 p 的值标在旁边——就是 &a 的那个地址。）
+变量有地址、指针存地址、内存是字节——三句话都有了实物，下一页把它们收成结论。
+-->
 
-不行。理由不是"传统上就得这么练"，是认知规律：**你没亲手实现过，你对复杂度的判断只是一串背下来的字符串，不是能用的直觉。** 你会得到一种很危险的状态，教育心理学叫"能力幻觉"——你读代码觉得都懂，一到要你判断这段代码在千万级数据下会不会崩，你答不出来。
+---
 
-所以我保留一个**很短**的手写清单，四项，每项只做一次，我不追求你熟练，我追求你有体感。
+# 指针，只留四条结论
 
-[click] 链表，先把手感找回来：指针怎么重连、边界条件是怎么冒出来的。
+<div class="pt-2 text-sm opacity-80">变量有地址、指针存地址、内存是字节——三句话都有实物，收成四条结论。</div>
 
-[click] 二叉树的递归——任何树的问题，都能拆成"左子树、右子树、合一步"；复杂度，顺着递归式就出来了。
+<div grid="~ cols-2 gap-4" class="pt-5 text-sm">
+<div class="rounded-lg border p-3">
+  <div class="font-bold">① 指针变量里存的是<b class="text-orange-500">地址</b></div>
+  <div class="pt-1.5 opacity-80">证据二里 <code>p == &amp;a</code>——p 的值就是 a 的地址，屏幕上刚见过。</div>
+</div>
+<div class="rounded-lg border p-3">
+  <div class="font-bold">② <code>*p</code> <b class="text-orange-500">解引用</b>；<code>p-&gt;x</code> 等价于 <code>(*p).x</code></div>
+  <div class="pt-1.5 opacity-80">顺着地址找过去，拿到的是对象本身；<code>-&gt;</code> 只是"先找对象、再取成员"的简写。</div>
+</div>
+<div class="rounded-lg border p-3">
+  <div class="font-bold">③ <code>NULL</code> 表示"不指向任何对象"</div>
+  <div class="pt-1.5 opacity-80">链式结构表示"没有下一个"的<b class="text-orange-500">唯一</b>手段——以后所有遍历都靠它收尾。</div>
+</div>
+<div class="rounded-lg border p-3">
+  <div class="font-bold">④ 指针本身的大小与平台相关，<b class="text-orange-500">与所指类型无关</b></div>
+  <div class="pt-1.5 opacity-80">32 位机 4 字节、64 位机 8 字节——<code>int*</code> 和 <code>char*</code> 一样大，年年有人答错。</div>
+</div>
+</div>
 
-[click] 哈希表，你要亲手感受一下"平均 O(1)"背后压着什么代价、最坏情况长什么样。
+<div class="pt-6 rounded-lg border border-teal-500/50 bg-teal-500/10 p-3 text-sm">
 
-[click] 堆加 top-k，亲手对比一下 n log n 和 n log k 差多少。
+**链式实现完全依赖指针**——指针不熟，第 2 章之后寸步难行。
 
-[click] **注意：平衡树，旋转不用写，但要理解。** 我们会讲它的不变量、讲它为什么长成这样、讲它跟 B 树的关系——把"它在维持什么"说清楚，比写得出来重要。
+</div>
+
+<!--
+先给指针这部分定个调：是复习，不是新课。我不重讲 C 语言，只挑这门课天天要用的东西扫一遍——哪条你陌生，课后自己补。
+指针，收成四条。
+第一条：指针里存的是地址——证据二里 p 的值和 &a 一模一样，屏幕上刚看过，不用背。
+第二条：星号是解引用——顺着地址找过去，拿到的是对象本身；p->x 只是"先找对象、再取成员"的简写，第二章的代码里满眼都是它。
+第三条：NULL 表示不指向任何东西。这一条以后特别重要——链表的末尾靠什么表示"到头了"？就靠 NULL，它是唯一手段；以后所有遍历都靠它收尾。
+第四条：指针本身多大？跟它指向什么类型没关系，64 位机上一律 8 字节——年年有人答错。
+一句话定调：这门课的链式实现，完完全全靠指针。指针不熟，第二章往后你就寸步难行。这不是吓你，这是事实。
+下一页把这条调子落在代码上——这门课最重要的一个 struct。
+-->
+
+---
+
+# 自引用结构体——后面所有链式结构的模板
+
+<div class="pt-2 text-sm opacity-80">一个结构体把数据打包成整体；里面有一个指针——指向自己这种类型。</div>
+
+<div grid="~ cols-2 gap-6" class="pt-6 text-sm">
+<div>
+
+```c
+typedef struct Node {
+    int          data;   /* 数据域：对应"数据元素 / 数据项" */
+    struct Node *next;   /* 指针域：对应"逻辑关系的显式表示" */
+} Node;
+```
+
+</div>
+<div>
+
+<div class="text-center">
+  <div class="pb-3 text-sm font-bold text-orange-500">三个结点 · 串成一条链</div>
+  <div class="flex items-end justify-center gap-1 font-mono">
+    <div class="flex flex-col items-center">
+      <div class="flex border border-orange-500 rounded overflow-hidden bg-orange-500/10">
+        <div class="w-9 h-11 flex items-center justify-center border-r border-orange-500/50">10</div>
+        <div class="w-12 h-11 flex items-center justify-center text-xs">800</div>
+      </div>
+      <div class="pt-1 text-xs opacity-70">@100</div>
+    </div>
+    <div class="pb-5 text-orange-500">→</div>
+    <div class="flex flex-col items-center">
+      <div class="flex border border-orange-500 rounded overflow-hidden bg-orange-500/10">
+        <div class="w-9 h-11 flex items-center justify-center border-r border-orange-500/50">20</div>
+        <div class="w-12 h-11 flex items-center justify-center text-xs">302</div>
+      </div>
+      <div class="pt-1 text-xs opacity-70">@800</div>
+    </div>
+    <div class="pb-5 text-orange-500">→</div>
+    <div class="flex flex-col items-center">
+      <div class="flex border border-orange-500 rounded overflow-hidden bg-orange-500/10">
+        <div class="w-9 h-11 flex items-center justify-center border-r border-orange-500/50">30</div>
+        <div class="w-12 h-11 flex items-center justify-center text-xs opacity-60">NULL</div>
+      </div>
+      <div class="pt-1 text-xs opacity-70">@302</div>
+    </div>
+  </div>
+  <div class="pt-5 text-xs opacity-80">每个结点都是一个 <code>Node</code>：<code>data</code> 装数据元素，<code>next</code> 存下一个结点的地址</div>
+  <div class="pt-1 text-xs opacity-80">最后一个 <code>next</code> 为 <code>NULL</code>——"没有下一个"</div>
+</div>
+
+</div>
+</div>
+
+<div class="pt-7 rounded-lg border border-orange-500/50 bg-orange-500/10 p-3 text-xs">
+
+坑：里面必须写 `struct Node *next`，**不能写 `Node *next`**——typedef 起的名字要等花括号闭合、分号打完才生效。
+
+</div>
+
+<!--
+把调子落在代码上——这门课最重要的一个 struct，看清楚：结构体里有一个指向自己这种类型的指针。
+data 是数据域，对应上半节课说的数据元素；next 是指针域，对应什么？（指左板那张"存储结构"图）对应"关系的显式表示"。上半节课那句抽象的话，落在这一行代码上——关系，第一次有了显式的存放处。
+（指右图）三个结点串成一条链，每个都是一个 Node：data 里装值，next 里装下一个结点的地址；最后一个 next 写 NULL，链就到头了。以后这样的图，你要画几百遍。
+（板书：跟着这张图，在左板"存储结构"那条链旁边再串一遍三个结点——两边互相呼应。）
+一个坑，注释里也写了：里面必须写 struct Node *next，不能写 Node *next。为什么？typedef 起的那个名字 Node，要等花括号结束、分号打完才生效，写在里面编译器不认。这个错每年都有人犯。
+-->
+
+---
+
+# 七个问题，能全答上来才算过关
+
+<div class="pt-3 flex items-start justify-center gap-4">
+<div>
+
+```c
+int a = 10;
+int *p = &a;   /* p 指向 a */
+```
+
+</div>
+<div>
+
+```c
+typedef struct Node {
+    int          data;
+    struct Node *next;
+} Node;
+```
+
+</div>
+</div>
+
+<div grid="~ cols-2 gap-4" class="pt-4 text-sm">
+<div class="rounded-lg border p-3"><b>①</b>　<code>p</code> 里面存的是什么？</div>
+<div class="rounded-lg border p-3"><b>②</b>　要让 <code>a</code> 变成 20：写 <code>p = 20</code> 还是 <code>*p = 20</code>？</div>
+<div class="rounded-lg border p-3"><b>③</b>　<code>&amp;p</code> 和 <code>p</code> 有什么区别？</div>
+<div class="rounded-lg border p-3"><b>④</b>　<code>Node *p</code>：<code>p->data</code> 展开就是什么？</div>
+<div class="rounded-lg border p-3"><b>⑤</b>　<code>Node *p</code> 与 <code>Node p</code> 差在哪？</div>
+<div class="rounded-lg border p-3"><b>⑥</b>　数组名和指针是同一回事吗？</div>
+<div class="rounded-lg border p-3"><b>⑦</b>　<code>p + 1</code> 跳过几个字节——由什么决定？</div>
+<div class="rounded-lg border border-teal-500/50 bg-teal-500/10 p-3">七问全对＝指针基础过关；有任何一问答不出，课后先补 C——第 2 章不等。</div>
+</div>
+
+<!--
+这一页拍照带走，作业里会检查。
+开头两段是背景代码：左边 a 与 p（①②③⑦ 都从它出发），右边是 Node 的定义（④⑤ 用它，与上一页同一模板）。
+七个问题，每一个都是第二章以后天天要用的东西：p 里存的是地址，*p 才是对象本身；想让 a 变成 20，要写 *p = 20——改的是 a 的格子，p 自己不动；&p 是"p 这个变量自己的地址"，别跟 p 的值搞混；p->data 就是 (*p).data 的简写；Node *p 是指针、Node p 是实体；数组名在大多数场合退化为指针，但它不是指针——不能自增、sizeof 结果不同；指针加 1 不是"地址加 1"：跳几个字节由它指向的类型决定（int* 跳 4、char* 跳 1）——对照一下，指针的大小与类型无关，指针的步长与类型有关。
+有任何一问答不顺，课后先补 C。第 2 章不等人的。
+-->
+
+---
+
+# 引用：一格两标签
+
+<div class="pt-1 text-center">给一个已经存在的对象起的<b>别名</b>——不是副本，也不是新对象。</div>
+
+<div grid="~ cols-2 gap-8" class="pt-6">
+<div>
+
+<div class="text-center text-sm font-bold text-teal-600 dark:text-teal-400 pb-5">引用 = 一格两标签</div>
+
+<div class="flex flex-col items-center">
+  <div class="flex gap-3 pb-1.5 font-mono">
+    <div class="rounded-md border-2 border-teal-500 bg-teal-500/15 px-3 py-0.5">a</div>
+    <div class="rounded-md border-2 border-teal-500 bg-teal-500/15 px-3 py-0.5">r</div>
+  </div>
+  <div class="w-28 h-16 border-2 border-teal-500 rounded-lg flex items-center justify-center text-2xl font-mono">20</div>
+  <div class="pt-2 text-xs opacity-70">内存里只有一个格子，上面贴了两张名签（地位完全平等）</div>
+</div>
+
+</div>
+<div>
+
+<div class="text-center text-sm font-bold text-orange-500 pb-5">指针（对照）= 两格一箭头</div>
+
+<div class="flex items-start justify-center gap-2">
+  <div class="flex flex-col items-center">
+    <div class="w-32 h-16 border-2 border-orange-500 rounded-lg flex items-center justify-center font-mono text-sm">0x7ffd…</div>
+    <div class="pt-2 text-xs opacity-70">p 自己占一格，装着 a 的地址</div>
+  </div>
+  <div class="text-2xl text-orange-500 pt-4">→</div>
+  <div class="flex flex-col items-center">
+    <div class="w-20 h-16 border-2 border-orange-500 rounded-lg flex items-center justify-center text-2xl font-mono">20</div>
+    <div class="pt-2 text-xs opacity-70">a 占另一格</div>
+  </div>
+</div>
+
+</div>
+</div>
+
+<div class="pt-7 flex justify-center">
+
+```cpp
+int a = 10;
+int &r = a;   /* r 是 a 的别名：不是副本，也不是新对象 */
+r = 20;       /* a 现在是 20 */
+```
+
+</div>
+
+<div class="pt-4 text-center text-xs opacity-60">拿纸，把两幅图各画一遍——这节课的钥匙。</div>
+
+<!--
+现在进入本节课唯一真正的难点。前面那些概念你听懂就行，这一个你必须会画图。
+引用是什么？一句话：给一个已经存在的对象起个别名。
+看代码：int a = 10; 然后 int &r = a;。从这一刻起，r 就是 a，a 就是 r。不是"r 复制了 a"，不是"r 指向 a"——它俩是同一个东西的两个名字。我写 r = 20，a 就变成 20。
+（指图）把这件事画出来是这样：内存里只有一个格子，格子上贴了两张名签，一张写 a，一张写 r。两张标签地位完全平等，别把 r 画小。就这么简单。
+再看右边，指针是怎样的：两个格子。p 自己占一格，里面装的是 a 的地址；a 占另一格，装的是 20。中间一支箭头。
+"一格两标签"对"两格一箭头"。这两幅图，请你们现在拿出纸，自己画一遍。我等十五秒。
+（真的等。走下去看两三个人画的。）
+画出来了吗？记住这两幅图。接下来的所有结论——引用为什么必须初始化、为什么不能改指向、为什么链表的 next 不能用引用——全都是从这两幅图直接推出来的，一条都不用背。
+-->
+
+---
+
+# 三条差别，每条都能从图上推出来
+
+<div grid="~ cols-3 gap-4" class="pt-3 text-sm">
+<div v-click class="rounded-lg border p-3">
+  <div class="font-bold">① 必须初始化？</div>
+  <div class="pt-1.5">指针：可先声明、后赋值</div>
+  <div>引用：<span class="text-teal-600 dark:text-teal-400 font-bold">必须在声明时绑定</span></div>
+  <div class="pt-1.5 text-xs opacity-70">图上怎么说：标签总得贴在某个格子上，不能拿着它在空中飘。</div>
+</div>
+<div v-click class="rounded-lg border p-3">
+  <div class="font-bold">② 能否改变指向？</div>
+  <div class="pt-1.5">指针：随时指向别的对象</div>
+  <div>引用：<span class="text-teal-600 dark:text-teal-400 font-bold">一经绑定，终身不变</span></div>
+  <div class="pt-1.5 text-xs opacity-70">图上怎么说：标签贴上去，撕不下来。</div>
+</div>
+<div v-click class="rounded-lg border p-3">
+  <div class="font-bold">③ 能否为空？</div>
+  <div class="pt-1.5">指针：可以是 <code>NULL</code></div>
+  <div>引用：<span class="text-teal-600 dark:text-teal-400 font-bold">不存在空引用</span></div>
+  <div class="pt-1.5 text-xs opacity-70">图上怎么说：总得先有个东西，才能给它起别名。</div>
+</div>
+</div>
+
+<div v-click class="pt-4 rounded-lg border p-3 text-sm">
+
+顺带第四条 · 使用语法：指针要写 <code>*p</code>、<code>p->x</code>；引用直接当对象用——一个得顺着箭头找过去，一个就是本格。
+
+</div>
+
+<!--
+有了那两幅图，三条差别不用背，我们一条条推。
+第一条：引用必须在声明的时候就绑定。为什么？看图——引用是一张标签，标签总得贴在某个格子上，你不能拿着一张标签在空中飘着。指针不一样，指针自己有格子，你可以先声明它，里面暂时装个垃圾值，回头再赋。
+第二条：引用一经绑定，终身不能改。为什么？标签贴上去撕不下来。指针呢？指针格子里装的是地址，你随时改成另一个地址，箭头就指别处了。
+第三条：没有空引用。指针可以是 NULL，表示"我现在不指向任何东西"。引用不行——它是别名，你总得先有个东西才能起别名。
+顺带把第四张卡带过：使用语法。指针要写星号和箭头，引用直接当对象用。
+-->
+
+---
+
+# 逐行找错，一行一行来
+
+<div grid="~ cols-2 gap-6" class="pt-1">
+<div>
+
+```cpp {all|1|4|5|all}
+int &r;            /* 这行有问题吗？ */
+int a = 1, b = 2;
+int &r2 = a;       /* 这行呢？ */
+r2 = b;            /* 编译能过。它到底干了什么？ */
+int &r3 = NULL;
+```
+
+</div>
+<div>
+
+<div v-click class="rounded-lg border p-2.5 text-sm"><b>第 1 行</b>　✗ 未初始化——标签总得贴在某个格子上</div>
+
+<div v-click class="pt-2 rounded-lg border p-2.5 text-sm"><b>第 4 行</b>　⚠ 能编译，但<b>不是改绑</b>：a 变成 2，r2 仍是 a 的别名，b 一动不动</div>
+
+<div v-click class="pt-2 rounded-lg border p-2.5 text-sm"><b>第 5 行</b>　✗ 不存在空引用</div>
+
+</div>
+</div>
+
+<div v-click class="pt-5">
+
+<div class="flex items-end justify-center gap-8 text-xs">
+  <div class="flex flex-col items-center">
+    <div class="flex gap-2 pb-1 font-mono">
+      <div class="rounded border border-teal-500 bg-teal-500/15 px-2">a</div>
+      <div class="rounded border border-teal-500 bg-teal-500/15 px-2">r2</div>
+    </div>
+    <div class="w-14 h-12 border-2 border-teal-500 rounded flex items-center justify-center font-mono text-base">1</div>
+    <div class="pt-1 opacity-70">执行前</div>
+  </div>
+  <div class="font-mono text-orange-500 pb-6">r2 = b →</div>
+  <div class="flex flex-col items-center">
+    <div class="flex gap-2 pb-1 font-mono">
+      <div class="rounded border border-teal-500 bg-teal-500/15 px-2">a</div>
+      <div class="rounded border border-teal-500 bg-teal-500/15 px-2">r2</div>
+    </div>
+    <div class="w-14 h-12 border-2 border-teal-500 rounded flex items-center justify-center font-mono text-base">2</div>
+    <div class="pt-1 opacity-70">执行后：a 变成 2</div>
+  </div>
+  <div class="flex flex-col items-center">
+    <div class="flex gap-2 pb-1 font-mono">
+      <div class="rounded border border-orange-500 bg-orange-500/15 px-2">b</div>
+    </div>
+    <div class="w-14 h-12 border-2 border-orange-500 rounded flex items-center justify-center font-mono text-base">2</div>
+    <div class="pt-1 opacity-70">b 从头到尾没动</div>
+  </div>
+</div>
+
+<div class="pt-3 text-center text-sm font-bold">标签没动，格子里的值动了。</div>
+
+</div>
+
+<!--
+好，看这段代码，你们找错。一行一行来。
+第一行，int &r;——有问题吗？（等）错，没初始化。
+往下，int &r2 = a; 这行没问题。
+下一行，r2 = b;——这一行编译能过吗？（等）能过。那它干了什么？
+（停一下）我知道很多人心里想的是"r2 现在改成 b 的别名了"。不是。看图：r2 是 a 的标签，撕不下来。r2 = b 这句话的意思是"往我这个格子里写 b 的值"，也就是 a = b。执行完，a 变成 2，r2 还是 a 的别名，b 一动没动。
+这是我教这一节最常见的错，每年都有一半人搞错。你们把这幅图记牢：标签没动，格子里的值动了。
+最后一行，int &r3 = NULL;——错，没有空引用。
+-->
+
+---
+
+# 一个 swap，三种传参
+
+<div class="pt-2 text-sm opacity-80">同样的功能，三种形参写法——先看代码，再猜输出。</div>
+
+<div class="pt-2">
+
+<<< @/snippets/ch01/swap-three.cpp#fns {lines:true}
+
+</div>
+
+<div class="pt-2">
+
+```cpp
+int x = 1, y = 2;   /* 三次接力调用——不会每次都从 1、2 重来 */
+swap_val(x, y);     /* 每次调用后立即打印 x、y */
+swap_ptr(&x, &y);
+swap_ref(x, y);
+```
+
+</div>
+
+<div v-click class="pt-3 text-center text-sm">
+
+先猜：**三行输出各是什么？** 写在纸上——下一页现场编译运行，对答案。
+
+</div>
+
+<!--
+三条差别讲完了，现在看它在传参上意味着什么。用最经典的 swap。
+三个版本：值传递、指针、引用。函数体里那三行代码几乎一模一样，唯一的差别在参数怎么写。
+下面四行是调用方：x=1、y=2，依次调用三个版本、每次调用后立即打印 x、y——调用写法顺带看一眼：swap_ptr 要写 &x，swap_ref 直接写 x。
+提醒接力：三次调用共用同一对变量，③ 是在 ② 换过的基础上再换——学生最常错在把 ③ 前的值当成 1、2，从而把 ③ 误判成没换。
+在我按回车之前，你们猜。第一个，swap_val 调完，x 和 y 是多少？第二个、第三个，三行输出全写在纸上。
+（等半分钟，让他们真的写）好，下一页对答案——我现场编译运行，真的跑。
+-->
+
+---
+
+# 第一行没换——因为形参是新开的格子
+
+<div class="rounded-lg bg-zinc-900 px-3 py-2 font-mono text-xs leading-relaxed">
+  <div class="text-zinc-400">$ ./swap-three</div>
+  <div class="text-emerald-400">swap_val: x=1 y=2　← 没换！</div>
+  <div class="text-emerald-400">swap_ptr: x=2 y=1</div>
+  <div class="text-emerald-400">swap_ref: x=1 y=2　← 不是没换——它换的是 ② 之后的 2、1</div>
+</div>
+
+<div grid="~ cols-2 gap-6" class="pt-3 text-sm">
+<div>
+
+<div class="text-xs opacity-70 pb-2">值传递时，栈上发生了什么：</div>
+
+<div class="flex items-start justify-center gap-3">
+  <div class="rounded-lg border-2 border-teal-500/60 p-2">
+    <div class="text-xs text-center pb-1.5 opacity-70">main 的帧</div>
+    <div class="flex gap-1.5">
+      <div class="w-14 h-10 border rounded flex items-center justify-center font-mono text-xs">x = 1</div>
+      <div class="w-14 h-10 border rounded flex items-center justify-center font-mono text-xs">y = 2</div>
+    </div>
+  </div>
+  <div class="rounded-lg border-2 border-orange-500/60 p-2">
+    <div class="text-xs text-center pb-1.5 text-orange-500">swap_val 的帧 = 新开的格子</div>
+    <div class="flex gap-1.5">
+      <div class="w-14 h-10 border rounded flex items-center justify-center font-mono text-xs">a = 1</div>
+      <div class="w-14 h-10 border rounded flex items-center justify-center font-mono text-xs">b = 2</div>
+      <div class="w-10 h-10 border rounded flex items-center justify-center font-mono text-xs">t</div>
+    </div>
+    <div class="pt-1.5 text-xs text-center opacity-70">交换发生在这里（改的是副本）</div>
+  </div>
+</div>
+
+<div class="pt-2 text-xs text-center opacity-70">函数一返回，整个帧消失——main 的 x、y 毫发无损。</div>
+
+</div>
+<div>
+
+<div v-click class="rounded-lg border p-2.5">① 值传递：形参是<b>副本</b>——换的是副本的格子，函数一返回就没了</div>
+
+<div v-click class="pt-2 rounded-lg border p-2.5">② 指针传递：传地址，<code>*a</code> 改的是<b>别人家的格子</b> → 有效；调用方写 <code>&amp;x</code>，函数内应判空</div>
+
+<div v-click class="pt-2 rounded-lg border p-2.5">③ 引用传递：形参是 x 的<b>别名</b>（同一个格子）→ 有效；调用写 <code>swap_ref(x, y)</code>，干净，不必判空</div>
+
+</div>
+</div>
+
+<div v-click class="pt-4 text-center text-sm">
+
+回头看 `InitComplex(&C, v1, v2)`——教材要的就是**第三种**。第 2 章起，所有"就地修改"的接口都用它。
+
+</div>
+
+<!--
+（真跑）看第一行：x 还是 1，y 还是 2。没换。
+为什么？（画栈帧）因为值传递的时候，形参 a 和 b 是新开的两个格子，装的是 x 和 y 的副本。我在这两个新格子里换得再热闹，函数一返回，整个帧没了，main 里的 x、y 根本没被碰过。
+第二个版本，指针。我传的是地址，函数里通过 *a 去改别人家的格子，所以有效。代价是：调用的时候要写 &x、&y，函数里最好判一下空。
+第三个版本，引用。形参 a 是 x 的别名——不是副本，是同一个格子的另一个名字。所以改 a 就是改 x，有效。而调用的时候写什么？就写 swap_ref(x, y)，跟传普通值一样干净，不用 &。函数里也不用判空，因为不存在空引用。
+再盯一眼屏幕上第三行——它和第一行一模一样，但别判成没换：它换的是 ② 之后已经变成 2、1 的 x、y，是又换了回来。三次调用接力共用同一对变量，这行就是考这个。
+现在你回头看上半节课那个 InitComplex(&C, v1, v2)，是不是明白了？教材要的就是第三种。
+-->
+
+---
+
+# 四种形参形式，以后写每个接口都回来查
+
+<style>
+.form-code {
+  --slidev-code-font-size: 16px;
+  --slidev-code-line-height: 24px;
+  --slidev-code-padding: 12px 16px;
+}
+</style>
+
+<div class="pt-2 form-code">
+
+```cpp
+void by_value(Node n);          /* 拷贝整个结构体 */
+void by_pointer(Node *p);       /* 函数内要判空；调用写法如 swap_ptr(&x, &y) */
+void by_reference(Node &n);     /* 非空；调用写法如 swap_ref(x, y) */
+void read_only(const Node &n);  /* 只读，函数内改不了，不拷贝 */
+```
+
+</div>
+
+<div class="pt-2 text-xs opacity-70">按原型从上到下念一遍：值、指针、引用、常量引用——区别只在两件事：能不能改，要不要带走一份。</div>
+
+<div v-click class="pt-4 text-sm">
+
+**选择准则**
+
+| 需求 | 选择 |
+| ---- | ---- |
+| 需**就地修改**实参，且对象一定存在 | **引用** ← `InitComplex(&C, v1, v2)` |
+| 只是**读**一个较大的结构体 | **常量引用**：省拷贝＋承诺不改 |
+| **可能为空**／要**改指向**／要**指针算术** | **只能用指针** |
+| 小的内置类型只读（`int`、`double`） | 值传递即可 |
+
+</div>
+
+<!--
+把选择做成一张表，你们拍下来。以后写每一个数据结构的接口，都回来看这张表。
+四种写法：值、指针、引用、常量引用。怎么选？三句话就够。
+第一，要就地改这个对象，而且这个对象一定存在——用引用。初始化一个顺序表、往栈里压一个元素，都是这一类。
+第二，只是要读一个比较大的结构体，不想付拷贝的代价——用常量引用。const 在这里有两个作用：省掉拷贝，同时向调用者承诺"我绝不改你的东西"，而且编译器会替你把这个承诺执行到底。
+第三，什么时候只能用指针？三种情况：参数可能不存在，也就是要允许"空"；要改变指向；要做指针算术、遍历数组。这三条记住，考试爱问"这里为什么不能用引用"，答案就在这里。
+最后，int、double 这种小东西只读，值传递就行，用引用反而多此一举。
+-->
+
+---
+
+# 两条边界：next 不能用引用，引用不能返回局部对象
+
+<div grid="~ cols-2 gap-6" class="pt-1">
+<div v-click>
+
+**边界一：链式结点的 `next` 只能是指针**
+
+```cpp
+struct Node { int data; Node *next; };   /* ✓ */
+struct Bad  { int data; Node &next; };   /* ✗ 行不通 */
+```
+
+<div class="pt-2 text-sm">理由不用背——回指三条差别的第 ② ③ 条：</div>
+
+<div class="pt-2 space-y-2 text-sm">
+<div class="rounded-lg border p-2.5">串接结点要<b>反复改变指向</b> → 引用不能改绑 ✗</div>
+<div class="rounded-lg border p-2.5">链尾要表示"<b>没有下一个</b>" → 引用不能为空 ✗</div>
+</div>
+
+<div class="pt-2 rounded-lg border border-teal-500/50 bg-teal-500/10 p-2.5 text-sm">
+
+引用能替代指针的场合**只有"传参与返回"**；`next`、`left`、`right`、`firstarc`……全是指针，一个引用都没有。
+
+</div>
+
+</div>
+<div v-click>
+
+**边界二：绝不能返回局部对象的引用**
+
+```cpp
+int &bad() { int x = 5; return x; }   /* ✗ 返回后 x 已销毁，引用悬空 */
+
+/* ✓ 被引用的对象由调用方 / 容器持有 */
+int &at(SqList &L, int i) { return L.data[i]; }
+/* 调用方：at(L, 3) = 100;  直接改到容器内部（第 2 章用） */
+```
+
+<div class="pt-2 rounded-lg border border-orange-500/50 bg-orange-500/10 p-2.5 text-sm">
+
+与"<code>free</code> 之后继续用指针"是**同一类**错误：
+
+<div class="pt-1 text-center font-bold">对象已死，名字还在。</div>
+
+<div class="pt-1 text-xs opacity-70">（下一节全是它的变体）</div>
+
+</div>
+
+</div>
+</div>
+
+<!--
+讲完好处，必须讲边界，因为你们一定会去试。
+第一条边界。既然引用这么好用，那链表结点里的 next，能不能写成引用？（等）不行。而且理由不用我规定，你自己从刚才那张表就能推出来：串链子要反复改指向——引用不能改绑，第二条就挂了；链子的末尾要表示"没有下一个"——引用不能为空，第三条也挂了。
+给一句结论，记牢：引用能替代指针的地方，只有传参和返回。凡是"指针作为数据成员来表示链接"的地方，引用替不了。整个第二章到第七章，next、left、right、firstarc，全都是指针，一个引用都没有。
+第二条边界。看这个函数：int &bad() { int x = 5; return x; }。它返回 x 的引用。有问题吗？（等）有。x 是局部变量，函数一返回它就没了。我还给你一张标签，贴在一个已经被拆掉的格子上。这叫悬空引用。
+还记得内存四区时让你们记住的那句话吗？局部变量函数返回即失效。就是用在这儿。
+那什么时候可以返回引用？看下面这个：at(SqList &L, int i) 返回 L.data[i] 的引用。这个可以，因为那个格子不是我造的，是调用方的顺序表持有的，函数返回它照样活着。而且有个很漂亮的效果：调用方可以写 at(L, 3) = 100;，直接改到容器内部去。第二章我们会用到。
+最后注意一件事：返回局部对象的引用，和"free 之后继续用那个指针"，是同一类错误。一句话概括：对象已死，名字还在。记住这句，下一节全是它的变体。
+-->
+
+---
+
+# 动态内存管理，就这四个函数
+
+<style>
+.form-code {
+  --slidev-code-font-size: 16px;
+  --slidev-code-line-height: 24px;
+  --slidev-code-padding: 12px 16px;
+}
+</style>
+
+<div class="pt-2 form-code">
+
+```c
+void *malloc(size_t size);           /* 分配；不清零（垃圾值） */
+void *calloc(size_t n, size_t size); /* 分配；全部清零 */
+void *realloc(void *p, size_t size); /* 重分配；可能搬家 */
+void  free(void *p);                 /* 释放（NULL 安全） */
+```
+
+</div>
+
+<div class="pt-2 text-xs opacity-70">原型都见过——只讲下一页就要用的那三点。</div>
+
+<div class="pt-4">
+
+**只强调三点**
+
+<div grid="~ cols-3 gap-4" class="pt-2 text-sm">
+<div class="rounded-lg border p-3">① <code>malloc</code> 出来的内容<b>不清零</b>——是垃圾值；<code>calloc</code> 清零，代价是慢一点</div>
+<div class="rounded-lg border p-3">② <code>realloc</code> <b>可能搬家</b>（给你一个新地址）→ <b>必须接收返回值</b>，不能写 <code>realloc(p, n);</code> 就完事——第 2 章顺序表扩容细讲</div>
+<div class="rounded-lg border p-3">③ <code>free(NULL)</code> 是安全的空操作——不必先判空再释放</div>
+</div>
+
+</div>
+
+<!--
+四个函数，你们都见过，我只强调三点。
+malloc 分配的内存不清零，里面是垃圾值。calloc 会清零，代价是慢一点。realloc 我今天只说一句话：它可能搬家，也就是给你一个新地址，所以你必须接收它的返回值，不能写 realloc(p, n); 就完事。第二章顺序表扩容我们细讲。free 补一句：free(NULL) 是安全的空操作，不用先判空再 free。
+-->
+
+---
+
+# malloc 规范四步
+
+<style>
+.form-code {
+  --slidev-code-font-size: 16px;
+  --slidev-code-line-height: 24px;
+  --slidev-code-padding: 12px 16px;
+}
+</style>
+
+<div class="pt-2 form-code">
+
+```cpp {all|1|2|3|4-6|all}
+Node *p = (Node *)malloc(sizeof(Node)); /* ① C++ 必须强转 */
+if (p == NULL) { return ERROR; }        /* ② 必判空 */
+p->data = 1; p->next = NULL;            /* ③ 逐域初始化 */
+/* ... 使用 p ... */
+free(p);                                /* ④ 有分配必有释放 */
+p = NULL;                               /* 置空，堵两类错误 */
+```
+
+</div>
+
+<div grid="~ cols-[1fr_auto] gap-6" class="pt-4">
+<div class="space-y-2 text-sm">
+<div>① 强转：<code>g++</code> 里 <code>void*</code> 不会隐式转成 <code>Node*</code></div>
+<div>② 判空：NULL 是失败的唯一通道，不查＝没处理失败</div>
+<div>③ 逐域初始化：不写 <code>next = NULL</code> 就拿去当链表用，它会指到随机地方</div>
+<div>④ <code>free</code> + 置空：一次堵掉"悬空指针"与"double free"两类错误</div>
+</div>
+
+<div class="rounded-lg border-2 border-orange-500/60 p-3 w-fit">
+  <div class="text-xs text-orange-500 pb-1.5">刚 malloc 出来的结点：</div>
+  <div class="flex border border-orange-500 rounded overflow-hidden font-mono text-sm">
+    <div class="px-3 py-1.5 bg-orange-500/10 border-r border-orange-500/50">-8391</div>
+    <div class="px-3 py-1.5 bg-orange-500/10">0x3f2a</div>
+  </div>
+  <div class="pt-1.5 text-xs">它不是零——两个域都是随机垃圾值</div>
+</div>
+
+</div>
+
+<!--
+重点是这个模板，四步。你们抄下来，以后每次 malloc 都照这个写。每一步我问一句为什么。
+第一步，强制类型转换。为什么？malloc 返回 void*，在 C 里可以隐式转，在 C++ 里不行，我们用 g++，所以必须强转。
+第二步，判空。为什么？刚说了，NULL 是失败的唯一通道，你不查就等于没处理失败。
+第三步，手动把每个域初始化。为什么？（等）因为 malloc 不清零！看右边这个结点——你刚 malloc 出来的东西长这样，两个域里是 -8391、0x3f2a 这种随机值。你要是不写 p->next = NULL 就拿去当链表用，它会指向内存里的某个随机地方，程序有时候崩有时候不崩，这种 bug 最难查。
+第四步，free。而且 free 完，紧跟一句 p = NULL。为什么要多写这一句？它一句话堵掉两类错误——下一页告诉你。
+-->
+
+---
+
+# 六类内存错误，一行代码看一个病
+
+<div class="pt-1 text-sm">
+
+| 错误 | 后果 | 防范 |
+| ---- | ---- | ---- |
+| **忘记判空** <br> `*p = 1;` | 解引用 NULL，当场崩溃 | `malloc` 后必判空 |
+| **内存泄漏** <br> 提前 `return` 的路径忘了 `free` | 内存耗尽 | 有分配必有释放；**错误分支也要释放** |
+| **重复释放** <br> `free(p); free(p);` | 未定义行为、崩溃 | `free` 后置 NULL |
+| **悬空指针** <br> `free(p); ... *p;` | 数据错乱且**难复现** | `free` 后置 NULL |
+| **越界访问** <br> `for (i = 0; i <= n; i++)` | 数据损坏、崩溃 | 盯住下标边界 |
+| **未初始化** <br> 读刚 malloc 的 `*p` | 结果不确定，时对时错 | `calloc` 或逐域初始化 |
+
+</div>
+
+<div grid="~ cols-2 gap-4" class="pt-3">
+<div class="rounded-lg border-2 border-teal-500/50 bg-teal-500/10 p-2.5 text-xs">
+
+<div>返回局部对象的引用　←　<b>对象已死，名字还在</b></div>
+<div class="pt-1">free 之后继续用指针　←　<b>对象已死，名字还在</b></div>
+<div class="pt-1.5 opacity-75">同一类生命周期错误。引用不是"更安全的指针"——它只是把这类错误换了个名字。</div>
+
+</div>
+<div>
+<div class="flex items-center justify-center gap-2">
+  <div class="font-mono text-sm">p</div>
+  <div class="text-orange-500 text-lg">→</div>
+  <div class="w-14 h-11 border-2 border-red-400 rounded flex items-center justify-center text-red-500 text-xl bg-red-500/10">✗</div>
+</div>
+<div class="pt-1 text-center text-xs opacity-70">对象已死（内存归还系统），指针还倔强地指着它</div>
+</div>
+</div>
+
+<!--
+六类错误，我不念表，一条一行代码，你们看病。
+第一类，忘记判空。malloc 完直接 *p = 1，如果分配失败，这一行就是解引用 NULL，当场崩。
+第二类，内存泄漏。这个大家都知道要 free，但我要提醒一个真实场景：函数中间有个 if 提前 return 了，那条路径上你 free 了吗？泄漏最常发生在错误处理分支里。
+第三类，double free，同一块内存 free 两次，未定义行为。
+第四类，悬空指针，free 完了还拿 p 去读写。这一类最阴险，因为那块内存往往还没被别人拿走，你读它甚至能读到原来的值，程序跑一百次对九十九次。等它错的时候你根本不知道错在哪。
+第三类和第四类，一句 p = NULL; 同时堵掉，这就是我上一页让你多写那一行的原因。
+第五类越界，第六类用未初始化的内存，前面都说过。
+（停）最后把下半节课收个口。看这两行：返回局部对象的引用——对象已死，名字还在；free 之后继续用指针——对象已死，名字还在。一模一样。
+所以你听我讲了半天引用的好处，可别以为引用是"更安全的指针"。它不是。它只是把某一类错误换了个名字。真正的安全来自你脑子里有一张对象生存期的图。
+（ASan 演示，时间紧可砍：g++ -fsanitize=address 跑 snippets/ch01/mem-errors.cpp，让工具替我说话——它直接打印泄漏的字节数和越界的位置。若演示机起不来，去掉 -fsanitize=address 直接跑，逐类取消注释观察。）
+-->
+
+---
+
+# 工程规矩：一个数据结构一组文件
+
+<div grid="~ cols-2 gap-5" class="pt-1">
+<div>
+
+**一个数据结构一组 `.h` / `.cpp`**
+
+<div class="pt-2 space-y-2 text-sm">
+<div class="rounded-lg border p-2.5"><b class="font-mono">sqlist.h</b>　类型定义 + 函数<b>声明</b>——调用方只需要看这个文件</div>
+<div class="rounded-lg border p-2.5"><b class="font-mono">sqlist.cpp</b>　实现——改这里，调用方的代码不用改</div>
+<div class="rounded-lg border p-2.5"><b class="font-mono">main.cpp</b>　只调用，不实现</div>
+</div>
+
+</div>
+<div>
+
+**头文件保护（防重复包含）**
+
+```cpp
+#ifndef SQLIST_H
+#define SQLIST_H
+/* ... 声明 ... */
+#endif
+```
+
+<div class="pt-2 text-xs opacity-70">两个文件都 include 了它而不加保护 → 类型被定义两遍，编译器直接报重定义。</div>
+
+</div>
+</div>
+
+<div class="pt-3 text-sm">
+
+**统一编译命令（实验课直接用）**
+
+```bash
+g++ -std=c++17 -Wall -Wextra -g -c complex.cpp
+g++ -std=c++17 -Wall -Wextra -g -c main.cpp
+g++ complex.o main.o -o demo
+```
+
+</div>
+
+<div class="pt-2 rounded-lg border border-orange-500/50 bg-orange-500/10 p-2 text-xs">
+
+作业要求：**`-Wall -Wextra` 零警告**——编译器早就在用警告提醒你，别把警告当噪音。Makefile 十行模板已给出，实验课细讲。
+
+</div>
+
+<!--
+最后两分钟讲工程规矩，很短，但作业要按这个交。
+一个数据结构一组文件：sqlist.h 放类型定义和函数声明，sqlist.cpp 放实现，main.cpp 只负责调用。为什么这么切？因为别人用你的东西时只需要看 .h——这就是上半节课讲的信息隐藏落到文件层面。
+头文件必须加这三行保护，ifndef、define、endif。不加会怎样？两个文件都 include 了它，类型就被定义两遍，编译器直接报重定义。
+编译命令三行，你们拍下来，实验课直接用。注意 -Wall -Wextra 一定要开，作业要求是零警告。很多同学觉得警告不是错误可以不管——错，你以后遇到的诡异 bug 有一半，编译器早就用警告提醒过你了。
+Makefile 我给你们一个十行的模板，怎么用实验课细讲，今天不占时间。
 -->
 
 ---
 layout: center
-class: text-center
 ---
 
-# 这门课的目标
+# 小结
 
-<div class="mt-6 p-6 rounded-lg border-2 border-teal-500/45 bg-teal-500/8 max-w-4xl mx-auto">
+<div class="pt-2 text-base leading-relaxed">
 
-<div class="text-xs tracking-widest opacity-60 mb-3">AI 时代的能力分水岭下移了</div>
+**逻辑结构**（有哪些元素、它们之间是什么关系）＋ **存储结构**（内存表示）＋ **运算** ＝ 数据结构
 
-<div class="text-3xl font-bold leading-relaxed">
-<span class="text-teal-700 dark:text-teal-300">判断的准确性</span>，<br>取代了<span class="opacity-60 line-through decoration-rose-500 decoration-2">实现的熟练度</span>。
-</div>
+<div class="pt-3">→　只说逻辑与运算 ＝ <b>ADT</b>——一份不涉及内存的规格说明</div>
 
-</div>
+<div class="pt-3">→　落地之前，先打地基：<b>指针、内存、引用</b>（后面每一章的代码都踩在这三样上）</div>
 
-<div v-click="1" class="mt-6 text-xl font-bold">
-不做被 AI 替代的程序员，做<span v-mark.circle.orange="2">驾驭 AI 的构建者</span>。
-</div>
+<div class="pt-3">→　ADT 落地靠 <b>.h/.cpp 分离 + 结构体 + 形参形式的正确选择</b></div>
 
-<div grid="~ cols-2 gap-5" class="mt-6 max-w-4xl mx-auto text-left">
+<div class="pt-3">→　形参四选一的依据：<b>能否改、会不会空、要不要拷贝</b></div>
 
-<div v-click="3" class="p-4 rounded-lg border border-rose-500/30 bg-rose-500/5">
-  <div class="text-xs tracking-widest opacity-60 mb-2">被替代的角色</div>
-  <div class="text-base">把明确规格<span class="font-bold">翻译成代码</span>的人</div>
-</div>
-
-<div v-click="4" class="p-4 rounded-lg border-2 border-teal-500/40 bg-teal-500/5">
-  <div class="text-xs tracking-widest opacity-60 mb-2">不可替代的角色</div>
-  <div class="text-base">定义规格、选择骨架、验证产出、<span class="font-bold text-teal-700 dark:text-teal-300">承担后果</span>的人</div>
-</div>
+<div class="pt-3">→　凡是从堆上要来的，必须还回去：<b>malloc 规范四步，free 后置空</b></div>
 
 </div>
 
-<div v-click="5" class="mt-5 text-base">
-后者的全部判断依据，<span class="font-bold">就是这门课的内容</span>。
-</div>
 
 <!--
-这一节收一句：**AI 时代的能力分水岭下移了。不再是"你会不会写"，而是"你判断得准不准"。**
-
-[click] 所以这门课的目标，我用一句话讲清楚：**不要做被 AI 替代的程序员，要做驾驭 AI 的构建者。**
-
-[click] 我把这两种人的界线划清楚。
-
-[click] 被替代的是谁？是把明确规格翻译成代码的人——因为这件事 AI 做得比你好，而且更便宜。
-
-[click] 不可替代的是谁？是定义规格、选择骨架、验证产出、并且**为结果承担后果**的人。最后这四个字很重要：承担后果。AI 不承担后果。系统崩了，是你去救。
-
-[click] 而你能不能救，取决于你脑子里有没有这门课的东西。
-
-————————————————
-【教师口袋问题｜时间富余或学生质疑时口头抛出，不翻页】
-
-Q1　三次跃迁表第四行"人写 → AI 生成"，五年后回看还会有哪些内容被吃掉？
-　→ 设计模式？部分系统设计经验？引导学生自己把这张表往前推。
-
-Q2　如果 AI 强到能自行判断"此处应用 Bloom filter"，"概念名词不可外包"的论证是否还成立？
-　→ 仍成立：内存预算与误判容忍度属**业务事实**而非技术推理，AI 无法自行获取。这个问题很好，值得当场表扬。
-
-Q3　网格聚合案例里，如果区县只有 5 个、只跑一次，原方案有问题吗？
-　→ 没有问题。"更优"永远相对于约束而言——这正是"评价"层能力的核心。
--->
-
----
-
-# 课程参考教材
-
-<div v-click="1" class="mt-6 flex items-baseline gap-4 p-3.5 rounded-lg border-2 border-teal-500/40 bg-teal-500/8">
-  <div class="w-20 shrink-0 text-xs tracking-widest opacity-60">教材</div>
-  <div class="text-xl font-bold">自编讲义</div>
-</div>
-
-<div v-click="2" class="mt-5">
-
-<div class="mb-1 text-xs tracking-widest opacity-55">参考教材</div>
-
-<div class="flex items-baseline gap-4 py-2.5 border-b border-gray-400/15">
-  <div class="flex-1 font-bold">《数据结构（C语言版）》</div>
-  <div class="w-72 shrink-0 text-sm opacity-70">严蔚敏 · 清华大学出版社</div>
-</div>
-
-<div class="flex items-baseline gap-4 py-2.5 border-b border-gray-400/15">
-  <div class="flex-1 font-bold">《数据结构与算法之美》</div>
-  <div class="w-72 shrink-0 text-sm opacity-70">王争 · 人民邮电出版社</div>
-</div>
-
-<div class="flex items-baseline gap-4 py-2.5 border-b border-gray-400/15">
-  <div class="flex-1 font-bold">《数据结构与算法分析——C语言描述》</div>
-  <div class="w-72 shrink-0 text-sm opacity-70">马克·艾伦·维斯 · 机械工业出版社</div>
-</div>
-
-<div class="flex items-baseline gap-4 py-2.5">
-  <div class="flex-1 font-bold">《算法》</div>
-  <div class="w-72 shrink-0 text-sm opacity-70">Robert Sedgewick · 人民邮电出版社</div>
-</div>
-
-</div>
-
-<!--
-最后把教材交代两句。
-
-[click] 主教材是我的**自编讲义**，跟着课程进度走。
-
-[click] 下面四本是参考教材——不用每本都从头读，挑一本对你胃口的跟着翻；哪一章卡住了，回来对着查。
--->
-
----
-
-# 考核方式
-
-<div class="mt-6 flex items-stretch gap-5">
-
-<div v-click="1" class="w-[60%] shrink-0 p-4 rounded-lg border-2 border-teal-500/40 bg-teal-500/8">
-  <div class="flex items-baseline justify-between px-0.5">
-    <div class="text-lg font-bold text-teal-700 dark:text-teal-300">平时成绩</div>
-    <div class="text-3xl font-bold text-teal-600 dark:text-teal-400">60%</div>
-  </div>
-  <div class="mt-3">
-    <div class="flex items-baseline gap-3 py-1.5 border-b border-gray-400/15">
-      <div class="w-28 shrink-0 text-sm font-bold">考勤</div>
-    </div>
-    <div class="flex items-baseline gap-3 py-1.5 border-b border-gray-400/15">
-      <div class="w-28 shrink-0 text-sm font-bold">作业 <span class="text-teal-600 dark:text-teal-400">10%</span></div>
-      <div class="flex-1 text-xs opacity-65">教学云平台提交，开放性作业为主</div>
-    </div>
-    <div class="flex items-baseline gap-3 py-1.5 border-b border-gray-400/15">
-      <div class="w-28 shrink-0 text-sm font-bold">综合实践 <span class="text-teal-600 dark:text-teal-400">40%</span></div>
-    </div>
-    <div class="flex items-baseline gap-3 py-1 pl-7 border-b border-gray-400/15">
-      <div class="w-16 shrink-0 text-xs font-bold opacity-80">独立 ×2</div>
-      <div class="flex-1 text-xs opacity-65">各 10 分 · 单独完成 · 提交答辩讲解视频到云平台</div>
-    </div>
-    <div class="flex items-baseline gap-3 py-1 pl-7 border-b border-gray-400/15">
-      <div class="w-16 shrink-0 text-xs font-bold opacity-80">团队 ×1</div>
-      <div class="flex-1 text-xs opacity-65">20 分 · 3 人 1 组 · 线下答辩验收</div>
-    </div>
-    <div class="flex items-baseline gap-3 py-1.5">
-      <div class="w-28 shrink-0 text-sm font-bold">期中 <span class="text-teal-600 dark:text-teal-400">10%</span></div>
-      <div class="flex-1 text-xs opacity-65">闭卷考试</div>
-    </div>
-  </div>
-</div>
-
-<div v-click="2" class="flex-1 flex flex-col p-4 rounded-lg border-2 border-gray-400/25 bg-gray-500/5">
-  <div class="flex items-baseline justify-between px-0.5">
-    <div class="text-lg font-bold">期末考试</div>
-    <div class="text-3xl font-bold opacity-80">40%</div>
-  </div>
-  <div class="mt-3 flex-1 flex flex-col justify-center gap-4">
-    <div class="flex items-baseline gap-3">
-      <div class="w-14 shrink-0 text-sm font-bold opacity-80">形式</div>
-      <div class="flex-1 text-sm">闭卷考试</div>
-    </div>
-    <div class="flex items-baseline gap-3">
-      <div class="w-14 shrink-0 text-sm font-bold text-teal-700 dark:text-teal-300">强化</div>
-      <div class="flex-1 text-sm font-medium">算法思想和解决问题的能力</div>
-    </div>
-    <div class="flex items-baseline gap-3">
-      <div class="w-14 shrink-0 text-sm font-bold opacity-55">弱化</div>
-      <div class="flex-1 text-sm opacity-70">知识点考核</div>
-    </div>
-  </div>
-</div>
-
-</div>
-
-<!--
-考核方式，也说清楚——免得期末有人觉得意外。
-
-[click] 大头在平时：平时成绩占 60%。构成呢——考勤，不单列比例；作业 10%，教学云平台提交，以开放性作业为主；综合实践占 40%，两次独立实践各 10 分，单独完成，答辩讲解视频提交到云平台，加一次团队实践 20 分，3 人 1 组完成，线下答辩验收；期中占 10%，闭卷。
-
-[click] 期末考试占 40%，闭卷。注意它的口径——强化算法思想和解决问题的能力，弱化知识点考核。这跟前面讲的是一路话：这门课不测你背了多少，测你能不能想清楚、做对取舍。所以别等到期末，平时这 60% 都是能一点点挣回来的。
-
-导论到这里就收尾了。下次课，我们正式进数据结构。
+收尾。看右边黑板那棵树，今天九十分钟其实是一条链子。
+逻辑结构管两件事：有哪些元素、它们之间是什么关系；存储结构管内存里的样子；再加上运算——三样凑起来，叫数据结构。把存储那一块盖住、只说逻辑和运算，剩下的那份说明书叫 ADT：它把实现挡在接口后面，这就是信息隐藏。
+但要写代码，脚下得先有地基：指针、内存、引用。后面每一章——链表、栈、树——代码都踩在这三样上；地基不牢，每一章都会晃。这三样你们不是在纸上背的：内存里是什么样、指针里装的是什么，调试器里亲眼看过。
+有了地基，再看落地：ADT 怎么变成代码？靠 .h 和 .cpp 分开、靠结构体、靠给每个参数选对形参形式——调用方只需要看 .h 一个文件。怎么选形参？三个问题：要不要改它、它会不会是空的、拷贝贵不贵；拿不准，回来翻那张表。
+最后，凡是从堆上要来的，必须还回去——malloc 规范四步，free 之后置空。今天最阴的两种错——悬空指针、double free——病根就一句话：对象已死，名字还在。
 -->
