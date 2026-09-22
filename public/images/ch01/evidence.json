@@ -1,0 +1,112 @@
+{
+  "captured_at": "2026-09-22T03:53:45.162459+00:00",
+  "python": "3.12.12",
+  "database": "SQLite，固定 50 行虚构数据",
+  "versions": {
+    "fastapi": "0.141.1",
+    "starlette": "1.6.0",
+    "sqlalchemy": "2.0.54",
+    "uvicorn": "0.53.0",
+    "debugpy": "1.8.22"
+  },
+  "limits": [
+    "调试栈来自 debugpy DAP，不是 IDE 截图",
+    "并发实验含人为 80ms 延迟，不是性能基准",
+    "四处合流另采单次请求，暂停并发",
+    "PostgreSQL、IDE 录像与教室投影未验证"
+  ],
+  "plain": {
+    "seconds": 0.179,
+    "requests": 11,
+    "log": "2026-09-22 11:53:46,212 INFO query keyword=react page=1\n2026-09-22 11:53:46,214 INFO query keyword=react page=1\n2026-09-22 11:53:46,215 INFO query keyword=react page=1\n2026-09-22 11:53:46,216 INFO query keyword=react page=1\n2026-09-22 11:53:46,216 INFO query keyword=react page=1\n2026-09-22 11:53:46,217 INFO query keyword=react page=1\n2026-09-22 11:53:46,217 INFO query keyword=react page=1\n2026-09-22 11:53:46,218 INFO query keyword=react page=1\n2026-09-22 11:53:46,219 INFO query keyword=react page=1\n2026-09-22 11:53:46,219 INFO query keyword=react page=1\n2026-09-22 11:53:46,219 INFO query keyword=react page=1\n2026-09-22 11:53:46,300 INFO sql:begin search\n2026-09-22 11:53:46,300 INFO sql:begin search\n2026-09-22 11:53:46,300 INFO sql:begin search\n2026-09-22 11:53:46,302 INFO sql:begin search\n2026-09-22 11:53:46,302 INFO sql:begin search\n2026-09-22 11:53:46,302 INFO sql:begin search\n2026-09-22 11:53:46,303 INFO sql:begin search\n2026-09-22 11:53:46,304 INFO sql:begin search\n2026-09-22 11:53:46,304 INFO sql:begin search\n2026-09-22 11:53:46,304 INFO sql:begin search\n2026-09-22 11:53:46,305 INFO sql:begin search\n2026-09-22 11:53:46,306 INFO sql:done rows=6\n2026-09-22 11:53:46,308 INFO sql:done rows=6\n2026-09-22 11:53:46,309 INFO assemble rows=6\n2026-09-22 11:53:46,309 INFO sql:done rows=6\n2026-09-22 11:53:46,309 INFO assemble rows=6\n2026-09-22 11:53:46,309 INFO sql:done rows=6\n2026-09-22 11:53:46,310 INFO sql:done rows=6\n2026-09-22 11:53:46,310 INFO sql:done rows=6\n2026-09-22 11:53:46,311 INFO assemble rows=6\n2026-09-22 11:53:46,311 INFO sql:done rows=6\n2026-09-22 11:53:46,311 INFO assemble rows=6\n2026-09-22 11:53:46,312 INFO sql:done rows=6\n2026-09-22 11:53:46,312 INFO assemble rows=6\n2026-09-22 11:53:46,313 INFO sql:done rows=6\n2026-09-22 11:53:46,313 INFO sql:done rows=6\n2026-09-22 11:53:46,314 INFO sql:done rows=6\n2026-09-22 11:53:46,315 INFO assemble rows=6\n2026-09-22 11:53:46,315 INFO assemble rows=6\n2026-09-22 11:53:46,315 INFO assemble rows=6\n2026-09-22 11:53:46,318 INFO assemble rows=6\n2026-09-22 11:53:46,319 INFO assemble rows=6\n2026-09-22 11:53:46,320 INFO assemble rows=6\n"
+  },
+  "trace": {
+    "seconds": 0.143,
+    "requests": 11,
+    "log": "2026-09-22 11:53:47,384 INFO [23256f896fe84201858d17049840419a] --> GET /openapi.json\n2026-09-22 11:53:47,387 INFO [23256f896fe84201858d17049840419a] <-- 200 3.1ms\n2026-09-22 11:53:47,422 INFO [noise-00] --> POST /getQuestions\n2026-09-22 11:53:47,425 INFO [noise-01] --> POST /getQuestions\n2026-09-22 11:53:47,425 INFO [noise-02] --> POST /getQuestions\n2026-09-22 11:53:47,427 INFO [noise-03] --> POST /getQuestions\n2026-09-22 11:53:47,427 INFO [noise-04] --> POST /getQuestions\n2026-09-22 11:53:47,427 INFO [noise-05] --> POST /getQuestions\n2026-09-22 11:53:47,427 INFO [noise-06] --> POST /getQuestions\n2026-09-22 11:53:47,427 INFO [noise-07] --> POST /getQuestions\n2026-09-22 11:53:47,428 INFO [noise-08] --> POST /getQuestions\n2026-09-22 11:53:47,430 INFO [noise-09] --> POST /getQuestions\n2026-09-22 11:53:47,430 INFO [noise-00] query keyword=react page=1\n2026-09-22 11:53:47,430 INFO [stu-demo-01] --> POST /getQuestions\n2026-09-22 11:53:47,432 INFO [noise-01] query keyword=react page=1\n2026-09-22 11:53:47,432 INFO [noise-02] query keyword=react page=1\n2026-09-22 11:53:47,433 INFO [noise-03] query keyword=react page=1\n2026-09-22 11:53:47,433 INFO [noise-04] query keyword=react page=1\n2026-09-22 11:53:47,434 INFO [noise-05] query keyword=react page=1\n2026-09-22 11:53:47,434 INFO [noise-06] query keyword=react page=1\n2026-09-22 11:53:47,435 INFO [noise-07] query keyword=react page=1\n2026-09-22 11:53:47,435 INFO [noise-08] query keyword=react page=1\n2026-09-22 11:53:47,436 INFO [noise-09] query keyword=react page=1\n2026-09-22 11:53:47,436 INFO [stu-demo-01] query keyword=react page=1\n2026-09-22 11:53:47,515 INFO [noise-00] sql:begin search\n2026-09-22 11:53:47,517 INFO [noise-01] sql:begin search\n2026-09-22 11:53:47,517 INFO [noise-00] sql:done rows=6\n2026-09-22 11:53:47,518 INFO [noise-00] assemble rows=6\n2026-09-22 11:53:47,518 INFO [noise-03] sql:begin search\n2026-09-22 11:53:47,519 INFO [noise-02] sql:begin search\n2026-09-22 11:53:47,519 INFO [noise-04] sql:begin search\n2026-09-22 11:53:47,519 INFO [noise-05] sql:begin search\n2026-09-22 11:53:47,520 INFO [noise-03] sql:done rows=6\n2026-09-22 11:53:47,521 INFO [noise-00] <-- 200 98.4ms\n2026-09-22 11:53:47,521 INFO [stu-demo-01] sql:begin search\n2026-09-22 11:53:47,522 INFO [noise-06] sql:begin search\n2026-09-22 11:53:47,522 INFO [noise-01] sql:done rows=6\n2026-09-22 11:53:47,522 INFO [noise-07] sql:begin search\n2026-09-22 11:53:47,522 INFO [noise-09] sql:begin search\n2026-09-22 11:53:47,523 INFO [noise-08] sql:begin search\n2026-09-22 11:53:47,523 INFO [noise-02] sql:done rows=6\n2026-09-22 11:53:47,524 INFO [noise-03] assemble rows=6\n2026-09-22 11:53:47,524 INFO [noise-04] sql:done rows=6\n2026-09-22 11:53:47,526 INFO [noise-01] assemble rows=6\n2026-09-22 11:53:47,526 INFO [noise-05] sql:done rows=6\n2026-09-22 11:53:47,527 INFO [noise-02] assemble rows=6\n2026-09-22 11:53:47,528 INFO [stu-demo-01] sql:done rows=6\n2026-09-22 11:53:47,528 INFO [noise-04] assemble rows=6\n2026-09-22 11:53:47,528 INFO [noise-06] sql:done rows=6\n2026-09-22 11:53:47,529 INFO [noise-05] assemble rows=6\n2026-09-22 11:53:47,529 INFO [noise-03] <-- 200 102.4ms\n2026-09-22 11:53:47,529 INFO [noise-08] sql:done rows=6\n2026-09-22 11:53:47,530 INFO [noise-09] sql:done rows=6\n2026-09-22 11:53:47,530 INFO [noise-07] sql:done rows=6\n2026-09-22 11:53:47,530 INFO [stu-demo-01] assemble rows=6\n2026-09-22 11:53:47,530 INFO [noise-06] assemble rows=6\n2026-09-22 11:53:47,531 INFO [noise-08] assemble rows=6\n2026-09-22 11:53:47,532 INFO [noise-01] <-- 200 107.1ms\n2026-09-22 11:53:47,532 INFO [noise-09] assemble rows=6\n2026-09-22 11:53:47,532 INFO [noise-07] assemble rows=6\n2026-09-22 11:53:47,535 INFO [noise-02] <-- 200 110.0ms\n2026-09-22 11:53:47,535 INFO [noise-04] <-- 200 108.5ms\n2026-09-22 11:53:47,536 INFO [noise-05] <-- 200 108.7ms\n2026-09-22 11:53:47,536 INFO [stu-demo-01] <-- 200 106.5ms\n2026-09-22 11:53:47,537 INFO [noise-06] <-- 200 109.5ms\n2026-09-22 11:53:47,537 INFO [noise-08] <-- 200 109.4ms\n2026-09-22 11:53:47,537 INFO [noise-09] <-- 200 107.7ms\n2026-09-22 11:53:47,538 INFO [noise-07] <-- 200 110.1ms\n"
+  },
+  "filtered": "2026-09-22 11:53:47,430 INFO [stu-demo-01] --> POST /getQuestions\n2026-09-22 11:53:47,436 INFO [stu-demo-01] query keyword=react page=1\n2026-09-22 11:53:47,521 INFO [stu-demo-01] sql:begin search\n2026-09-22 11:53:47,528 INFO [stu-demo-01] sql:done rows=6\n2026-09-22 11:53:47,530 INFO [stu-demo-01] assemble rows=6\n2026-09-22 11:53:47,536 INFO [stu-demo-01] <-- 200 106.5ms",
+  "joined": {
+    "request": "POST /getQuestions?keyword=react",
+    "rid": "stu-demo-01",
+    "status": 200,
+    "http_version": "HTTP/1.1",
+    "headers": {
+      "date": "Tue, 22 Sep 2026 03:53:49 GMT",
+      "server": "uvicorn",
+      "content-length": "969",
+      "content-type": "application/json",
+      "x-request-id": "stu-demo-01"
+    },
+    "body": {
+      "success": true,
+      "data": [
+        {
+          "id": 1,
+          "title": "react 练习问题 01",
+          "body": "这是虚构教学数据，第 1 个问题，不对应真实用户。",
+          "created_at": "2026-09-01T08:00:00Z"
+        },
+        {
+          "id": 6,
+          "title": "react 练习问题 06",
+          "body": "这是虚构教学数据，第 6 个问题，不对应真实用户。",
+          "created_at": "2026-09-01T08:00:00Z"
+        },
+        {
+          "id": 11,
+          "title": "react 练习问题 11",
+          "body": "这是虚构教学数据，第 11 个问题，不对应真实用户。",
+          "created_at": "2026-09-01T08:00:00Z"
+        },
+        {
+          "id": 16,
+          "title": "react 练习问题 16",
+          "body": "这是虚构教学数据，第 16 个问题，不对应真实用户。",
+          "created_at": "2026-09-01T08:00:00Z"
+        },
+        {
+          "id": 21,
+          "title": "react 练习问题 21",
+          "body": "这是虚构教学数据，第 21 个问题，不对应真实用户。",
+          "created_at": "2026-09-01T08:00:00Z"
+        },
+        {
+          "id": 26,
+          "title": "react 练习问题 26",
+          "body": "这是虚构教学数据，第 26 个问题，不对应真实用户。",
+          "created_at": "2026-09-01T08:00:00Z"
+        }
+      ]
+    },
+    "stack": [
+      {
+        "name": "get_questions",
+        "file": "v2_traceable.py",
+        "line": 76
+      },
+      {
+        "name": "run",
+        "file": "_asyncio.py",
+        "line": 1100
+      },
+      {
+        "name": "_bootstrap_inner",
+        "file": "threading.py",
+        "line": 1075
+      },
+      {
+        "name": "_bootstrap",
+        "file": "threading.py",
+        "line": 1032
+      }
+    ],
+    "variables": {
+      "keyword": "'react'",
+      "page": "1",
+      "rid": "'stu-demo-01'"
+    },
+    "log": "2026-09-22 11:53:49,539 INFO [384bbf753d934ae389c21423662dc6fc] --> GET /openapi.json\n2026-09-22 11:53:49,554 INFO [384bbf753d934ae389c21423662dc6fc] <-- 200 15.7ms\n2026-09-22 11:53:49,573 INFO [stu-demo-01] --> POST /getQuestions\n2026-09-22 11:53:49,581 INFO [stu-demo-01] query keyword=react page=1\n2026-09-22 11:53:49,584 INFO [stu-demo-01] sql:begin search\n2026-09-22 11:53:49,604 INFO BEGIN (implicit)\n2026-09-22 11:53:49,605 INFO SELECT * FROM questions WHERE title LIKE '%react%' LIMIT 20 OFFSET 0\n2026-09-22 11:53:49,605 INFO [generated in 0.00288s] ()\n2026-09-22 11:53:49,610 INFO [stu-demo-01] sql:done rows=6\n2026-09-22 11:53:49,610 INFO ROLLBACK\n2026-09-22 11:53:49,612 INFO [stu-demo-01] assemble rows=6\n2026-09-22 11:53:49,616 INFO [stu-demo-01] <-- 200 43.2ms\n",
+    "stack_source": "debugpy DAP stackTrace + variables，实际断点采集"
+  }
+}

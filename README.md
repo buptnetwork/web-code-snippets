@@ -14,6 +14,58 @@ pnpm build                  # 整站构建到 dist/（部署前缀见 scripts/bu
 pnpm export                 # 导出 PDF（需先装 playwright-chromium）
 ```
 
+## 第一次课：请求全链路
+
+成稿入口为 `ch01.md`，正文与备注在 `pages/ch01/01.md`：44 页教学正文＋3 页准备附录，连同章节封面、目录、收尾共 50 页。节奏为 95 分钟＋5 分钟缓冲；底稿已归档，后续只修改最终工程。
+
+```bash
+pnpm exec slidev ch01.md --port 3031
+pnpm exec slidev build ch01.md --base /web-2026b/ch01/ --out .build-check/ch01
+```
+
+### 单文件演示与阶段切换
+
+示例是按底稿在本工程重建的，不是外部 `m0-tracer` 仓库的 Git tags。三个阶段各保留独立单文件；`v3_m0.py` 是课后参考，不被导入 slides 或复制到 public。发布学生材料时，只选取对应阶段，不能把整个目录当作课前包分发。
+
+以下在 **`snippets/ch01/m0-tracer` 目录**执行，要求 Python 3.12 与 uv：
+
+```bash
+uv sync --frozen
+uv run python seed.py
+uv run uvicorn v1_ai_raw:app --host 127.0.0.1 --port 8000
+```
+
+- `v1_ai_raw:app`：能运行的反例，POST 查询、拼接 SQL、详情不存在仍返回 200。
+- `v2_traceable:app`：课堂目标。先设 `TRACE_MODE=plain DEMO_DELAY_MS=80`，再切 `TRACE_MODE=trace DEMO_DELAY_MS=80`；第二终端执行 `uv run python bench.py`，同时手动发一次请求。
+- 四处合流：停止并发，启动 `TRACE_MODE=trace SQL_ECHO=1 uv run uvicorn v2_traceable:app`。不再设置人为延迟，使用一次性的合法 id（1–64 个字母、数字、点、下划线或连字符）。
+- `v3_m0:app`：课后参考增加 `GET /questions/{qid}`、`GET /healthz`，搜索改为 `GET /questions`。
+- 每次切换先停止上一个服务，避免端口冲突。每次启动重建 `server.log`，先保存必要证据；80ms 延迟仅用于日志交织，不是性能基准。
+- 复制 `.env.example` 为 `.env` 后，使用 `uv run --env-file .env ...` 显式加载；仅创建文件不会自动加载。`.env` 已忽略，不能提交真实凭据。
+- shell 内联环境变量是 macOS / Linux 写法；PowerShell 使用 `$env:TRACE_MODE='trace'` 等赋值。
+
+默认 SQLite：`sqlite:///./demo.db`。结构在 `seed.sql`，`seed.py` 写入固定的 30 个问题、15 个回答、5 个标签；全部虚构。需要复位时先停服务，再执行 `uv run python seed.py --reset`。初始化工具只允许名为 `demo.db` 的 SQLite 文件，或本机库名以 `m0_` 开头的 PostgreSQL 教学库。
+
+PostgreSQL 16 / 17 可通过 `DATABASE_URL` 配置：事先创建隔离教学库并给测试账号授权；不连接生产数据。本轮未获得可用 PostgreSQL 服务，**PostgreSQL 未验证**，默认 SQLite 为已验证备用路径。
+
+### 调试、验收与证据
+
+用 VS Code **直接打开 m0-tracer 目录**，安装 Python / Python Debugger 扩展；选附带 `.vscode/launch.json` 的配置，在 `v2_traceable.py` 的 `rows = conn.execute(...)` 处下断点。关闭 reload、`justMyCode=false`；Windows 将解释器路径改为 `.venv/Scripts/python.exe`。先截 Call Stack 与 Variables 中的 rid，继续后再截响应与日志。多行表达式可能再次命中，取证后可移除断点。
+
+```bash
+uv run python verify_m0.py --all       # 三个阶段的隔离 SQLite 验证
+uv run python verify_m0.py --app student_app
+make verify                          # 默认检查 v3_m0 参考答案
+uv run python capture_evidence.py     # 重采 HTTP、并发日志、debugpy 停点与 SQL
+```
+
+验证器要求待测单文件暴露 `app`、`engine`，从 `DATABASE_URL` / `LOG_FILE` 环境变量读取测试配置；在临时 SQLite 中检查响应、数据、配对日志、SELECT 1、断连后的 503 和恢复。`/boom` 是特意保留的异常路径缺陷，单独检查，不要求它有离开日志或响应 id。凭据扫描只是有限 AST 规则，不等于安全审计。当前锁定的 Starlette 使用 HTTPX TestClient 时会发出弃用提示，测试仍通过。
+
+证据采集只使用自身的 `.capture/demo.db` 与回环服务；停止自己启动的进程，不影响已有应用。原始记录与版本在 `public/images/ch01/evidence.json`；页面仅做时间前缀省略、节选和高亮。单次合流来自同一个 HTTP 请求和真实 debugpy 停点，**不是手写模拟数据，也不是 IDE / 终端界面截图**。用相同 id 重发四次不能冒充同一次执行。
+
+已验证环境：Python 3.12.12、FastAPI 0.141.1、Starlette 1.6.0、SQLAlchemy 2.0.54、uvicorn 0.53.0、debugpy 1.8.22；准确锁定版本以 `uv.lock` 为准。SQL echo 本身无 request-id，四处合流在暂停并发后采集；计时含调试暂停，不用作性能证据。
+
+**授课前缺项**：DevTools / 终端 / IDE 原始界面截图及 40 秒 IDE 备用录像待补；当前以真实协议与日志输出重排作有限备用。`/docs` 默认依赖 CDN 脚本，离线可用 curl。PDF 与教室投影未验证，网页可用不代表这些交付形式已验收。
+
 ## 课堂互动（课件端已集成）
 
 支持教师面板、单选/多选/自由文本、二维码、公开统计、评论审核与展示端配对入口。默认关闭，公开浏览不请求互动 API、不建立 SSE；只有主动连接课堂后才实时同步。

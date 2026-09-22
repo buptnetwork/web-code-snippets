@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "M0 v2：查询断点（无 reload）",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["v2_traceable:app", "--host", "127.0.0.1", "--port", "8000"],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "DATABASE_URL": "sqlite:///./demo.db",
+        "TRACE_MODE": "trace",
+        "SQL_ECHO": "1",
+        "DEMO_DELAY_MS": "0"
+      }
+    }
+  ]
+}

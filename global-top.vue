@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ClassroomHost from './components/classroom/ClassroomHost.vue'
+import './styles/index.css'
 </script>
 
 <template>

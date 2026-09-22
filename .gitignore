@@ -16,3 +16,12 @@ snippets/lesson00/todos.json
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# 第一次课的隔离演示与验证运行产物
+.env
+.venv/
+snippets/ch01/m0-tracer/*.db
+snippets/ch01/m0-tracer/*.log
+snippets/ch01/m0-tracer/m0-verify-*/
+snippets/ch01/m0-tracer/.capture/
+.build-check/
