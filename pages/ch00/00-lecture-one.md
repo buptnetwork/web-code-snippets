@@ -76,10 +76,10 @@ layout: section
 <div class="text-xs tracking-widest opacity-60 mb-2">先建立轮廓（第 12 次课正式比较）</div>
 <div class="space-y-2.5 text-sm">
   <div class="p-3 rounded border border-gray-400/25 bg-gray-500/5">
-    <span class="font-bold">纯静态页面</span><span class="opacity-70">　只有客户端，没有服务端逻辑</span>
+    <span class="font-bold">纯静态页面</span><span class="opacity-70">　无需动态后端，文件可由静态服务器提供</span>
   </div>
   <div class="p-3 rounded border border-gray-400/25 bg-gray-500/5">
-    <span class="font-bold">服务端渲染</span><span class="opacity-70">　服务端拼好完整 HTML 发过来</span><span class="text-xs opacity-50">（第 4 次课做）</span>
+    <span class="font-bold">服务端渲染</span><span class="opacity-70">　服务端拼好完整 HTML 发过来</span><span class="text-xs opacity-50">（第 5 次课做）</span>
   </div>
   <div class="p-3 rounded border-2 border-teal-500/40 bg-teal-500/5">
     <span class="font-bold text-teal-700 dark:text-teal-300">前后端分离</span><span class="opacity-70">　服务端只发数据，浏览器自己画</span><span class="text-xs opacity-50">（第 12 次课做）</span>
@@ -105,7 +105,7 @@ layout: section
   </div>
 </div>
 <div class="mt-3 p-3 rounded-lg bg-rose-500/8 border-l-4 border-rose-500 text-sm">
-<b>预期：</b>页面框架、按钮、样式<span class="font-bold">都还在</span>，但数据区域空了或报错；控制台出现网络请求失败。
+<b>前提与预期：</b>静态页面由独立服务提供；只停止数据后端。刷新后页面仍在，数据请求失败。若页面也由同一后端提供，刷新可能连页面都打不开。
 </div>
 </div>
 
@@ -114,7 +114,7 @@ layout: section
 <!--
 [click] 我现在演示一下。这个页面现在好好的，有数据。我去终端把后端进程杀掉。（杀掉，刷新）
 
-你看，页面还在，按钮还在，样式还在，但数据没了。为什么？因为页面这些东西是浏览器手里的，后端死了不影响它。但数据是要去问后端的，后端死了就问不到。
+本演示要求静态页面服务和数据后端分开启动，只停止数据后端。若使用同源单进程服务，不照搬“刷新后页面还在”的预期；可保留已打开页面，再触发一次取数操作。
 
 这就是"两个进程"的直接证据。这一节不要引入任何术语层级，你只要建立"两个进程"这一个概念就够了。
 -->
@@ -235,7 +235,7 @@ layout: section
   <div class="text-xs tracking-widest opacity-60 mb-2">不会被发到服务端</div>
   <div class="text-sm">
     · <span class="font-bold text-rose-600 dark:text-rose-400">片段</span> <code class="text-xs">#top</code>
-    <div class="mt-1.5 text-xs opacity-75">只有浏览器自己用——服务端永远看不到井号后面的东西。</div>
+    <div class="mt-1.5 text-xs opacity-75">URL 的片段不随该 HTTP 请求发送；脚本另行发送是另一回事。</div>
   </div>
 </div>
 
@@ -253,7 +253,7 @@ URL 你们每天在用，但可能没拆过。看这一行，六段：协议、�
 
 # 0.2 HTTP 报文四部分
 
-<div class="text-xs opacity-55 -mt-1 mb-3">请求和响应都是这四样：起始行 · 头 · 空行 · 体。<span class="font-bold text-amber-600 dark:text-amber-400">空行是头与体的唯一分界</span>。</div>
+<div class="text-xs opacity-55 -mt-1 mb-3">HTTP/1.1 文本示意：起始行 · 头 · 空行 · 体。<span class="font-bold text-amber-600 dark:text-amber-400">空行结束头部</span>；HTTP/2、HTTP/3 的线上编码不同。</div>
 
 <div grid="~ cols-2 gap-5" class="mt-2 text-[13px]">
 
@@ -290,16 +290,16 @@ URL 你们每天在用，但可能没拆过。看这一行，六段：协议、�
 </div>
 <div class="p-3 rounded bg-gray-500/8">
   <div class="text-xs tracking-widest opacity-60 mb-1.5">方法与状态码只记轮廓</div>
-  <span class="font-bold">GET</span> 读 · <span class="font-bold">POST</span> 提交　｜　<span class="text-teal-700 dark:text-teal-300 font-bold">2xx</span> 成功 · <span class="text-amber-600 dark:text-amber-400 font-bold">4xx</span> 你错了 · <span class="text-rose-600 dark:text-rose-400 font-bold">5xx</span> 我错了
+  <span class="font-bold">GET</span> 读 · <span class="font-bold">POST</span> 提交　｜　<span class="text-teal-700 dark:text-teal-300 font-bold">2xx</span> 成功 · <span class="text-amber-600 dark:text-amber-400 font-bold">4xx</span> 请求侧问题 · <span class="text-rose-600 dark:text-rose-400 font-bold">5xx</span> 服务端未完成
 </div>
 </div>
 
 <!--
-现在看报文。HTTP 报文长什么样？四部分：起始行、头、空行、体。就这四样，请求响应都一样。
+现在用 HTTP/1.1 的文本示意读四部分：起始行、头、空行、体。不要把该排版说成 HTTP/2 或 HTTP/3 的线上字节。
 
 注意中间这个空行——它是头和体的唯一分界，没有它服务端不知道头到哪儿结束。学生最容易忽略它，所以我把它标红。
 
-[click] 下面这两块你扫一眼就行。四个头先认脸不求深解；方法和状态码只记轮廓——GET 读、POST 提交，2xx 成功、4xx 你错了、5xx 我错了。判据留给第 1 次课，今天不抢。
+[click] 下面这两块你扫一眼就行。四个头先认脸不求深解；方法和状态码只记轮廓——GET 读、POST 提交，2xx 报告成功、4xx 请求条件等有问题、5xx 服务端未能完成。它们是线索，不是责任归属的最终证明。
 -->
 
 ---
@@ -314,12 +314,12 @@ URL 你们每天在用，但可能没拆过。看这一行，六段：协议、�
 <div class="text-xs tracking-widest opacity-60 mb-2">五个方法 · 你想对资源做什么</div>
 <div class="rounded-lg overflow-hidden border border-gray-400/25 text-[13px]">
 <div class="flex gap-2 px-3 py-1.5 border-b border-gray-400/15"><code class="w-16 shrink-0 font-bold text-teal-600 dark:text-teal-400">GET</code><span class="opacity-85">读一个资源（列表、详情）</span></div>
-<div class="flex gap-2 px-3 py-1.5 border-b border-gray-400/15"><code class="w-16 shrink-0 font-bold text-teal-600 dark:text-teal-400">POST</code><span class="opacity-85">新建一个资源（发帖、注册）</span></div>
+<div class="flex gap-2 px-3 py-1.5 border-b border-gray-400/15"><code class="w-16 shrink-0 font-bold text-teal-600 dark:text-teal-400">POST</code><span class="opacity-85">提交数据处理（常用于发帖、注册）</span></div>
 <div class="flex gap-2 px-3 py-1.5 border-b border-gray-400/15"><code class="w-16 shrink-0 font-bold text-amber-600 dark:text-amber-400">PUT</code><span class="opacity-85">整体替换一个资源</span></div>
 <div class="flex gap-2 px-3 py-1.5 border-b border-gray-400/15"><code class="w-16 shrink-0 font-bold text-amber-600 dark:text-amber-400">PATCH</code><span class="opacity-85">局部修改一个资源</span></div>
 <div class="flex gap-2 px-3 py-1.5"><code class="w-16 shrink-0 font-bold text-rose-600 dark:text-rose-400">DELETE</code><span class="opacity-85">删除一个资源</span></div>
 </div>
-<div class="mt-2 text-xs opacity-70">第 1 次课的五个接口，正好把这五个方法各用一次。</div>
+<div class="mt-2 text-xs opacity-70">第 1 次课只对照读取时使用 POST 与 GET；完整语义留第 2 次课。</div>
 </div>
 
 <div>
@@ -327,11 +327,11 @@ URL 你们每天在用，但可能没拆过。看这一行，六段：协议、�
 <div class="space-y-1.5 text-[13px]">
 <div class="flex gap-2 items-baseline"><span class="w-9 shrink-0 font-mono font-bold text-teal-700 dark:text-teal-300">2xx</span><span class="opacity-85">成功</span><span class="font-mono text-xs opacity-55">200 · 201 · 204</span></div>
 <div class="flex gap-2 items-baseline"><span class="w-9 shrink-0 font-mono font-bold text-sky-600 dark:text-sky-400">3xx</span><span class="opacity-85">重定向</span><span class="font-mono text-xs opacity-55">301 · 302 · 303</span></div>
-<div class="flex gap-2 items-baseline"><span class="w-9 shrink-0 font-mono font-bold text-amber-600 dark:text-amber-400">4xx</span><span class="opacity-85">你（客户端）错了</span><span class="font-mono text-xs opacity-55">400 · 401 · 403 · 404 · 409 · 422</span></div>
-<div class="flex gap-2 items-baseline"><span class="w-9 shrink-0 font-mono font-bold text-rose-600 dark:text-rose-400">5xx</span><span class="opacity-85">我（服务端）错了</span><span class="font-mono text-xs opacity-55">500</span></div>
+<div class="flex gap-2 items-baseline"><span class="w-9 shrink-0 font-mono font-bold text-amber-600 dark:text-amber-400">4xx</span><span class="opacity-85">请求条件等有问题</span><span class="font-mono text-xs opacity-55">400 · 401 · 403 · 404 · 409 · 422</span></div>
+<div class="flex gap-2 items-baseline"><span class="w-9 shrink-0 font-mono font-bold text-rose-600 dark:text-rose-400">5xx</span><span class="opacity-85">服务端未能完成</span><span class="font-mono text-xs opacity-55">500</span></div>
 </div>
 <div class="mt-3 p-2.5 rounded-lg bg-gray-500/8 text-xs">
-<b>先记三个</b>：<code>200</code> 成功、<code>404</code> 没找到、<code>500</code> 服务端炸了。其余第 1 次课逐个见到——<code>401</code> 没登录、<code>403</code> 没权限、<code>409</code> 冲突、<code>422</code> 校验失败。
+<b>先记三个</b>：<code>200</code> 成功、<code>404</code> 没找到、<code>500</code> 服务端错误。第一课还会观察 <code>422</code> 参数不合法和 <code>503</code> 暂时不可用；不是背状态码大全。
 </div>
 </div>
 
@@ -340,11 +340,9 @@ URL 你们每天在用，但可能没拆过。看这一行，六段：协议、�
 <!--
 报文四部分的起始行里，有两个关键词：方法和状态码。这一页把它们认全。
 
-左边五个方法，就是"你想对资源做什么"：GET 读、POST 新建、PUT 整体替换、PATCH 局部改、DELETE 删。第 1 次课那五个接口，正好一个方法用一次，你到时候会一一对上。
+左边认常见方法用途，不把 POST 等同于只能新建。第一课只用搜索案例对照 POST 和 GET，完整语义留第 2 次课。
 
-右边状态码，是服务端的回话。先记大类：2xx 成功、3xx 重定向、4xx 你错了、5xx 我错了。这个"你错了/我错了"的分法要刻进脑子——4xx 是客户端的问题，5xx 是服务端的问题，排障时第一刀就砍在这里。
-
-具体码今天先认三个：200 成功、404 没找到、500 服务端炸了。剩下的 401 没登录、403 没权限、409 冲突、422 校验失败——第 1 次课会一个个见到，每个都配一个现场复现。今天不抢判据，认脸就够。
+右边状态码报告 HTTP 结果。先识别大类，再看响应体和服务端证据；不能只凭 4xx / 5xx 断定是谁写错了代码。第一课聚焦错误 200 为什么误导诊断，不承诺逐个复现所有状态码。
 -->
 
 ---
@@ -417,9 +415,9 @@ class: text-center
 </div>
 
 <!--
-[click] 现在用浏览器访问同一个地址，打开 F12 看 Network。你会发现浏览器发的头比 curl 多得多——十几个。
+现在用浏览器访问同一个地址，打开 F12 看 Network，对照请求头。数量受浏览器与环境影响，不要求固定个数。
 
-这些头都在干什么？第二次课整节课讲。今天你只要建立一个认知：每次请求都是一段有固定格式的文本，你能看到它的每一个字节。Web 开发里没有魔法，出问题的时候你总能把报文抓出来看。
+今天先会找请求、读 Headers 和 Response。DevTools 是解码后的界面视图，不保证能看到线上每个原始字节；没有可用响应时，还需要检查失败详情和启动终端。
 -->
 
 ---
@@ -432,7 +430,7 @@ class: text-center
 
 <div class="flex items-start gap-3 p-2.5 rounded-lg border border-gray-400/25 bg-gray-500/5">
 <span class="w-6 h-6 rounded-full bg-teal-500/25 text-xs flex items-center justify-center font-bold shrink-0">1</span>
-<div><b>看状态码</b><span class="opacity-75">　点开请求，Headers 顶部那个 200 / 404 / 500——第一刀砍在 4xx 还是 5xx</span></div>
+<div><b>看状态码</b><span class="opacity-75">　点开请求，先确认请求存在，再读 Headers 中的状态或失败详情</span></div>
 </div>
 
 <div class="flex items-start gap-3 p-2.5 rounded-lg border border-gray-400/25 bg-gray-500/5">
@@ -442,7 +440,7 @@ class: text-center
 
 <div class="flex items-start gap-3 p-2.5 rounded-lg border border-gray-400/25 bg-gray-500/5">
 <span class="w-6 h-6 rounded-full bg-teal-500/25 text-xs flex items-center justify-center font-bold shrink-0">3</span>
-<div><b>看请求载荷与响应体</b><span class="opacity-75">　Payload 标签是你发过去的 JSON；Response / Preview 标签是服务端回的数据</span></div>
+<div><b>看请求载荷与响应体</b><span class="opacity-75">　核对查询串、表单或 JSON；Response / Preview 看返回内容</span></div>
 </div>
 
 <div class="flex items-start gap-3 p-2.5 rounded-lg border border-gray-400/25 bg-gray-500/5">
@@ -458,23 +456,23 @@ class: text-center
 </div>
 
 <div v-click class="mt-3 p-3 rounded-lg bg-amber-500/8 border-l-4 border-amber-500 text-sm">
-这五件事就是预习包第 6 章那道必做题的操作清单。第 1 次课起，每次问「失败什么样、在哪观察」，答案都在这五件事里。
+这五件事就是预习包第 6 章那道必做题的操作清单。这是客户端侧的入口；第 1 次课还会结合应用日志、断点栈帧和 SQL 日志。
 </div>
 
 <!--
 跟做 2 你们已经打开了 Network 面板，也看到了浏览器发的头比 curl 多得多。这一页我把「在 Network 里到底看什么」系统成五件事，这是你今后排障的主战场。
 
-第一，看状态码。点开任何一个请求，最上面那个数字，200 还是 404 还是 500——排障第一刀就砍在这里：是 4xx 你错了，还是 5xx 我错了。
+第一，先找请求是否存在，再看状态码或失败详情。有状态码也不保证端点已经执行，没有可读响应也不保证应用没收到。
 
 第二，看请求头和响应头。Request Headers 里是你发过去的，Cookie、Authorization 都在这；Response Headers 里是服务端回过来的，Set-Cookie、Cache-Control 在这。
 
-第三，看请求载荷和响应体。Payload 标签是你发过去的 JSON，Response 或 Preview 标签是服务端回的数据。第 1 次课那个 422 的 errors 数组，就是在这里看到的。
+第三，看请求载荷和响应体。载荷不一定是 JSON，也可能是查询参数或表单。第一课 POST 搜索参数就在查询串中；422 默认响应中的 detail 也在 Response 里读取。
 
 第四，看耗时。Timing 标签把一次请求拆成 DNS、连接、等待、下载几段——用户说"慢"，你要能说出慢在哪一段。
 
 第五，勾上 Disable cache，分清这个资源是从缓存来的还是从服务器来的。Size 列如果显示 memory cache 或 disk cache，说明根本没走网络。你改了代码刷新没生效，十有八九是缓存——这是排查的第一步。
 
-这五件事，就是预习包第 6 章那道必做题的操作清单。从第 1 次课起，我们每节课问"失败什么样、在哪观察"，答案都落在这五件事里。
+这五件事，就是预习包第 6 章那道必做题的操作清单。第一课把客户端观察与服务端记录结合起来，不能只靠 Network 解释所有内部行为。
 -->
 
 ---
@@ -517,7 +515,7 @@ curl -i -X POST http://127.0.0.1:8000/echo -H 'content-type: application/json' -
 <!--
 最后让它返回一个 404 和一个 400。第一个请求一个不存在的路径，第二个发一段坏掉的 JSON。
 
-你看状态行：404 是"你请求的东西我这儿没有"，400 是"你发的东西我读不懂"。这两个状态码第 1 次课会反复见到，今天先混个脸熟。
+你看状态行：404 是"你请求的东西我这儿没有"，400 是"你发的东西我读不懂"。这是本节 demo_server 的行为；第一课使用 FastAPI，参数校验常见的是 422，不能假定所有服务返回相同格式。
 -->
 
 ---
@@ -560,15 +558,14 @@ curl -i -X POST http://127.0.0.1:8000/echo -H 'content-type: application/json' -
 <div class="text-xs tracking-widest opacity-60 mb-2">三层嵌套结构树</div>
 <div class="p-4 rounded-lg bg-gray-500/8 border border-gray-400/25 font-mono text-xs leading-relaxed">
 <div><span class="text-teal-700 dark:text-teal-300 font-bold">对象</span> {</div>
-<div class="pl-4">"type": "...", "status": 422,</div>
-<div class="pl-4"><span class="text-amber-600 dark:text-amber-400 font-bold">"errors": 数组</span> [</div>
-<div class="pl-8"><span class="text-sky-600 dark:text-sky-400 font-bold">对象</span> {"field": "title", "msg": "..."},</div>
-<div class="pl-8"><span class="text-sky-600 dark:text-sky-400 font-bold">对象</span> {"field": "body",  "msg": "..."}</div>
-<div class="pl-4">],</div>
-<div class="pl-4">"request_id": "9f2c1a4b7e30"</div>
+<div class="pl-4">"success": true,</div>
+<div class="pl-4"><span class="text-amber-600 dark:text-amber-400 font-bold">"data": 数组</span> [</div>
+<div class="pl-8"><span class="text-sky-600 dark:text-sky-400 font-bold">对象</span> {"id": 1, "title": "..."},</div>
+<div class="pl-8"><span class="text-sky-600 dark:text-sky-400 font-bold">对象</span> {"id": 2, "title": "..."}</div>
+<div class="pl-4">]</div>
 <div>}</div>
 </div>
-<div class="mt-2 text-xs opacity-75">最外层是<b>对象</b> → <code>errors</code> 是<b>数组</b> → 每个元素又是<b>对象</b>，各有 <code>field</code> 和 <code>msg</code> 两个键。</div>
+<div class="mt-2 text-xs opacity-75">第一课搜索响应的简化结构：最外层是<b>对象</b> → <code>data</code> 是<b>数组</b> → 每项是<b>对象</b>。示意省略了其他字段。</div>
 </div>
 
 </div>
@@ -578,9 +575,7 @@ JSON 就六种值，对象、数组、字符串、数字、布尔、null。没�
 
 三个坑，你们写的时候一定会踩：JSON 里是小写的 true false null，Python 里是大写的 True False None。还有键必须用双引号，单引号 JSON 不认。
 
-[click] 现在看右边这段——这是第 1 次课我演示校验失败时你们会看到的真实响应。你们现在就要能读它。最外面是一个对象，里面 errors 这个键它的值是一个数组，数组里每个元素又是一个对象，每个对象有 field 和 msg 两个键。三层。
-
-为什么要专门练这个？因为第十次课我们做前端表单，就是要把这个数组里的每一项，按 field 的值找到对应的输入框，把 msg 显示在它下面。你读不懂这个结构，那节课就没法做。
+[click] 右边是搜索响应的简化结构树，不是完整原始 JSON。让学生指出 data 的值是数组，每个元素是对象，再找到 id 与 title。第一课会把真实响应与这个结构对应；不提前引入统一错误契约。
 -->
 
 
@@ -597,7 +592,7 @@ JSON 就六种值，对象、数组、字符串、数字、布尔、null。没�
   <div class="text-xs opacity-80 space-y-1">
     <div><code>pwd</code> 看我在哪 · <code>cd</code> 换地方 · <code>ls</code> 看有什么</div>
     <div>相对路径相对<b>当前工作目录</b>，不是文件所在目录</div>
-    <div class="text-rose-600 dark:text-rose-400">必须在项目根启动：配置里 <code>env_file=".env"</code> 是相对路径，站错地方它<b>不报错</b>、默默用默认值</div>
+    <div class="text-rose-600 dark:text-rose-400">在示例要求的目录启动：相对数据库路径和模块查找受启动方式影响；讲二 0.12 会练 m0-tracer</div>
   </div>
 </div>
 
@@ -615,7 +610,7 @@ JSON 就六种值，对象、数组、字符串、数字、布尔、null。没�
   <div class="text-xs opacity-80 space-y-1">
     <div>环境变量是操作系统给进程的一组键值对，程序启动时能读到</div>
     <div><code>.env</code> <b>不是 Python 语法</b>，只是约定格式的文本，由库去读</div>
-    <div>为什么用它：密钥、数据库地址不能写进代码（第 1 次课 1.5.3 讲原理）</div>
+    <div>第一课用 os.getenv 读环境；使用 .env 时显式加 <code>uv run --env-file .env</code>（配置管理留第 4 次）</div>
   </div>
 </div>
 
@@ -640,7 +635,7 @@ JSON 就六种值，对象、数组、字符串、数字、布尔、null。没�
   <div class="font-bold mb-1 text-teal-700 dark:text-teal-300">⑥ 三条会反复用到的命令</div>
   <div class="text-xs space-y-1">
     <div><code>curl -i URL</code> 看完整响应含头 <span class="opacity-60">· 第 1、8、11 次课</span></div>
-    <div><code>grep -rn "词" 目录/</code> 全项目搜字符串 <span class="opacity-60">· 查架构违规</span></div>
+    <div><code>grep -rn "词" 目录/</code> 全项目搜字符串 <span class="opacity-60">· 查代码与日志</span></div>
     <div><code>python -m 包.模块</code> 以模块方式运行 <span class="opacity-60">· 第 0、1 次课</span></div>
   </div>
 </div>
@@ -650,7 +645,7 @@ JSON 就六种值，对象、数组、字符串、数字、布尔、null。没�
 <!--
 这一节全是操作，你们必须跟着做，光看没用。它直接预防第 1 次课教案里记录的四类现场事故。
 
-先说工作目录。这个东西每年都有人栽。第一次课我们的配置文件里写的是 env_file 等于点 env，这是个相对路径，相对的是你启动命令时所在的目录，不是代码文件所在的目录。你在别的地方启动，它找不到这个文件，然后——注意——它不报错，它默默用默认值。你调试半小时才发现配置根本没生效。所以规则很简单：永远在项目根目录启动。
+先说工作目录：按具体示例指定目录运行。第一课在 snippets/ch01/m0-tracer 启动；os.getenv 只读取进程环境，创建 .env 不会自动生效，要显式加载。讲二 0.12 会让学生实际启动单文件搜索服务。
 
 再说端口。端口是独占的，一个端口同一时刻只能一个进程听。
 
@@ -709,7 +704,7 @@ class: text-center
 </div>
 
 <div class="mt-1 max-w-4xl mx-auto text-left">
-<div class="text-[11px] opacity-60 mb-1.5 text-center">必须在 <code>snippets/lesson00</code> 目录执行 · 这个程序贯穿讲一讲二，现在必须跑通</div>
+<div class="text-[11px] opacity-60 mb-1.5 text-center">必须在 <code>snippets/lesson00</code> 目录执行 · mini 仅用于工具练习，不要求设计它的分层</div>
 
 ```bash
 cd snippets/lesson00
@@ -816,20 +811,20 @@ ModuleNotFoundError: No module named 'mini'
 </div>
 
 <div>
-<div class="text-xs tracking-widest opacity-60 mb-2">板书 · 阅读顺序</div>
+<div class="text-xs tracking-widest opacity-60 mb-2">板书 · /boom 报错的结构示意</div>
 <div class="rounded-lg overflow-hidden border border-gray-400/25 font-mono text-[11px] leading-relaxed">
   <div class="px-3 py-1 bg-gray-500/8 opacity-45">Traceback (most recent call last):</div>
-  <div class="px-3 py-1 bg-gray-500/8 opacity-45">　File ".../fastapi/routing.py", line 812　<span class="opacity-60">← 库帧，跳过</span></div>
-  <div class="px-3 py-1 bg-gray-500/8 opacity-45">　File ".../starlette/middleware.py", line 88　<span class="opacity-60">← 库帧，跳过</span></div>
-  <div class="relative px-3 py-1 bg-teal-500/12 border-l-4 border-teal-500 font-bold">　File "app/services/post_service.py", line 18
+  <div class="px-3 py-1 bg-gray-500/8 opacity-45">　File ".../框架内部.py", line ...　<span class="opacity-60">← 库帧，跳过</span></div>
+  <div class="px-3 py-1 bg-gray-500/8 opacity-45">　File ".../运行库内部.py", line ...　<span class="opacity-60">← 库帧，跳过</span></div>
+  <div class="relative px-3 py-1 bg-teal-500/12 border-l-4 border-teal-500 font-bold">　File "v2_traceable.py", line 101, in boom
     <span class="absolute right-2 top-0.5 text-[10px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-700 dark:text-teal-300">② 再找这里 ↑</span>
   </div>
-  <div class="px-3 py-1 bg-teal-500/8 border-l-4 border-teal-500/50">　　1 / 0</div>
-  <div class="relative px-3 py-1.5 bg-rose-500/15 border-l-4 border-rose-500 font-bold">ZeroDivisionError: division by zero
+  <div class="px-3 py-1 bg-teal-500/8 border-l-4 border-teal-500/50">　　raise RuntimeError("故意触发：…")</div>
+  <div class="relative px-3 py-1.5 bg-rose-500/15 border-l-4 border-rose-500 font-bold">RuntimeError: 故意触发：…
     <span class="absolute right-2 top-1 text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-700 dark:text-rose-300">① 先看这里</span>
   </div>
 </div>
-<div class="mt-2 text-xs opacity-75">最后一行说「除零」，往上第一个自己的文件是 <code>post_service.py:18</code> → <b class="text-teal-700 dark:text-teal-300">错误产生在服务层</b>。</div>
+<div class="mt-2 text-xs opacity-75">先读 RuntimeError，再定位 <code>v2_traceable.py</code> 的 boom 函数。示意省略库帧与长消息；实际行号以当前源码为准。</div>
 </div>
 
 </div>
@@ -841,7 +836,7 @@ ModuleNotFoundError: No module named 'mini'
 
 最后一行告诉你发生了什么——除零了、找不到模块了、字段缺了。这是结论。然后你从下往上找，找到第一个是你自己写的文件。中间那些一堆库里的文件，它们绝大多数情况只是传递者，不是原因，先跳过。
 
-三步：看最后一行，往上找自己的文件，然后去那一行。就这样。你看右边这段，最后一行 ZeroDivisionError，往上第一个自己的文件是 post_service.py 第 18 行——错误产生在服务层。说得出来，你就已经在做"定位"这件事了，而定位是第十六课的正题。
+先确定异常类型，再定位自己的文件与函数，这是调查入口，不是所有根因已经查明。右边是 /boom 的结构示意，不冒充真实完整 traceback；第一课将用它观察异常前后有哪些记录。
 -->
 
 ---
@@ -858,26 +853,26 @@ ModuleNotFoundError: No module named 'mini'
 
 <div v-click="1" class="flex gap-4 py-3 border-b border-gray-400/15 items-center">
   <div class="w-72 shrink-0 font-mono text-xs text-rose-600 dark:text-rose-400">ModuleNotFoundError:<br>No module named 'x'</div>
-  <div class="flex-1">依赖没装 / 工作目录不对 / 少了 <code class="text-xs">__init__.py</code></div>
+  <div class="flex-1">依赖没装 / 解释器不对 / 搜索路径不对</div>
   <div class="w-56 shrink-0 text-xs opacity-80">我在哪个目录？<br>我用 <code>uv run</code> 了吗？</div>
 </div>
 
 <div v-click="2" class="flex gap-4 py-3 border-b border-gray-400/15 items-center">
   <div class="w-72 shrink-0 font-mono text-xs text-rose-600 dark:text-rose-400">ImportError: cannot import name 'y' from partially initialized module</div>
-  <div class="flex-1"><b class="text-amber-600 dark:text-amber-400">循环导入</b>（0.12 现场制造）</div>
+  <div class="flex-1">可能是<b class="text-amber-600 dark:text-amber-400">循环导入</b>（先识别，不做架构实验）</div>
   <div class="w-56 shrink-0 text-xs opacity-80">两个文件是不是<br>互相 import 了？</div>
 </div>
 
 <div v-click="3" class="flex gap-4 py-3 border-b border-gray-400/15 items-center">
   <div class="w-72 shrink-0 font-mono text-xs text-rose-600 dark:text-rose-400">ValidationError:<br>field required</div>
   <div class="flex-1">配置或请求数据缺字段</div>
-  <div class="w-56 shrink-0 text-xs opacity-80">看它说的是哪个字段<br>（第 1 次课开场就见）</div>
+  <div class="w-56 shrink-0 text-xs opacity-80">看它说的是哪个字段<br>（第 3 / 4 次课展开）</div>
 </div>
 
 </div>
 
 <div v-click="4" class="mt-5 p-3.5 rounded-lg bg-sky-500/8 border-l-4 border-sky-500 text-sm">
-<span class="font-bold text-sky-700 dark:text-sky-300">对应第 1 次课：</span>我会故意在服务层插一行 <code class="text-xs">1 / 0</code>，让你看到「栈只进日志、不进响应体」。那时你要能一眼读出：错误产生在 <code class="text-xs">post_service.py</code>，<b>在服务层</b>。
+<span class="font-bold text-sky-700 dark:text-sky-300">对应第 1 次课：</span>单文件 <code>v2_traceable.py</code> 的 <code>/boom</code> 故意抛出 RuntimeError。对比终端异常、HTTP 响应和应用记录，不展开服务层或全局异常设计。
 </div>
 
 <!--
@@ -885,11 +880,11 @@ ModuleNotFoundError: No module named 'mini'
 
 [click] 第一种 ModuleNotFoundError，找不到模块。十有八九不是代码问题，是你站错了目录，或者没用 uv run。
 
-[click] 第二种 ImportError，partially initialized module，后面还跟着 circular import。这是循环导入，0.12 那一节我会让你们亲手把 mini 弄坏，制造出这个报错。
+[click] 第二种报错提示模块只初始化了一部分，先检查是否互相导入。架构调整留后续，不在课前设计依赖方向。
 
-[click] 第三种 ValidationError，field required，配置或者请求数据缺字段。第 1 次课开场你们就会见到。
+[click] 第三种是校验错误，先读缺了哪个字段；完整规则留第 3 / 4 次课。
 
-[click] 这一节直接支撑第 1 次课的 500 演示，以及第 16 次课的定位四步法。第一次课我会故意写一个除零错误，你们要能一眼说出"这是服务层的问题"。
+[click] 第一课用单文件 /boom 复现 RuntimeError，练习从报错定位函数，并核对哪些观察记录缺失。
 -->
 
 ---
@@ -924,19 +919,19 @@ class: text-center
 <!--
 现在你们自己读三段，我给了文件，每段回答两个问题：哪个文件哪一行，我该先改什么。用刚学的三步法。
 
-（跟做 7，留时间）三段的答案：第一段不是代码问题，是工作目录不对或没用 -m；第二段是循环导入，service.py 那句 import 要删掉；第三段是 repo.py 拼错了 title，注意错误产生在仓储层，但报错是从 cli 一路传上来的——这就是异常穿层，0.9 会讲。
+（跟做 7，留时间）三段的答案：第一段不是代码问题，是工作目录不对或没用 -m；第二段是循环导入，service.py 那句 import 要删掉；第三段是 repo.py 拼错了 title。先定位变量，再沿调用关系读异常传播；0.9 只讲执行顺序，不讲架构分层。
 -->
 
 ---
 
-# 0.6 调试器：为什么不用 print
+# 0.6 调试器：暂停后能多看什么
 
-<div class="text-xs opacity-55 -mt-1 mb-3">本讲<b class="text-amber-600 dark:text-amber-400">高光</b>，25 分钟不可压缩。先解决态度问题——否则学完你还是会退回去用 print。</div>
+<div class="text-xs opacity-55 -mt-1 mb-3">本节保留动手时间。日志记录经过，调试器观察停点状态；两者互补，不是二选一。</div>
 
 <div grid="~ cols-2 gap-6" class="mt-2">
 
 <div>
-<div class="text-xs tracking-widest opacity-60 mb-2">print 调试为什么不行</div>
+<div class="text-xs tracking-widest opacity-60 mb-2">临时 print 的观察边界</div>
 <div class="space-y-2.5 text-sm">
   <div class="p-3 rounded-lg border border-rose-500/30 bg-rose-500/5">
     <b class="text-rose-600 dark:text-rose-400">只能看到你事先想到</b>要看的那一个值——可 bug 恰恰出在你<b>没想到</b>的地方
@@ -945,7 +940,7 @@ class: text-center
     要改代码、要记得删；删漏一行就跟着上线了
   </div>
   <div class="p-3 rounded-lg border-2 border-teal-500/40 bg-teal-500/5">
-    <b class="text-teal-700 dark:text-teal-300">断点停下的那一刻</b>：当前所有变量、整条调用链，全摊在你面前——<b>包括你没想到要看的</b>
+    <b class="text-teal-700 dark:text-teal-300">断点停下的那一刻</b>：可查看当前线程的调用栈，切换帧后检查该帧的变量；不是整个系统的全量状态
   </div>
 </div>
 </div>
@@ -980,7 +975,7 @@ class: text-center
 <!--
 这二十五分钟是这一讲最重要的，我建议你们看两遍。
 
-先回答一个问题：为什么不用 print 调试？因为 print 只能看到你事先想到要看的那个值。但 bug 之所以是 bug，就是因为出在你没想到的地方。断点停下那一刻，所有变量、整条调用链，全摊在你眼前。
+临时 print 只输出你写下的表达式；调试器允许在停点查看当前帧变量、沿当前线程调用栈切换。日志适合保留经过，断点会改变运行时序，两者都有边界。
 
 好，五个动作：点行号设断点，F5 启动，F10 单步跳过，F11 单步进入，F5 继续。就这五个。F10 和 F11 的区别要记牢：F10 是「这行执行掉，别带我进去」，F11 是「带我进这个函数里面看」。
 -->
@@ -994,7 +989,7 @@ class: text-center
 <div>
 <div class="text-xs tracking-widest opacity-60 mb-2">停下后看四个面板</div>
 <div class="space-y-2 text-sm">
-  <div class="p-2.5 rounded border border-gray-400/25 bg-gray-500/5"><b>Variables</b><span class="opacity-75">　此刻所有变量的值</span></div>
+  <div class="p-2.5 rounded border border-gray-400/25 bg-gray-500/5"><b>Variables</b><span class="opacity-75">　当前所选栈帧的变量</span></div>
   <div class="p-2.5 rounded border-2 border-amber-500/50 bg-amber-500/8"><b class="text-amber-700 dark:text-amber-300">Call Stack</b><span class="opacity-80">　我在哪、被谁调进来的</span><span class="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold align-middle">本节重点</span></div>
   <div class="p-2.5 rounded border border-gray-400/25 bg-gray-500/5"><b>Watch</b><span class="opacity-75">　盯住某个表达式</span></div>
   <div class="p-2.5 rounded border border-gray-400/25 bg-gray-500/5"><b>Debug Console</b><span class="opacity-75">　在断点处直接执行代码试试</span></div>
@@ -1005,7 +1000,7 @@ class: text-center
 <div class="text-xs tracking-widest opacity-60 mb-2">今天最重要的概念：栈</div>
 <div class="space-y-2.5 text-sm">
   <div class="p-3 rounded-lg bg-gray-500/8">函数被<b class="text-teal-700 dark:text-teal-300">调用</b>时，一个「帧」被<b>压</b>到栈上；函数<b class="text-rose-600 dark:text-rose-400">返回</b>时，这个帧被<b>弹</b>掉。</div>
-  <div class="p-3 rounded-lg bg-gray-500/8"><b>栈底</b>是程序入口，<b class="text-amber-600 dark:text-amber-400">栈顶是你现在停的位置</b>。</div>
+  <div class="p-3 rounded-lg bg-gray-500/8">本例是单线程同步调用：栈底可看到入口，<b class="text-amber-600 dark:text-amber-400">栈顶是当前停点</b>。</div>
   <div class="p-3 rounded-lg border-2 border-teal-500/40 bg-teal-500/5 font-bold text-center">读调用栈 ＝ 回答两个问题：<br>我在哪？我是怎么来的？</div>
 </div>
 </div>
@@ -1013,9 +1008,9 @@ class: text-center
 </div>
 
 <!--
-停在断点后，看四个面板。Variables 是此刻所有变量的值；Call Stack 是重点——我在哪、我是被谁调进来的；Watch 盯住某个表达式；Debug Console 可以在断点处直接敲代码试试。
+停在断点后，看四个面板。Variables 是当前所选栈帧的变量；Call Stack 是重点——我在哪、我是被谁调进来的；Watch 盯住某个表达式；Debug Console 可以在断点处直接敲代码试试。
 
-[click] 现在讲今天最重要的概念——栈。函数被调用时，一个「帧」被压到栈上；函数返回时，这个帧被弹掉。栈底是程序入口，栈顶是你现在停的位置。所以读调用栈就是在回答两个问题：我在哪？我是怎么来的？就这两个。下一页我用一个最干净的例子，把压栈弹栈一步步放给你看。
+[click] 现在讲今天最重要的概念——栈。函数被调用时，一个「帧」被压到栈上；函数返回时，这个帧被弹掉。接下来这个单线程同步例子里，栈底可见模块入口，栈顶是当前停点。不要把它推成所有异步 Web 服务都有一个完整栈。所以读调用栈就是在回答两个问题：我在哪？我是怎么来的？就这两个。下一页我用一个最干净的例子，把压栈弹栈一步步放给你看。
 -->
 
 ---
@@ -1122,24 +1117,25 @@ class: text-center
 
 ---
 
-# 0.6 切到 mini：栈帧的层次就是分层的层次
+# 0.6 从停点出发，不把栈当成系统全景
 
-<div class="text-xs opacity-55 -mt-1 mb-2">在 <code>mini/repo.py</code> 的 <code>get()</code> 首行打断点，跑 <code>uv run python -m mini.cli done 1</code>，命中时的栈：</div>
-
-<CallStackLayers />
-
-<div v-click class="mt-5 p-3.5 rounded-lg bg-teal-500/8 border-l-4 border-teal-500 text-sm">
-<b class="text-teal-700 dark:text-teal-300">对照着看：栈的层次，就是右边分层的层次。</b>这句话你现在可能觉得平淡，但它是第 1 次课的核心。
+<div grid="~ cols-2 gap-6" class="mt-6 text-sm">
+<div class="p-4 rounded-lg border border-teal-500/40">
+<h3>课前已经会做</h3>
+<p>停在 level3，切到 level2，解释为什么两个帧中的 n 不同。</p>
+<p>调用栈回答：此刻停在哪个函数，在这个线程里如何来到这里？</p>
+</div>
+<div class="p-4 rounded-lg border border-sky-500/40">
+<h3>第一课继续追问</h3>
+<p>把同样操作放到单文件搜索服务：停在 SQL 调用前，查看端点参数和当前帧状态。</p>
+<p>再与客户端、日志的记录核对，而不是只数帧。</p>
+</div>
 </div>
 
-<div v-click="2" class="mt-3 p-3 rounded-lg bg-sky-500/8 border-l-4 border-sky-500 text-sm">
-<span class="font-bold text-sky-700 dark:text-sky-300">对应第 1 次课：</span>1.4.4 高光页的栈有<b>八层</b>——<code class="text-xs">uvicorn → FastAPI → 中间件 → 路由匹配 → 校验 → 路由函数 → 服务层 → 仓储层</code>。比 mini 多的<b class="text-amber-600 dark:text-amber-400">前五层全是框架替你做的事</b>。今天先在没框架的干净环境把「栈＝分层」看明白，第 1 次课就能把 6 分钟全花在「框架多做了什么」上。
-</div>
+<div v-click class="mt-5 p-3 rounded-lg bg-amber-500/10 text-sm"><b>调用栈 ≠ 完整请求链路 ≠ 架构分层。</b>同步端点可能在工作线程执行；跨进程、线程和异步边界，不能保证出现在同一个栈里。</div>
 
 <!--
-现在换到 mini 程序，这一段是重点。我在 repo 的 get 方法里打断点，跑一个 done 命令。看栈：最上面 repo.get，下面 service.get_todo，再下面 service.finish_todo，再下面 cli 的 main。
-
-[click] 你们对照右边那张四个方框的图看——栈的层次，就是我画的分层的层次。
-
-[click] 这句话你们现在可能觉得平淡，但它是第一次课的核心。第一次课我会在 FastAPI 里做同样的事，那时候栈上会有八层，前面五层全是框架替你干的活。今天你先在没有框架的干净环境里把这件事看明白，下周你就能把注意力全放在「框架到底多做了什么」上面。
+教学单元：0.6；本页：从工具操作承接第一课。
+不再用 mini 的多文件组织预讲架构，只回收切换栈帧与变量的实际操作。
+[click] 明确观察边界。第一课使用真实停点，既不预画八层完整栈，也不要求学生现在解释线程池实现；机制留第 5 次课。
 -->

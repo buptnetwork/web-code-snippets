@@ -16,7 +16,7 @@ pnpm export                 # 导出 PDF（需先装 playwright-chromium）
 
 ## 第一次课：请求全链路
 
-成稿入口为 `ch01.md`，正文与备注在 `pages/ch01/01.md`：44 页教学正文＋3 页准备附录，连同章节封面、目录、收尾共 50 页。节奏为 95 分钟＋5 分钟缓冲；底稿已归档，后续只修改最终工程。
+成稿入口为 `ch01.md`，正文与备注在 `pages/ch01/01.md`，包含教学正文、作业工具卡与准备附录。课前课聚焦“运行工具与代码阅读”，第一课保持“观察与取证”；分层和框架设计留后续课。节奏为 95 分钟＋5 分钟缓冲，作业工具卡供课后查阅，不挤占现场取证；底稿已归档，后续只修改最终工程。
 
 ```bash
 pnpm exec slidev ch01.md --port 3031
@@ -38,7 +38,8 @@ uv run uvicorn v1_ai_raw:app --host 127.0.0.1 --port 8000
 - `v1_ai_raw:app`：能运行的反例，POST 查询、拼接 SQL、详情不存在仍返回 200。
 - `v2_traceable:app`：课堂目标。先设 `TRACE_MODE=plain DEMO_DELAY_MS=80`，再切 `TRACE_MODE=trace DEMO_DELAY_MS=80`；第二终端执行 `uv run python bench.py`，同时手动发一次请求。
 - 四处合流：停止并发，启动 `TRACE_MODE=trace SQL_ECHO=1 uv run uvicorn v2_traceable:app`。不再设置人为延迟，使用一次性的合法 id（1–64 个字母、数字、点、下划线或连字符）。
-- `v3_m0:app`：课后参考增加 `GET /questions/{qid}`、`GET /healthz`，搜索改为 `GET /questions`。
+- 学生从同目录的 `v2_traceable.py` 复制为 `student_app.py` 读改：搜索迁移 `GET /questions`，详情改为 `GET /questions/{qid}`，增加 `GET /healthz`。保留日志、中间件与静态页面；允许查文档和 AI 辅助，但须解释改动并提交检查结果，不要求从零写框架。
+- `v3_m0:app`：以上任务的课后参考；新 API 提示与完整验收约定已放入第一课作业页。
 - 每次切换先停止上一个服务，避免端口冲突。每次启动重建 `server.log`，先保存必要证据；80ms 延迟仅用于日志交织，不是性能基准。
 - 复制 `.env.example` 为 `.env` 后，使用 `uv run --env-file .env ...` 显式加载；仅创建文件不会自动加载。`.env` 已忽略，不能提交真实凭据。
 - shell 内联环境变量是 macOS / Linux 写法；PowerShell 使用 `$env:TRACE_MODE='trace'` 等赋值。
@@ -58,7 +59,7 @@ make verify                          # 默认检查 v3_m0 参考答案
 uv run python capture_evidence.py     # 重采 HTTP、并发日志、debugpy 停点与 SQL
 ```
 
-验证器要求待测单文件暴露 `app`、`engine`，从 `DATABASE_URL` / `LOG_FILE` 环境变量读取测试配置；在临时 SQLite 中检查响应、数据、配对日志、SELECT 1、断连后的 503 和恢复。`/boom` 是特意保留的异常路径缺陷，单独检查，不要求它有离开日志或响应 id。凭据扫描只是有限 AST 规则，不等于安全审计。当前锁定的 Starlette 使用 HTTPX TestClient 时会发出弃用提示，测试仍通过。
+验证器要求待测单文件暴露 `app`、`engine`，从 `DATABASE_URL` / `LOG_FILE` 环境变量读取测试配置；在临时 SQLite 中检查响应、数据、配对日志、SELECT 1、断连后的 503 和恢复。`/boom` 是特意保留的异常路径缺陷，由 v2/v3 阶段测试单独检查，不纳入学生模块的配对日志验收。凭据扫描只是有限 AST 规则，不等于安全审计。当前锁定的 Starlette 使用 HTTPX TestClient 时会发出弃用提示，测试仍通过。
 
 证据采集只使用自身的 `.capture/demo.db` 与回环服务；停止自己启动的进程，不影响已有应用。原始记录与版本在 `public/images/ch01/evidence.json`；页面仅做时间前缀省略、节选和高亮。单次合流来自同一个 HTTP 请求和真实 debugpy 停点，**不是手写模拟数据，也不是 IDE / 终端界面截图**。用相同 id 重发四次不能冒充同一次执行。
 
@@ -106,7 +107,7 @@ pnpm typecheck                         # 课堂集成代码类型检查
 │   ├── ch00/          # 课程导论，章内分节，一次课一个文件，用 src: 引入
 │   │   └── 00-lecture-zero.md        # 导论第0讲
 │   │   └── 00-lecture-one.md        # 导论第1讲
-│   │   └── 00-lecture-two.md        # 导论第2讲
+│   │   └── 02-lecture-two.md        # 导论第2讲
 │   └── ch01/          # 第1章
 ├── components/        # 全课程共享 Vue 组件（结构可视化等）
 ├── snippets/          # 可用 <<< 引入的示例代码
