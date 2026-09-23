@@ -110,7 +110,7 @@ pnpm typecheck                         # 课堂集成代码类型检查
 │   │   └── 02-lecture-two.md        # 导论第2讲
 │   └── ch01/          # 第1章
 ├── components/        # 全课程共享 Vue 组件（结构可视化等）
-├── snippets/          # 可用 <<< 引入的示例代码
+├── snippets/          # 可用 <<< 引入的示例代码（独立仓库 subtree，见下）
 ├── public/            # 静态资源，用 / 开头的绝对路径引用
 │   ├── images/        # 位图：common/ 为全课通用，chXX/ 为各章专属
 │   ├── diagrams/      # SVG 图示，同上分章
@@ -127,6 +127,24 @@ pnpm typecheck                         # 课堂集成代码类型检查
     ├── draft/ch00/ch00.md             # 导论教案（已归档，以最终课件工程为准）
     └── slidev-starter-*.md.bak        # Slidev 官方模板 demo 留档
 ```
+
+## snippets 独立仓库（git subtree）
+
+`snippets/` 已提取为独立仓库 [`buptnetwork/web-code-snippets`](https://github.com/buptnetwork/web-code-snippets)（分支 `main`），单独共享给学生；课件仍通过原路径 `<<< @/snippets/...` 引用，构建不受影响。本仓库以 git subtree 方式接回该目录，remote 名为 `snippets`。
+
+同步命令（在本仓库根目录执行）：
+
+```bash
+# 拉取独立仓库的最新改动到 snippets/（--squash 保持本仓库历史整洁）
+git subtree pull --prefix=snippets snippets main --squash
+
+# 把本仓库对 snippets/ 的改动推送回独立仓库
+git subtree push --prefix=snippets snippets main
+```
+
+- 首次 clone 本仓库后无需额外操作，`snippets/` 内容随仓库一起拉取。
+- `.venv`、`__pycache__`、`.capture/`、`*.db` 等运行产物仍由根 `.gitignore` 排除，不进入任一仓库。
+- 同一时间只在一端修改后再同步，避免双向并发编辑产生冲突。
 
 ## 文档导航
 
