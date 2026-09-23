@@ -1,0 +1,16 @@
+[project]
+name = "m0-tracer"
+version = "0.1.0"
+description = "第一次课：仅用于本地虚构数据的请求追踪实验"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "sqlalchemy>=2.0,<2.1",
+  "psycopg[binary]>=3.2,<4",
+  "httpx>=0.28,<1",
+  "debugpy>=1.8,<2",
+]
+
+[tool.uv]
+package = false

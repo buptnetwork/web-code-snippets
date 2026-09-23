@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>M0 · 请求观察实验</title>
+  <style>
+    body { max-width: 820px; margin: 6vh auto; padding: 24px; font: 18px/1.6 system-ui; color: #173344; background: #f4f8fa; }
+    input, button, select { font: inherit; padding: 8px 12px; margin: 6px 0; }
+    label { display: block; margin-top: 14px; }
+    pre { background: #132c3c; color: #d2e9eb; padding: 22px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    small { color: #536674; }
+    #rid { font-family: monospace; color: #0e716c; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <small>现代 Web 开发技术 / 第一次课 / 仅本地虚构数据</small>
+  <h1>这一次请求，在哪里？</h1>
+  <p>先打开 DevTools → Network，勾选 Preserve log，再发请求。</p>
+  <label>教学阶段 <select id="stage"><option value="v2">v2：POST /getQuestions</option><option value="v3">v3：GET /questions</option></select></label>
+  <label>关键词 <input id="keyword" value="react"></label>
+  <label>本次请求标识（朴素日志阶段不使用）<input id="request-id" value="stu-demo-01"></label>
+  <button id="send">发送一次请求</button>
+  <p>响应状态：<strong id="status">尚未发送</strong>　响应标识：<span id="rid">—</span></p>
+  <pre id="result">只展示真实响应；没有响应时显示网络错误。</pre>
+  <script>
+    document.querySelector('#send').addEventListener('click', async () => {
+      const button = document.querySelector('#send')
+      button.disabled = true
+      document.querySelector('#rid').textContent = '—'
+      try {
+        const params = new URLSearchParams({ keyword: document.querySelector('#keyword').value, page: '1' })
+        const isV3 = document.querySelector('#stage').value === 'v3'
+        const response = await fetch(`${isV3 ? '/questions' : '/getQuestions'}?${params}`, {
+          method: isV3 ? 'GET' : 'POST',
+          headers: { 'X-Request-ID': document.querySelector('#request-id').value },
+        })
+        document.querySelector('#status').textContent = `${response.status} ${response.statusText}`
+        // 课后 B 档：同源请求可直接读取；跨域需服务端暴露此响应头。
+        document.querySelector('#rid').textContent = response.headers.get('X-Request-ID') || '未返回'
+        document.querySelector('#result').textContent = JSON.stringify(await response.json(), null, 2)
+      } catch (error) {
+        document.querySelector('#status').textContent = '未获得可用响应'
+        document.querySelector('#result').textContent = String(error)
+      } finally {
+        button.disabled = false
+      }
+    })
+  </script>
+</body>
+</html>
