@@ -506,9 +506,6 @@ class: text-center
 
 </div>
 
-<div v-click class="mt-3 p-3 rounded-lg bg-amber-500/8 border-l-4 border-amber-500 text-sm">
-这五件事就是预习包第 6 章那道必做题的操作清单。这是客户端侧的入口；第 1 次课还会结合应用日志、断点栈帧和 SQL 日志。
-</div>
 
 <!--
 跟做 2 你们已经打开了 Network 面板，也看到了浏览器发的头比 curl 多得多。这一页我把「在 Network 里到底看什么」系统成五件事，这是你今后排障的主战场。
