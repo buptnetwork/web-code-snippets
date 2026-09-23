@@ -17,10 +17,11 @@
 .slidev-layout.l01 .unit { color: #597281; font-size: 13px; letter-spacing: .08em; margin-bottom: 10px; font-weight: 650; }
 .slidev-layout.l01 .lead { font-size: 24px; line-height: 1.65; margin: 24px 0; }
 .slidev-layout.l01 .hero { font-size: 38px; line-height: 1.5; font-weight: 700; margin: 28px 0; }
-.slidev-layout.l01 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: start; }
-.slidev-layout.l01 .cols-code { display: grid; grid-template-columns: 1.45fr 1fr; gap: 22px; align-items: start; }
-.slidev-layout.l01 .thirds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-.slidev-layout.l01 .panel { border: 1px solid #d7e3e8; border-radius: 8px; padding: 18px 20px; background: #f1f6f8; }
+.slidev-layout.l01 .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px; align-items: start; }
+.slidev-layout.l01 .cols-code { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.slidev-layout.l01 .thirds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.slidev-layout.l01 .panel { border: 1px solid #d7e3e8; border-radius: 10px; padding: 16px 18px; background: #f1f6f8; }
+.slidev-layout.l01 .panel > :last-child { margin-bottom: 0; }
 .slidev-layout.l01 .callout { border-left: 4px solid #12958e; background: #e8f5f1; padding: 12px 16px; margin-top: 18px; font-size: 18px; }
 .slidev-layout.l01 .warning { border-left-color: #c98716; background: #fff5e3; }
 .slidev-layout.l01 .danger { border-left-color: #bd5256; background: #fff0ef; }
@@ -46,3 +47,69 @@
 .slidev-layout.l01 .url { display: flex; flex-wrap: wrap; gap: 10px; margin: 25px 0; }
 .slidev-layout.l01 .url > div { border-bottom: 3px solid #12958e; padding: 10px 12px; background: #edf5f6; font-family: monospace; }
 .slidev-layout.l01 .url small { display: block; font: 15px/1.6 system-ui; color: #536d7a; margin-top: 8px; }
+.slidev-layout.l01 .key { color: #0f766e; font-weight: 700; }
+.slidev-layout.l01 .example { color: #0369a1; font-weight: 700; }
+.slidev-layout.l01 .caution { color: #a16207; font-weight: 700; }
+.slidev-layout.l01 .error { color: #be123c; font-weight: 700; }
+.slidev-layout.l01 .cols > *,
+.slidev-layout.l01 .cols-code > *,
+.slidev-layout.l01 .thirds > * { min-width: 0; }
+.slidev-layout.l01 .wrap-code code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.slidev-layout.l01 .wrap-code .line { white-space: pre-wrap; }
+.slidev-layout.l01 .wrap-code .line::before { white-space: nowrap; overflow-wrap: normal; }
+.slidev-layout.l01 .message-parts { margin-top: 0; }
+.slidev-layout.l01 .message-parts li { margin: 0 0 16px; }
+.slidev-layout.l01 .url .fragment { border-color: #c98716; background: #fff5e3; color: #a16207; }
+.slidev-layout.l01.lesson-opening { background: linear-gradient(125deg, #eaf6f3, #fbfcfd 70%); }
+.slidev-layout.l01 .slidev-vclick-target { transition: opacity 180ms ease; }
+
+/* 课前讲二：限定作用域，保留其他次课的主题与排版。 */
+.slidev-layout.lecture-two {
+  padding: 36px 46px 32px;
+  --slidev-code-font-size: 15px;
+  --slidev-code-line-height: 22px;
+  --lecture-key: #0f766e;
+  --lecture-example: #0369a1;
+  --lecture-caution: #a16207;
+  --lecture-error: #be123c;
+}
+.dark .slidev-layout.lecture-two {
+  --lecture-key: #5eead4;
+  --lecture-example: #7dd3fc;
+  --lecture-caution: #fcd34d;
+  --lecture-error: #fda4af;
+}
+.slidev-layout.lecture-two h1 { font-size: 28px; line-height: 1.35; font-weight: 700; margin-bottom: 18px; padding-right: 18px; }
+.slidev-layout.lecture-two h3 { font-size: 19px; line-height: 1.4; font-weight: 650; margin-bottom: 12px; }
+.slidev-layout.lecture-two p { margin: 10px 0; }
+.slidev-layout.lecture-two .text-sm { font-size: 16px; line-height: 1.6; }
+.slidev-layout.lecture-two .text-xs { font-size: 14px; line-height: 1.5; }
+.slidev-layout.lecture-two .key { color: var(--lecture-key); font-weight: 700; }
+.slidev-layout.lecture-two .example { color: var(--lecture-example); font-weight: 700; }
+.slidev-layout.lecture-two .caution { color: var(--lecture-caution); font-weight: 700; }
+.slidev-layout.lecture-two .error { color: var(--lecture-error); font-weight: 700; }
+.slidev-layout.lecture-two .eyebrow { font-size: 13px; letter-spacing: .12em; color: var(--lecture-key); font-weight: 700; margin-bottom: 12px; }
+.slidev-layout.lecture-two .reading-card { border: 1px solid rgb(128 145 155 / 25%); border-radius: 10px; padding: 16px 18px; background: rgb(128 145 155 / 4%); }
+.slidev-layout.lecture-two .reading-card > :last-child { margin-bottom: 0; }
+.slidev-layout.lecture-two .step-row { padding: 10px 14px; border-left: 3px solid var(--lecture-key); background: rgb(20 184 166 / 6%); border-radius: 0 8px 8px 0; }
+.slidev-layout.lecture-two .result { font: 14px/1.7 var(--slidev-code-font-family); }
+.slidev-layout.lecture-two .lesson-link { margin-top: 16px; font-size: 14px; line-height: 1.55; }
+.slidev-layout.lecture-two [grid] > div,
+.slidev-layout.lecture-two .grid > div { min-width: 0; }
+.slidev-layout.lecture-two .wrap-code .slidev-code code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.slidev-layout.lecture-two .wrap-code .slidev-code .line { white-space: pre-wrap; }
+.slidev-layout.lecture-two .wrap-code .slidev-code .line::before { white-space: nowrap; overflow-wrap: normal; }
+.slidev-layout.lecture-two .slidev-code { border: 1px solid rgb(128 145 155 / 20%); }
+.slidev-layout.lecture-two.compact-code { padding-top: 28px; }
+.slidev-layout.lecture-two.compact-code h1 { margin-bottom: 10px; }
+.slidev-layout.lecture-two.compact-code .slidev-code { padding: 6px 10px !important; }
+.slidev-layout.lecture-two table { font-size: 16px; line-height: 1.5; }
+.slidev-layout.lecture-two th { color: var(--lecture-example); font-weight: 650; }
+.slidev-layout.lecture-two td, .slidev-layout.lecture-two th { padding: 13px 12px; }
+.slidev-layout.lecture-two .slidev-vclick-target { transition: opacity 180ms ease; }
+.slidev-layout.lecture-two.lecture-opening h1 { font-size: 38px; line-height: 1.45; margin-bottom: 26px; }
+.slidev-layout.lecture-two.lecture-opening { background: linear-gradient(135deg, rgb(20 184 166 / 8%), transparent 65%); }
+@media (prefers-reduced-motion: reduce) {
+  .slidev-layout.lecture-two .slidev-vclick-target,
+  .slidev-layout.l01 .slidev-vclick-target { transition: none; }
+}

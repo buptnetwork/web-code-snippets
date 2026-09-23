@@ -23,7 +23,9 @@ const numbers = ['', '①', '②', '③', '④']
         <strong>{{ stage.title }}</strong>
         <small>{{ stage.sub }}</small>
         <div v-if="stage.point" class="chain-point">{{ numbers[stage.point] }} {{ stage.observation }}</div>
-        <span v-if="i < 7" class="chain-arrow">→</span>
+        <svg v-if="i < 7" class="chain-arrow" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M2 8h11M9 4l4 4-4 4" />
+        </svg>
       </div>
     </div>
     <div class="chain-return"><span>←</span> 响应回到客户端，再由前端处理与渲染</div>
@@ -35,7 +37,7 @@ const numbers = ['', '①', '②', '③', '④']
 .request-chain { margin: 18px 0; color: #17394a; }
 .chain-heading { display: flex; gap: 12px; align-items: center; font-size: 16px; font-weight: 650; margin-bottom: 12px; }
 .chain-heading small { margin-left: auto; font-size: 14px; font-weight: 400; color: #526577; }
-.chain-stages { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 12px; }
+.chain-stages { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 16px; }
 .chain-stage { position: relative; min-height: 133px; padding: 10px 3px; text-align: center; background: #eef3f7; border-top: 3px solid #90a4b5; border-radius: 3px; }
 .chain-order { font-family: monospace; font-size: 14px; color: #627d8b; margin-bottom: 10px; }
 .request-chain .chain-stage strong { display: block; color: inherit; font-size: 15px; line-height: 1.5; white-space: nowrap; }
@@ -44,7 +46,7 @@ const numbers = ['', '①', '②', '③', '④']
 .chain-stage.proxy { background: #f4f4f4; border-top-style: dashed; color: #6b7280; }
 .chain-stage.selected { background: #cff4eb; outline: 2px solid #0f8d86; }
 .chain-point { margin-top: 12px; font-size: 14px; color: #086d68; font-weight: 700; }
-.chain-arrow { position: absolute; right: -13px; top: 47px; width: 13px; color: #526577; }
+.chain-arrow { position: absolute; right: -16px; top: 47px; width: 16px; height: 16px; fill: none; stroke: #526577; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .chain-return { border-bottom: 2px solid #79aaa9; border-left: 2px solid #79aaa9; border-right: 2px solid #79aaa9; margin: 8px 40px 0; padding: 4px 0 7px; text-align: center; font-size: 14px; color: #176b70; }
 .chain-return span { font-size: 19px; margin-right: 8px; }
 .chain-caption { font-size: 15px; line-height: 1.55; margin-top: 16px; color: #526577; }

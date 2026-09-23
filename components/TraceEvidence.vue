@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import evidence from '../public/images/ch01/evidence.json'
-withDefaults(defineProps<{ view?: 'noise' | 'compare' | 'stack' | 'joined' | 'sql' }>(), { view: 'joined' })
+withDefaults(defineProps<{
+  view?: 'noise' | 'compare' | 'stack' | 'joined' | 'sql'
+  progressive?: boolean
+}>(), { view: 'joined', progressive: false })
 // 仅去掉时间与级别前缀以放大正文；原始记录完整保存在 evidence.json。
 const clean = (text: string) => text.trim().split('\n').map(line => line.replace(/^\d{4}-\d\d-\d\d \S+ INFO /, ''))
 const plainLines = clean(evidence.plain.log)
@@ -24,7 +27,7 @@ const segments = (line: string) => line.split(rid)
           <h3>无关联标记 <small>真实并发日志 · 连续节选</small></h3>
           <pre><div v-for="(line, i) in (view === 'compare' ? noise.slice(0, 8) : noise)" :key="i">{{ line }}</div></pre>
         </section>
-        <section v-if="view === 'compare'" class="evidence-box">
+        <section v-if="view === 'compare'" v-click="progressive ? 1 : 0" class="evidence-box">
           <h3>同一 id 过滤 <small>另一次带标记实验</small></h3>
           <pre><div v-for="(line, i) in filtered" :key="i"><template v-for="(part, j) in segments(line)" :key="j"><mark v-if="j">{{ rid }}</mark>{{ part }}</template></div></pre>
           <p>从进入到离开，六条记录属于同一次请求，不靠相邻位置猜。</p>
@@ -45,11 +48,13 @@ keyword = {{ evidence.joined.variables.keyword }}
 page = {{ evidence.joined.variables.page }}</pre>
         </section>
         <section class="stack-explanation">
-          <h3>对应链路中的“应用代码”</h3>
-          <p><b>get_questions</b>：正在执行的端点。</p>
-          <p><b>run</b>：AnyIO 工作线程入口。</p>
-          <p><b>threading</b>：线程启动路径。</p>
-          <div class="boundary">同步端点在线程池中运行，不能在这个栈里硬找 uvicorn 和中间件。用 <b>rid</b> 把跨线程的事实接起来。</div>
+          <div v-click="progressive ? 1 : 0">
+            <h3>对应链路中的“应用代码”</h3>
+            <p><b>get_questions</b>：正在执行的端点。</p>
+            <p><b>run</b>：AnyIO 工作线程入口。</p>
+            <p><b>threading</b>：线程启动路径。</p>
+          </div>
+          <div v-click="progressive ? 2 : 0" class="boundary">同步端点在线程池中运行，不能在这个栈里硬找 uvicorn 和中间件。用 <b>rid</b> 把跨线程的事实接起来。</div>
         </section>
       </div>
       <div class="evidence-source">实际停点输出重排，不是 IDE 界面。Python {{ evidence.python }} / FastAPI {{ evidence.versions.fastapi }} / debugpy {{ evidence.versions.debugpy }}。</div>
@@ -71,17 +76,17 @@ page = {{ evidence.joined.variables.page }}</pre>
 content-type: {{ evidence.joined.headers['content-type'] }}
 x-request-id: <mark>{{ rid }}</mark></pre>
         </section>
-        <section class="evidence-box">
+        <section v-click="progressive ? 1 : 0" class="evidence-box">
           <h3>② 应用日志 <small>进入 / 离开</small></h3>
           <pre><div v-for="(line, i) in app" :key="i"><template v-for="(part, j) in segments(line)" :key="j"><mark v-if="j">{{ rid }}</mark>{{ part }}</template></div></pre>
         </section>
-        <section class="evidence-box">
+        <section v-click="progressive ? 2 : 0" class="evidence-box">
           <h3>③ 断点状态 <small>DAP 实测，栈节选</small></h3>
           <pre>{{ evidence.joined.stack[0].name }}
 ← {{ evidence.joined.stack[1].name }} (AnyIO worker)
 rid = <mark>{{ evidence.joined.variables.rid }}</mark></pre>
         </section>
-        <section class="evidence-box">
+        <section v-click="progressive ? 3 : 0" class="evidence-box">
           <h3>④ SQL 调用 <small>前后日志关联，已暂停并发</small></h3>
           <pre><mark>{{ rid }}</mark> sql:begin
 SELECT * FROM questions …
@@ -95,11 +100,11 @@ SELECT * FROM questions …
 
 <style scoped>
 .trace-evidence { color: #193b4b; }
-.evidence-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.evidence-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
 .evidence-columns.single { grid-template-columns: 1fr; }
 .evidence-box { background: #132f40; border-radius: 7px; padding: 14px 17px; color: #e1edf1; }
 .evidence-box h3 { color: #f1f8fa !important; font-size: 16px !important; margin: 0 0 12px !important; font-weight: 650; }
-.evidence-box h3 small { display: block; color: #aecbd6; font-size: 12px; font-weight: 400; margin-top: 4px; }
+.evidence-box h3 small { display: block; color: #c1d9e2; font-size: 13px; font-weight: 400; margin-top: 4px; }
 .trace-evidence pre { font: 14px/1.55 'SFMono-Regular', Consolas, monospace; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #daecf0; }
 .trace-evidence mark { background: #9cedd5; color: #103e3c; border-radius: 2px; padding: 0 2px; }
 .evidence-box p { font-size: 15px; line-height: 1.6; color: #bed6df; margin: 16px 0 0; }
@@ -118,6 +123,7 @@ SELECT * FROM questions …
 .boundary { border-left: 3px solid #14998d; background: #e6f4ee; padding: 12px 15px; font-size: 17px; line-height: 1.6; }
 .sql pre { font-size: 16px; line-height: 1.8; }
 .four { gap: 14px; }
-.four .evidence-box { padding: 13px 15px; }
+.four .evidence-box { padding: 13px 15px; height: 100%; }
+.stack-explanation b { color: #087b76; }
 .four pre { font-size: 16px; line-height: 1.55; }
 </style>
