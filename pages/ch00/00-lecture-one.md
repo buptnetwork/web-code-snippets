@@ -9,13 +9,39 @@ layout: section
 </div>
 
 <div class="mt-8 text-xs opacity-50">
-本讲 60 分钟 · 标「暂停跟做」处务必动手
+本讲约 60 分钟 · 工具操作必须动手，知识全表按需查阅
 </div>
 
 <!--
 课前课第一讲。这一讲不讲任何框架，只干一件事：把"你写的代码到底跑在哪儿、报错怎么读、调试器怎么用"这三件高风险的前置项打通。
 
-这一讲有六节，其中 0.6 调试器是高光，二十五分钟，不可压缩。中间有六处"暂停跟做"，录播课最大的失败模式是你一路看完什么都没动手，所以那几页是专门用来打断你的。
+这一讲有六节，其中 0.6 调试器保留二十五分钟。优先完成标注的工具跟做与切帧练习；HTML 标签全表、状态码全表和 mini 的完整 CRUD 流程作认读参考，不逐项要求掌握。
+-->
+
+---
+
+# 讲一怎么学：先跑通工具，再按需查表
+
+<div grid="~ cols-2 gap-6" class="mt-6 text-sm">
+<div class="p-5 rounded-lg border border-teal-500/40 bg-teal-500/5">
+<h3>必须动手</h3>
+<p>起停服务；用 curl 与 Network 找到请求、状态和正文。</p>
+<p>确认工作目录与运行环境；读报错，确定先检查哪里。</p>
+<p>设置断点、继续运行、切换栈帧，并解释当前帧变量。</p>
+</div>
+<div class="p-5 rounded-lg border border-sky-500/40 bg-sky-500/5">
+<h3>认读与参考</h3>
+<p>HTML 认结构与表单去向；标签、属性全表不要求背诵。</p>
+<p>状态码先识别常见信号，完整方法与状态表按需查阅。</p>
+<p>mini 只用来练运行；完整 CRUD 流程供回看，不考分层设计。</p>
+</div>
+</div>
+
+<div class="mt-5 p-3 rounded-lg bg-amber-500/10 text-sm">第一课会继续使用这些工具，不重做整套课前练习；课堂时间留给真实搜索请求的观察与取证。</div>
+
+<!--
+教学单元：讲一导读；本页：区分必须操作与参考内容，不另加课时。
+详细材料保留在本讲。熟悉的语法和查表页可快进，但停点、切帧与请求工具要亲手验证；遇到困难先回看对应工具页，不提前要求设计框架。
 -->
 
 ---
@@ -123,7 +149,7 @@ layout: section
 
 # 0.2 HTML：浏览器眼里的文档
 
-<div class="text-xs opacity-55 -mt-1 mb-2">0.1 说浏览器跑 HTML·CSS·JS——这一页把 HTML 认全。<b class="text-teal-700 dark:text-teal-300">落点：表单提交，就是在发一个 HTTP 请求。</b></div>
+<div class="text-xs opacity-55 -mt-1 mb-2">认读参考：文档骨架会读即可；标签按需查阅，不要求背全表。</div>
 
 <div grid="~ cols-2 gap-6" class="mt-1 text-sm">
 
@@ -161,44 +187,66 @@ layout: section
 </div>
 </div>
 
+<div class="space-y-4">
+<h3>先回答“这部分是什么”</h3>
+<p><code>head</code> 放编码、标题等元信息；<code>body</code> 承载页面内容。</p>
+<p>常用标签帮助辨认段落、链接、列表与图片；语义标签表达内容角色，不自动决定外观。</p>
+<p>本课不考 CSS 布局。下一页只用一个表单，连接页面操作与 HTTP 请求。</p>
+</div>
+</div>
+
+<!--
+教学单元：0.2；本页：HTML 文档认读参考。
+主讲只指文档骨架，标签表按需回看，不逐项背诵。常用标签与语义标签保留作检索；显示样式还受 CSS 等因素影响。
+-->
+
+---
+
+# 0.2 表单：一次提交发往哪里？
+
+<div class="text-xs opacity-55 -mt-1 mb-3">认读重点：方法、去向与字段名。示例表单不连接当前搜索服务；不要求实现发帖端点。</div>
+
+<div grid="~ cols-[1.15fr_0.85fr] gap-6" class="mt-3 text-sm">
 <div>
-<div class="text-xs tracking-widest opacity-60 mb-1.5">表单全套 · 一个发帖表单</div>
+<div class="text-xs tracking-widest opacity-60 mb-1.5">一个原生 POST 表单</div>
 
 ```html
 <form action="/posts" method="POST">
-  <label>标题 <input name="title" required></label>
+  <label>标题
+    <input name="title" required>
+  </label>
   <textarea name="body"></textarea>
-  <select name="category"><option value="tech">技术</option></select>
+  <select name="category">
+    <option value="tech">技术</option>
+  </select>
   <button type="submit">发布</button>
 </form>
 ```
 
-<div class="mt-1.5 text-[11px] opacity-70"><code>input</code> 的 type：<span class="font-mono">text · password · email · number · checkbox · radio · file · hidden</span></div>
-
-<div class="text-xs tracking-widest opacity-60 mt-3 mb-1.5">五个关键属性</div>
-<div class="text-[12px] space-y-1">
+</div>
+<div>
+<div class="text-xs tracking-widest opacity-60 mb-2">五个关键属性</div>
+<div class="text-sm space-y-2">
 <div class="flex gap-2"><code class="w-16 shrink-0 text-amber-600 dark:text-amber-400 font-bold">action</code><span class="opacity-85">提交到哪个 URL</span></div>
 <div class="flex gap-2"><code class="w-16 shrink-0 text-amber-600 dark:text-amber-400 font-bold">method</code><span class="opacity-85">GET / POST</span></div>
 <div class="flex gap-2"><code class="w-16 shrink-0 text-amber-600 dark:text-amber-400 font-bold">name</code><span class="opacity-85">字段名 → 请求体的键</span></div>
 <div class="flex gap-2"><code class="w-16 shrink-0 text-amber-600 dark:text-amber-400 font-bold">value</code><span class="opacity-85">字段值 → 请求体的值</span></div>
 <div class="flex gap-2"><code class="w-16 shrink-0 text-amber-600 dark:text-amber-400 font-bold">required</code><span class="opacity-85">空着不让提交</span></div>
 </div>
+<div class="mt-4 text-xs opacity-70">input 类型参考：<span class="font-mono">text · password · email · number · checkbox · radio · file · hidden</span></div>
 </div>
 
 </div>
 
 <div v-click class="mt-2 p-2.5 rounded-lg bg-teal-500/8 border-l-4 border-teal-500 text-sm">
-点「发布」那一刻：浏览器把每个 <code class="text-xs">name=value</code> 拼成请求体，按 <code class="text-xs">method</code> 发到 <code class="text-xs">action</code> 那个 URL——<b>这就是下一页要拆的 HTTP 请求。</b>
+本例校验通过后，浏览器把可提交字段编码进请求体，以 <b>POST</b> 发往 <code>/posts</code>。<br>GET 表单则把字段放入查询串；接下来拆解 URL 与报文。
 </div>
 
 <!--
-0.1 我们说浏览器里跑的是 HTML、CSS、JS。这一页把 HTML 认全——不用背，认脸就行。
+教学单元：0.2；本页：表单方法与去向，承接文档认读，不新增课时。
+指出 action / method / name。右栏 name/value 的请求体说明限定本例 POST；input 类型供查阅，不逐项展开。required 是浏览器原生校验，不替代后端校验。本页只是 HTML 阅读片段，不要求连接或实现 /posts。
 
-左边，一个 HTML 文档就这么个骨架：DOCTYPE 声明、html 根、head 放元信息、body 放你看到的一切。常用标签这些 div、span、p、标题、列表、链接、图片、表格，你天天在网页上见到，现在知道它们叫什么。语义标签 header、nav、main、section、article、footer——它们和 div 长得一样，区别是「结构即含义」，浏览器和搜索引擎能读懂这块是页头还是正文。本课不考 CSS 布局，HTML 只要求看得懂、改得动。
-
-右边是重点——表单。你看这个发帖表单：form 标签上有两个关键属性，action 和 method。action 是提交到哪个 URL，method 是用 GET 还是 POST。里面每个输入控件都有 name——title、body、category，这就是将来请求体里的键。required 是浏览器级校验，空着不让你提交。input 还有很多 type，密码、邮箱、数字、复选、单选、文件，今天认脸就行。
-
-[click] 现在把这两页连起来：你点「发布」那一刻，浏览器干了什么？它把所有 name=value 拼成请求体，按 method 指定的方法，发到 action 那个 URL。这就是一个 HTTP 请求。表单，是 HTTP 请求最常见的源头。下一页我们就拆开这个请求看——URL 长什么样、报文长什么样。
+[click] 本例原生表单在校验通过后提交可提交控件的字段；禁用或无 name 的控件等不应一概算入。默认 POST 表单正文不是 JSON。GET 表单使用查询串，不能把两者都说成拼进请求体。接下来拆 URL，再读 HTTP 报文。
 -->
 
 ---
@@ -306,7 +354,7 @@ URL 你们每天在用，但可能没拆过。看这一行，六段：协议、�
 
 # 0.2 HTTP 方法与状态码
 
-<div class="text-xs opacity-55 -mt-1 mb-3">报文起始行里的两个关键词。<b class="text-amber-600 dark:text-amber-400">今天认脸，判据与修复留第 1 次课。</b></div>
+<div class="text-xs opacity-55 -mt-1 mb-3">认读参考：先找方法与状态，不背全表。<b class="text-amber-600 dark:text-amber-400">第一课观察信号，第二课用于搜索页闭环。</b></div>
 
 <div grid="~ cols-2 gap-6" class="mt-2 text-sm">
 
@@ -319,7 +367,7 @@ URL 你们每天在用，但可能没拆过。看这一行，六段：协议、�
 <div class="flex gap-2 px-3 py-1.5 border-b border-gray-400/15"><code class="w-16 shrink-0 font-bold text-amber-600 dark:text-amber-400">PATCH</code><span class="opacity-85">局部修改一个资源</span></div>
 <div class="flex gap-2 px-3 py-1.5"><code class="w-16 shrink-0 font-bold text-rose-600 dark:text-rose-400">DELETE</code><span class="opacity-85">删除一个资源</span></div>
 </div>
-<div class="mt-2 text-xs opacity-70">第 1 次课只对照读取时使用 POST 与 GET；完整语义留第 2 次课。</div>
+<div class="mt-2 text-xs opacity-70">第 1 次课对照查询用 POST 与 GET；第 2 次课用 HTTP 判据处理搜索页，第 8 次课系统设计资源 API。</div>
 </div>
 
 <div>
@@ -338,9 +386,9 @@ URL 你们每天在用，但可能没拆过。看这一行，六段：协议、�
 </div>
 
 <!--
-报文四部分的起始行里，有两个关键词：方法和状态码。这一页把它们认全。
+报文起始行里先找方法和状态码。本页作参考表，不逐项背诵或演示。
 
-左边认常见方法用途，不把 POST 等同于只能新建。第一课只用搜索案例对照 POST 和 GET，完整语义留第 2 次课。
+左边认常见方法用途，不把 POST 等同于只能新建。第一课只用搜索案例对照 POST 和 GET；第二课按搜索页需要运用判据，完整资源设计留第 8 次课。
 
 右边状态码报告 HTTP 结果。先识别大类，再看响应体和服务端证据；不能只凭 4xx / 5xx 断定是谁写错了代码。第一课聚焦错误 200 为什么误导诊断，不承诺逐个复现所有状态码。
 -->
@@ -405,7 +453,7 @@ class: text-center
 </div>
 
 <div class="p-4 rounded-lg border-2 border-teal-500/40 bg-teal-500/5 text-sm">
-<b class="text-teal-700 dark:text-teal-300">对比 <code class="text-xs">your_headers</code> 的内容：</b>浏览器发的头比 curl <span class="font-bold">多很多</span>——十几个。这些头都在干什么？<span class="font-bold">第二次课整节课讲。</span>
+<b class="text-teal-700 dark:text-teal-300">对比 <code class="text-xs">your_headers</code>：</b>浏览器和 curl 发出的头有哪些不同？<span class="font-bold">第二课按搜索页需要解释相关报文，并把请求结果落实到界面。</span>完整头字段按需查阅，不按数量背诵。
 </div>
 
 </div>
@@ -704,43 +752,53 @@ class: text-center
 </div>
 
 <div class="mt-1 max-w-4xl mx-auto text-left">
-<div class="text-[11px] opacity-60 mb-1.5 text-center">必须在 <code>snippets/lesson00</code> 目录执行 · mini 仅用于工具练习，不要求设计它的分层</div>
+<div class="text-xs opacity-70 mb-2 text-center">mini 只练运行，不考分层；必须做 add / list，其余流程按需回看</div>
+
+<div grid="~ cols-2 gap-5">
+<div>
+<div class="text-xs tracking-widest opacity-60 mb-2">必须跟做 · 从课件仓库根目录开始</div>
 
 ```bash
 cd snippets/lesson00
 uv run python -m mini.cli add "写第一次课作业"
-uv run python -m mini.cli add "看完课前课"
 uv run python -m mini.cli list
+```
+
+<div class="mt-3 text-sm">找到新增待办及其 id；能解释自己在哪个目录、运行的是哪个模块。</div>
+</div>
+<div>
+<div class="text-xs tracking-widest opacity-60 mb-2">完整流程参考 · 沿用左侧目录</div>
+
+```bash
+uv run python -m mini.cli add "看完课前课"
 uv run python -m mini.cli done 1
 uv run python -m mini.cli list
 uv run python -m mini.cli delete 99
 ```
 
-<div class="text-xs tracking-widest opacity-55 mt-3 mb-1.5">预期看到（节选）</div>
+<div class="mt-3 text-sm">把 1 换成实际新增 id。先确认 99 不存在，再观察失败提示和非零退出码。</div>
+</div>
+</div>
 
-```
-INFO  mini.repo    READ todos.json -> 0 rows
-INFO  mini.repo    INSERT -> id=1
+<div class="text-xs tracking-widest opacity-55 mt-3 mb-1.5">空数据首次运行的输出节选；重复运行时 id / 行数会变化</div>
+
+```text
 已添加：[ ] #1 写第一次课作业
-...
-INFO  mini.repo    UPDATE id=1 done=True
-已完成：[x] #1 写第一次课作业
-...
-错误[not_found]：待办 99 不存在        ← 这一行走的是 stderr（退出码 4）
+错误[not_found]：待办 99 不存在
 ```
 
 </div>
 
-<div class="mt-4 inline-flex items-center gap-2 text-teal-700 dark:text-teal-300 font-bold">
-✓ 做完再继续
+<div class="mt-3 inline-flex items-center gap-2 text-teal-700 dark:text-teal-300 font-bold">
+✓ 跑通 add / list，再做下一页工作目录实验
 </div>
 
 <!--
-最后跑通我们的 mini 程序。这个程序你们接下来两讲会反复见到，而且第一次课我还会提它，所以现在必须跑通。
+本页只要求在指定目录运行 add / list，看到自己新增的待办。随后接工作目录实验；不要求通读 mini 的模块组织，也不把完整 CRUD 当成第一课先修。
 
-看这些 INFO 开头的行——这是数据访问日志，它告诉你这次操作读了几次、写了几次。你数一下 add 那次：读一次、写一次。这个"数一下"的习惯，第六课能救你的命。
+右栏是教师演示或课后参考。已有数据时 id 不从 1 开始，用实际 id；先核对 99 不存在再做失败请求。不要为得到固定输出清空学生数据。
 
-最后看那条 delete 99，它返回了一个错误，而且走的是 stderr 不是 stdout，退出码是 4 不是 0。一个正经的命令行程序要这样。这一点跟第一次课的"错误必须用正确的状态码"是同一回事。
+delete 99 在该前提下返回 not_found，消息走 stderr，退出码为 4。只认“机器可识别的失败信号”这一类比；退出码不等于 HTTP 状态码，日志调用数也不能直接当作数据库 SQL 次数。
 -->
 
 ---
@@ -902,7 +960,7 @@ class: text-center
 打开 <code class="text-xs">snippets/lesson00/traceback_samples.md</code>，里面有<b>三段真实报错</b>。每段回答两个问题：
 <div class="mt-3 grid grid-cols-2 gap-3">
   <div class="p-2.5 rounded border border-teal-500/30 bg-teal-500/5 text-center font-bold text-teal-700 dark:text-teal-300">① 哪个文件、哪一行？</div>
-  <div class="p-2.5 rounded border border-teal-500/30 bg-teal-500/5 text-center font-bold text-teal-700 dark:text-teal-300">② 我该先去改什么？</div>
+  <div class="p-2.5 rounded border border-teal-500/30 bg-teal-500/5 text-center font-bold text-teal-700 dark:text-teal-300">② 我该先核对什么？</div>
 </div>
 </div>
 
@@ -917,9 +975,9 @@ class: text-center
 </div>
 
 <!--
-现在你们自己读三段，我给了文件，每段回答两个问题：哪个文件哪一行，我该先改什么。用刚学的三步法。
+现在自己读三段，每段回答：哪个文件哪一行，我该先核对什么。只练定位与提出下一步检查，不要求重构示例。
 
-（跟做 7，留时间）三段的答案：第一段不是代码问题，是工作目录不对或没用 -m；第二段是循环导入，service.py 那句 import 要删掉；第三段是 repo.py 拼错了 title。先定位变量，再沿调用关系读异常传播；0.9 只讲执行顺序，不讲架构分层。
+（跟做 7，留时间）第一段核对工作目录和模块运行方式；第二段核对互相导入的位置，只识别循环导入，不考依赖方向设计；第三段核对报错字段与实际字段名。先定位变量，再沿调用关系读异常传播；0.9 只讲执行顺序。
 -->
 
 ---

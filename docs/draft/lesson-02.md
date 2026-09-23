@@ -1,818 +1,474 @@
-# 第 2 次课教学底稿（修订版）
-## HTTP 语义与浏览器运行时
+# 第 2 次课教学底稿（完整整改版）
+## HTTP 判据与请求—界面闭环
 
----
+## 〇、备课定位与交接起点
 
-## 〇、给 PPT 制作团队的全局说明
+第一课教“在哪里看”，本课教“根据实际请求与响应更新界面”。学生不需要会 React，使用原生 HTML/JS 与给定样式。主线是：**页面为什么没工作 → 查看请求 → 区分失败阶段 → 更新四态 → 安全显示文本。**
 
-本次课 95 分钟，留 5 分钟缓冲。上一次课解决的是"看不见"，本次课解决的是"看见了，但不知道该看什么"——把 HTTP 协议和浏览器行为变成一组**每天用得上的判据**，而不是知识点罗列。**不进协议内核**（HPACK、QUIC、TCP 细节一律不讲，只给结论卡）。
+起点必须是合格 M0：
+- 搜索 `GET /questions?keyword=...&page=1`，200 为 `{"success":true,"data":[...]}`，列表项已有 `title/body`。
+- 详情 `GET /questions/{qid}`；`GET /healthz` 保留 200/503 原契约。
+- 正常及框架已处理错误路径保留 request-id 与配对日志；`/boom` 的已知边界未在本课修复。
+- 页面与 API 同源。第二课不更改后端路径、搜索容器或探针，不再要求保留 `/getQuestions`。
 
-**本次课的核心实操**：修复搜索页，正确呈现加载、结果、空结果和错误——完成请求到界面的完整闭环。
+第三课才把集合迁移为 `items/total/page` 并同步前端。这里任何正常请求都读 `payload.data`，不能提前换成 `items`。教学故障夹具与合格 M0 分开，不能削弱 `verify_m0.py` 断言来使错误页面通过。
 
-**本次课的暗线，请在课件中贯穿**：上一次课我们发现 AI 生成的代码"不可观察"；本次课会发现它的另一类问题——**违反了浏览器和协议的规则，但不报错**。语义标签丢了不报错、`innerHTML` 拼接用户内容不报错、脚本放错位置报的错还是误导性的。这条暗线叫**"沉默的成本"**，请在开场与收尾各点一次。
+### 95 分钟教学 + 5 分钟缓冲
 
-**课堂与课后边界**：
-- **课堂完成**：搜索页修复与四态演示（单元 7、8）、脚本加载与语义标签（单元 7）
-- **课后自学**：方法矩阵完整讨论（单元 3）、状态码细分、Cookie/Storage 完整讨论（单元 5）、HTTP 版本与"老优化"表（单元 9）、缓存实验（单元 6 改为 B 档）
+| 单元 | 分钟 | 课堂处理 |
+|---|---:|---|
+| 一、从结果到过程 | 4 | 主讲 |
+| 二、分阶段页面反例 | 10 | 教师定位 null；其余故障逐步解锁 |
+| 三、方法与状态码 | 12 | 讲主线判据，完整表课后读 |
+| 四、参数位置与编码 | 8 | 教师对照 query / JSON / form |
+| 五、加载时机与语义结构 | 10 | 教师修 defer 与表单 |
+| 六、fetch 的失败边界 | 14 | 教师分阶段验证 |
+| 七、搜索页四态闭环 | 22 | 唯一学生现场必做 |
+| 八、缓存与状态载体 | 10 | 6 分钟缓存短演示，4 分钟条件导读 |
+| 九、作业与收尾 | 5 | 基础 / 拓展分开 |
+| 合计 | 95 | 另留 5 分钟缓冲 |
 
-**最难讲清、优先制作的三处**：
+A 档课后基础阅读：完整状态码表、请求编码、错误分类与页面参考实现。缓存完整实验、Lighthouse、HTTP 版本比较是 B 档；Cookie/Storage 先掌握条件，认证与攻防留第十四、十五课。超时压缩缓存和状态载体口头展开，不占用唯一现场任务的核对时间。
 
-1. **fetch 错误处理（单元 8）**。这是学生和 AI 共同的高频错误，且错法隐蔽——`try/catch` 看起来写了，其实接不住所有错误。要先让学生预测、再运行揭晓。**注意**：必须分开演示 HTTP 错误、解析错误、网络失败三种情况，不能混在一起。
-2. **null 错误与 XSS 演示的顺序（单元 7）**。同步头部脚本使 `listEl` 为 `null`，会阻断后续渲染。必须先修复加载时机，再演示 XSS，最后修复为 `textContent`。
-3. **脚本加载时机（单元 7）**。闭合解剖台留下的第一个报错，是理解后续内容的前提。
+## 一、开场：Network 成功不等于页面成功
 
-**若时间不够的压缩顺序**：先压单元 5（状态载体地图，整体移到课后自读）→ 再压单元 9 的 Lighthouse 部分（整体移到课后 B 档）→ 再压单元 4 中 `multipart/form-data` 的报文细节（只展示 `urlencoded` 与 `json` 两种对照即可）。**单元 7、单元 8 不能压缩**：单元 7 闭合了解剖台留下的报错，单元 8 是下节课与第 12 次课的直接基础。
+**课堂 4 分钟。**
 
-**与上一次课的衔接**：本次课继续使用同一个演示项目，但静态页由 FastAPI 自己托管（同源），**本次课刻意不碰跨域**。如果有学生把页面单独用另一个端口打开而撞上 CORS 错误，请按预案回答并记为欠账（见单元 10），不要在本课展开。
+打开实际页面，只选一条搜索请求，沿着“提交事件→URL→HTTP→解析→字段→DOM”读。资源请求条数按现场实际记录，不预设一定十几条。
 
----
+问题：列表没出现，是没有请求、返回 HTTP 错误、数据结构不对，还是页面操作失败？本课要让每种情况都有可解释的界面和证据。
 
-## 一、开场：从"一次请求"到"一串请求"
+讲：控制台错误通常指出出错位置，但不自动说明上游原因。没有报错也不代表可访问性、安全性和交互正确；同样，AI 也可能一开始就写对，评价依据是检查结果。
 
-**约 4 分钟。**
+## 二、反例分阶段：不要让 null 阻断 XSS
 
-内容：
+**课堂 10 分钟。** 以下是待制作的隔离教学页面，不是声称仓库已有 `v2-ai-page` tag，也不是 M0 必须存在这些错误。
 
-上一次课我们追踪了**一个**请求，把它从浏览器一路跟到数据库。今天换一个视角：打开任意一个真实网页，看看 Network 面板里有多少条。
-
-现场打开课程演示页，Network 面板显示十几条记录：HTML 文档、CSS、JS、字体、图片、几个 XHR。
-
-于是产生三个新问题，它们构成本次课的三条线：
-
-| 问题 | 本次课的回答 | 落在哪几个单元 |
-|---|---|---|
-| 这些请求**各自是什么性质**？哪些能重试、能缓存、能收藏？ | 方法性质矩阵 + 状态码判据 | 单元 3、4 |
-| 这些请求**之间怎么传递状态**？我登录了，下一个请求怎么知道？ | 状态载体地图 | 单元 5 |
-| 这些请求**有些为什么没发出去**？ | 缓存 + 脚本阻塞 | 单元 6、7 |
-
-讲：
-
-> 今天不会讲 TCP 怎么握手、HTTP/2 怎么分帧。那些是《计算机网络》的事。今天讲的全部是**你每周都会用到的判断**：这个接口该用什么方法、该返回什么状态码、用户为什么看到旧页面、为什么我明明传了参数服务端说没收到。
->
-> 上次课的主题是"让系统可观察"，今天的主题是——**浏览器和协议有一套规则，你不遵守它不会报错，但会用别的方式收费。**
-
----
-
-## 二、解剖台：三条不报错的错误
-
-**约 12 分钟。本次课的动机来源。**
-
-### 情境设定
-
-> 这是 AI 给你生成的问答社区首页，它能跑。你打开页面，点搜索，列表出来了。你觉得没问题。
->
-> 然后发生了三件事：
-> 第一，有同学说"我用键盘 Tab 到搜索框，按回车没反应"。
-> 第二，你在手机 4G 下打开，白屏了两秒。
-> 第三，有人发了一条标题里带 `<img>` 的问题，你的页面弹出了一个对话框。
->
-> 这三件事，浏览器控制台里**一条错误都没有**。
-
-### 代码（tag: `v2-ai-page`，可运行，教学反例，已验证其预期行为）
-
-`static/index.html`：
+### 2.1 初始反例只验证加载时机
 
 ```html
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="zh-CN">
 <head>
-  <title>问答社区</title>
-  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-  <script src="/static/app.js"></script>
-  <link rel="stylesheet" href="/static/app.css">
+  <meta charset="utf-8">
+  <title>隔离页面反例</title>
+  <script src="/static/lab-page.js"></script>
 </head>
 <body>
-  <div class="header">
-    <div class="title">问答社区</div>
-  </div>
-  <div class="search-bar">
-    <input type="text" id="kw" placeholder="搜索问题">
-    <div class="btn" onclick="doSearch()">搜索</div>
-  </div>
+  <input id="kw" placeholder="搜索问题">
+  <div onclick="doSearch()">搜索</div>
   <div id="list"></div>
 </body>
 </html>
 ```
 
-`static/app.js`：
-
 ```js
 const listEl = document.getElementById('list');
 
 async function doSearch() {
-  const kw = document.getElementById('kw').value;
-  const res = await axios.post('/getQuestions?keyword=' + kw);
-  listEl.innerHTML = '';
-  res.data.data.forEach(q => {
-    listEl.innerHTML += '<div class="item">'
-      + '<div class="t">' + q.title + '</div>'
-      + '<div class="b">' + q.body + '</div>'
-      + '</div>';
+  const query = new URLSearchParams({
+    keyword: document.getElementById('kw').value, page: '1',
   });
+  const res = await fetch(`/questions?${query}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const payload = await res.json();
+  listEl.innerHTML = '';
+  for (const q of payload.data) {
+    listEl.innerHTML += `<div>${q.title}</div>`;
+  }
 }
 ```
 
-### 现场演示顺序（三件事逐个复现）
+前提是同源服务、脚本确实加载、M0 请求成功。`listEl` 在解析到 body 前取得 null；点击后先在 `innerHTML` 赋值处失败。不要称这个版本“点搜索正常且控制台无错误”。
 
-**第一件：点搜索，控制台报错**
+### 2.2 明确的阶段矩阵
 
-```
-Uncaught TypeError: Cannot read properties of null (reading 'innerHTML')
-```
-
-向学生提问：**这条错误信息在指向哪里？**
-
-学生会说"`listEl` 是 null"。追问："那为什么是 null？页面上明明有 `<div id="list">`。"
-
-**这就是本单元最有价值的一点**：这条报错**指向了错误的位置**。它让你以为是元素找不到、是 id 写错了，实际原因是脚本的**执行时机**——`<script>` 在 `<head>` 里同步执行，那一刻 HTML 解析器还没走到 `<body>`，`#list` 根本不存在。
-
-> 报错信息告诉你"哪一行崩了"，不告诉你"为什么会崩"。这个差距就是排查能力。解决办法在单元 7。
-
-**第二件：Tab 到搜索框按回车，没反应**
-
-原因有两层：
-- 输入框不在 `<form>` 里，浏览器没有"提交表单"这个语义可执行；
-- 按钮是 `<div onclick>`，**不能被 Tab 聚焦、不能被回车或空格触发、屏幕阅读器不会念成"按钮"**。
-
-`<button>` 自带这些行为，`<div>` 没有，而且**不会报错**。
-
-**第三件：XSS 预演（克制版）**
-
-数据库里插入一条标题为 `<img src=x onerror="alert('xss')">` 的问题，搜索出来，弹窗。
-
-**合规声明（请在课件上单独一行标注）**：本演示在课程本地靶场进行，仅弹出无害提示；严禁对任何真实系统实施。第 15 次课会在签署确认书后做完整攻防。
-
-只说一句话，不展开：
-
-> 这叫 XSS。它的成因是：你用 `innerHTML` 把**用户输入的字符串**交给浏览器，浏览器就把它当 HTML 代码解析了。第 15 次课我们会用同一个口子真正偷走登录状态。今天先记住那个动作。
-
-### 把其余问题挂上欠账清单（接住但不展开）
-
-| 发现的问题 | 本次课处理 | 何时还 |
+| 阶段 | 只改变什么 | 预期现象 |
 |---|---|---|
-| 读操作用 POST、URI 是动词 | 单元 3 回收（这是本课内容） | — |
-| `innerHTML` 拼接用户输入 | 今天只到"会用 textContent"（单元 8） | 第 15 次课 |
-| 为一个 HTTP 请求引入整个 axios | 今天记一笔 | 第 10 次课（包体积） |
-| 没有 loading / error / empty 状态 | 单元 8 回收 | — |
-| `innerHTML +=` 每次重建整个列表 | 今天点名代价 | 第 11 次课（React 接管） |
-| 全是 `<div class="...">` | 单元 2 已点名，单元 7 修复 | — |
+| A | head 同步脚本，保留其他条件 | listEl 为 null，渲染提前中断 |
+| B | 仅给脚本加 defer | 普通列表出现，仍使用不安全 HTML 插入 |
+| C | B 上用本地无害标题夹具 | 浏览器把标题解释为 HTML；在允许内联事件的隔离环境中可出现提示 |
+| D | 改用 textContent，再加完整四态 | 同一标题按文字显示，错误有明确分类 |
 
-### 本单元结论（醒目页）
+XSS 的本地夹具为 `<img src=x onerror="alert('xss')">`，仅无害提示，不读 Cookie、不访问外部目标。不修改共享数据库；教师可在隔离副本 seed 或响应夹具中提供。若 CSP 已阻止事件执行，记录其作用，不为了“必弹窗”撤掉学生项目的正确安全措施。
 
-> **这三条错误的共同点：浏览器不会拦你。**
->
-> 语义标签写错了，页面照样显示；
-> `innerHTML` 拼用户内容，功能照样正常；
-> 脚本放错位置，报的错还是误导性的。
->
-> 上次课的问题是"代码不可观察"，今天的问题是"**代码违反了规则，而规则不会主动执行**"。这两类问题，AI 都不会替你避免——因为它们都不影响"能跑"。
+回车不提交另由没有 form 和真实 button 解释。三个现象按条件分别验证，不把它们声称为同一初始版同时成功复现。
 
----
+## 三、HTTP 方法与状态码：结论要带条件
 
-## 三、方法性质矩阵与状态码判据
+**课堂 12 分钟，完整表 A 档课后阅读。**
 
-**约 14 分钟。纯讲授单元，内容较密，建议分 3–4 页。请在中途用一次快速提问换节奏（例如"删两次算不算幂等"）。**
+### 3.1 三种性质
 
-### 3.1 三个性质，以及它们各自导致什么后果
+- 安全：客户端不请求业务状态变更；不禁止日志等附带动作。GET 删除内容违反这一语义，预取和爬虫可能触发真实副作用。
+- 幂等：多次相同请求的预期服务器效果与一次相同，不要求每次响应相同。DELETE 首次 204、再次 404 仍可幂等。
+- 可缓存：是否允许存储并复用，取决于方法、状态、缓存指令、认证等，不是只看方法的一格勾号。
 
-不要求背表，要求理解**每个性质丢失之后会发生什么**。
+| 方法 | 安全 | 幂等语义 | 缓存与用途 |
+|---|:--:|:--:|---|
+| GET / HEAD | 是 | 是 | 常用于读取；按响应缓存策略处理 |
+| POST | 否 | 不保证 | 创建或操作；满足特定条件可缓存，通用缓存支持有限 |
+| PUT | 否 | 是 | 按契约整体替换目标状态 |
+| PATCH | 否 | 不保证 | 局部修改；某些具体操作可以幂等 |
+| DELETE | 否 | 是 | 删除目标资源 |
 
-| 性质 | 定义 | 丢失之后会发生什么 |
-|---|---|---|
-| **安全（safe）** | 不改变服务器状态，只读 | 浏览器预取、爬虫抓取、链接预览、企业安全网关扫描**都会真的执行它**。经典事故：把"删除"做成 `<a href="/delete?id=5">`，搜索引擎爬虫把全站数据删光 |
-| **幂等（idempotent）** | 执行一次和执行 N 次，**服务器最终状态相同** | 网络抖动导致客户端重发，就会产生重复副作用——重复发帖、重复扣款。第 8 次课会用这一条 |
-| **可缓存（cacheable）** | 响应可被浏览器 / 代理 / CDN 存下来复用 | 每次都必须打到服务器，性能与成本都上去了；也无法用 CDN 分发 |
+本课不实现 PUT/PATCH。缺字段怎样处理由契约决定，不能说“PUT 漏 body 必然清空”；PATCH 的缺失/null 在第八课系统处理。
 
-矩阵：
+### 3.2 主线状态码
 
-| 方法 | 安全 | 幂等 | 默认可缓存 | 典型用途 |
-|---|:--:|:--:|:--:|---|
-| GET | ✓ | ✓ | ✓ | 读取资源 |
-| HEAD | ✓ | ✓ | ✓ | 只要响应头（探测存在性、大小） |
-| POST | ✗ | ✗ | ✗ | 创建；无法归入其他方法的操作 |
-| PUT | ✗ | ✓ | ✗ | 整体替换（给全量，替换成这个样子） |
-| PATCH | ✗ | ✗ | ✗ | 局部修改（只给要改的字段） |
-| DELETE | ✗ | ✓ | ✗ | 删除 |
-
-**必须现场澄清的一个疑问（请设计为提问后揭晓）**：
-
-> 删除同一条资源两次，第一次 204，第二次 404，响应都不一样，怎么能叫幂等？
-
-答：幂等说的是**服务器状态**，不是响应内容。删一次和删两次，最终状态都是"这条不存在"。所以 DELETE 幂等。**这个区分很重要，第 8 次课设计重试策略时直接依赖它。**
-
-**PUT 与 PATCH 的差别用一个例子说清**（第 8 次课会重做一遍）：一个问题有 title 和 body，你只想改 title。用 PUT 就必须把 body 也一起发过去，否则 body 会被替换成空；用 PATCH 只发 title。**AI 生成的"更新接口"经常写成 PUT 但按 PATCH 的语义实现**，结果用户改个标题正文没了。
-
-### 3.2 状态码：给判据，不给清单
-
-回收上一次课的三大类（2xx 成功 / 4xx 你错了，原样重试无意义 / 5xx 我错了，重试可能有用），今天细化到**选择判据**。
-
-**成功类**
-
-| 码 | 什么时候用 | 关键点 |
-|---|---|---|
-| 200 | 读取成功、更新成功且返回了内容 | — |
-| 201 | **创建**成功 | 应当带 `Location` 响应头指向新资源 |
-| 204 | 成功但**没有响应体** | 典型：删除成功。注意此时不要返回 `{}` |
-
-**客户端错误类——这几组的区分是判据的核心**
-
-| 对比 | 怎么选 |
+| 状态 | 选择与观察 |
 |---|---|
-| **400 vs 422** | 400：请求本身没法解析（JSON 语法坏了、Content-Type 不对）。422：能解析，但内容不合法（年龄 = -5、标题超长）。**FastAPI 默认对校验失败返回 422**，第 3 次课会解剖它的响应结构 |
-| **401 vs 403** | 401：我不知道你是谁（未认证 / 凭证失效）——**注意它的名字 Unauthorized 有误导性，它其实是"未认证"**。403：我知道你是谁，但你不能做这个（已认证但无权限）。〔埋点 → 第 14 次课〕 |
-| **403 vs 404** | 存在但无权 = 403；不存在 = 404。**但有时会故意用 404 代替 403**，避免泄露"这条资源确实存在"。〔埋点 → 第 14 次课 IDOR〕 |
-| **409** | 状态冲突：重复创建、并发修改撞车。〔埋点 → 第 8 次课乐观锁〕 |
-| **429** | 触发限流。〔埋点 → 第 16 次课配额〕 |
+| 200 | 成功且有响应内容；仍核对业务数据 |
+| 201 | 已创建资源；课程创建接口用 Location 指向新资源 |
+| 204 | 成功且没有正文；不能无条件调用 res.json() |
+| 400 / 422 | 区分一般客户端错误与无法处理的内容；框架具体映射必须实测 |
+| 404 | 资源或路径不存在；也可能按策略隐藏资源存在性 |
+| 409 | 与当前资源状态冲突，例如本课程标题重复 |
+| 429 | 超出速率限制，按 Retry-After 和策略处理 |
+| 500 | 服务端未能完成请求；不把内部堆栈回显给用户 |
+| 502 / 504 | 网关收到无效上游响应 / 等上游超时；结合网关与应用日志 |
+| 503 | 暂时不可用；M0 探针数据库故障用此状态 |
+| 303 | 本课只认识重定向；第五课 POST 后引导 GET |
 
-**服务端错误类**
+**FastAPI 默认把 JSON 语法错误也列为 422。** 不先讲“必定 400”，第三课再说框架不符合。课程第三、四课保持这一状态，仅第四课明确迁移错误正文；媒体类型错误也不能一概归为 400，API 可以声明 415。
 
-| 码 | 含义 | 你该去哪里查 |
+401 表示缺少有效认证凭据，需注意 `WWW-Authenticate`；403 表示服务器拒绝执行，不必然证明“已认证”。完整认证选择留后续。
+
+重试不只看 4xx/5xx：具体原因、请求副作用、结果是否未知、幂等性和退避都重要。搜索 GET 可以提供用户触发的重试，但不要求自动无限重试。错误 200 会误导只读状态码的工具，不意味着所有缓存、代理都必定做出同一种动作。
+
+## 四、数据在哪里：query、表单与 JSON
+
+**课堂 8 分钟；教师演示，学生课后查表。**
+
+| 发法 | 典型代码或头 | 参数去哪里 |
 |---|---|---|
-| 500 | 应用代码抛了未处理异常 | 应用日志 + 异常栈（第 1 次课的观察点②③） |
-| 502 | 网关连上了后端，但收到的响应无效 | 后端进程可能崩了 |
-| 503 | 服务暂时不可用 | 第 1 次课 `/healthz` 用的就是它 |
-| 504 | 网关等后端超时 | 后端太慢或卡死 |
-
-**重定向类只讲一条**：303 的含义是"用 GET 去那个地址取结果"。**第 5 次课的 PRG 模式（提交后重定向，防止刷新重复提交）用的就是它**，今天先记住这个码。
-
-### 讲
-
-> 我不要求你们背这张表。我要求的是：**当你看到 AI 写了 `return {"success": False}` 配 200，你知道它让哪些东西失效了**——这个上次课列过。当你看到它把删除写成 GET，你知道爬虫会把你的数据删光。
->
-> 状态码不是装饰，是**协议层面的约定**，浏览器、代理、CDN、监控、重试库都在读它。你写错了，这些机器全部会做出错误的决定。
-
----
-
-## 四、同一份数据的三种报文：表单编码与 JSON
-
-**约 11 分钟。这一段解决一个学生高频困惑："我明明传了参数，服务端说没收到。"**
-
-### 内容
-
-用一个只有两个字段（`title`、`body`）的表单，**同一份数据，四种发法，看四种报文**。全程在 DevTools 的 Payload / Request Headers 面板对照。
-
-**发法一：原生表单默认提交**
-
-```html
-<form action="/echo" method="post">
-  <input name="title" value="React 怎么学">
-  <textarea name="body">求推荐路线</textarea>
-  <button>提交</button>
-</form>
-```
-
-报文：
-```
-Content-Type: application/x-www-form-urlencoded
-
-title=React+%E6%80%8E%E4%B9%88%E5%AD%A6&body=%E6%B1%82%E6%8E%A8%E8%8D%90%E8%B7%AF%E7%BA%BF
-```
-要点：像查询串一样的 `k=v&k=v`，中文和特殊字符被百分号编码。
-
-**发法二：表单带文件上传**
-
-```html
-<form action="/echo" method="post" enctype="multipart/form-data">
-```
-报文：`Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryXXX`，每个字段被 boundary 分段，二进制文件原样放在段里。
-
-要点一句话即可：**要传文件就必须用它，因为 urlencoded 编码二进制会膨胀且无法表达**。
-
-**发法三：`fetch` 发 JSON**
+| GET 搜索 | `new URLSearchParams({keyword, page:'1'})` | URL 查询串 |
+| 原生 POST form | 默认 `application/x-www-form-urlencoded` | 正文中的键值对 |
+| 文件 form / FormData | `multipart/form-data; boundary=...` | 正文分段 |
+| fetch JSON | `Content-Type: application/json` + JSON.stringify | JSON 正文 |
 
 ```js
-fetch('/echo', {
+await fetch('/lab/echo', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ title: 'React 怎么学', body: '求推荐路线' })
+  body: JSON.stringify({ title: '学习 HTTP', body: '这是课程虚构的表单正文。' }),
 });
 ```
-报文：`Content-Type: application/json`，body 是 JSON 文本。
 
-**发法四：GET 把数据放查询串**
+`/lab/echo` 是待制作的教师教学端点，不是 M0 已有端点。若使用 FormData，让浏览器设置包含 boundary 的 Content-Type，不手工只填 `multipart/form-data`。文件上传的常用原生表单编码是 multipart，不宣称二进制绝对不可能通过其他编码发送。
 
-```
-GET /echo?title=React+%E6%80%8E%E4%B9%88%E5%AD%A6&body=...
-```
-要点：**没有请求体**，数据在 URL 里。URL 会进浏览器历史、服务器访问日志、Referer 头——所以敏感信息不能放这里。
+中文、`&`、`#` 等必须正确编码；URL 长度限制由浏览器、代理、服务器决定，不是协议统一 2KB。查询串可能进入历史、日志或按 Referrer-Policy 传播，敏感数据不放这里。换成 POST 本身不提供加密。
 
-### 核心判据（请做成醒目页）
+Content-Type 声明正文格式，服务端还要按接口期望解析。FastAPI 的 JSON 模型与 Form 是不同输入适配路径，第五课才实现 Form，且需要 `python-multipart`。
 
-> **`Content-Type` 是你告诉服务端"我这段 body 该怎么解析"。**
->
-> 服务端按照这个声明去解析。**声明和实际内容不符，或者声明和服务端期望不符，就会解析失败。**
->
-> 这是"我明明传了参数，它说没收到"的头号原因——不是参数没发，是发的编码对方不认。排查方法固定：**打开 Payload 面板，看实际发出去的是什么格式；再看服务端期望的是什么格式。**
+## 五、加载时机与语义结构
 
-补一条埋点：FastAPI 里接收表单要用 `Form(...)`，接收 JSON 要用 Pydantic 模型，**这是两套不同的解析路径**。第 3 次课讲参数类型时会展开，第 5 次课做 HTML 表单时会再用一次。
+**课堂 10 分钟。** 先修阶段 B，观察普通标题，再按第二单元条件做无害 XSS 对照，最后进入完整页面。
 
-### 材料
-
-- 需要一个 `/echo` 端点：原样回显收到的 `Content-Type`、解析后的字段、以及原始 body 前 200 字符。它只用于教学，放在演示仓库的 `app/echo.py`。
-- 截图需求：四种发法的 Request Headers + Payload 面板，**放大 `Content-Type` 那一行和 body 区域**，四张图建议纵向排列在同一页便于对照。
-
----
-
-## 五、状态载体地图：登录状态是怎么带过去的
-
-**约 8 分钟。时间紧张时这是第一个压缩对象，可压成一张速查卡 + 两条判据。**
-
-### 内容
-
-HTTP 本身是无状态的：服务端处理完一个请求就忘了你。那"我登录了，下一个请求怎么知道"？答案是每次请求都**重新带上**某种凭据。带的方式有几种，各有各的性质。
-
-| 载体 | 存在哪 | **是否自动随请求发送** | 服务端能否读到 | JS 能否读到 | 容量 | 典型用途 |
-|---|---|---|---|---|---|---|
-| URL 查询串 | URL 里 | 是（它本身就在 URL 里） | 能 | 能 | ~2KB | 筛选、分页、排序——**可分享、可收藏的状态** |
-| **Cookie** | 浏览器 | **是，每个同域请求自动携带** | 能 | 除非设了 `HttpOnly` | ~4KB | 会话标识 |
-| localStorage | 浏览器 | **否，必须手动放进 header** | 否 | 能 | ~5MB | 客户端偏好（主题、折叠状态） |
-| sessionStorage | 浏览器 | 否 | 否 | 能 | ~5MB | 单个标签页内的临时数据 |
-| 内存（JS 变量） | 页面 | 否 | 否 | 能 | — | 临时 UI 状态；刷新即失 |
-
-### 两条判据（这一段真正要带走的东西）
-
-**判据一：Cookie 自动携带——这一条同时是它的优点和它的漏洞。**
-
-优点：你什么都不用写，浏览器替你带上，会话就这么维持住了。
-漏洞：**别的网站发起的请求，只要目标是你的域名，浏览器同样会自动带上。** 这就是 CSRF 的成因。〔埋点 → 第 15 次课，届时会直接回到这一页〕
-
-**判据二：localStorage 不自动携带，但 JS 完全可读。**
-
-所以把 token 放 localStorage 时：每个请求要手动加 `Authorization` 头；并且**一旦页面存在 XSS，token 就能被脚本读走**。〔埋点 → 第 14 次课 Session vs JWT 决策矩阵〕
-
-**顺带回收第 1 次课埋的一个点**：URL 里 `#` 之后的片段不会发送到服务器，所以它不能用来携带任何服务端需要的状态。〔→ 第 13 次课前端路由〕
-
-### 讲
-
-> 今天不下结论说"token 该放哪"。那是第 14 次课要做的取舍，需要先看到攻击长什么样。今天只要求你能回答一个问题：**这个东西存在哪里，下一个请求还能不能拿到它，谁能读到它。**
-
----
-
-## 六、现场必做：我改了代码，用户还看到旧页面
-
-**约 16 分钟。本次课高光，每个学生必须亲手做一遍，不是看演示。**
-
-### 教学设计说明（给制作团队）
-
-这个问题学生在开发时**从来不会遇到**，因为 DevTools 的 "Disable cache" 是默认勾着的。所以流程必须是：**先取消勾选 → 制造问题 → 让他们自己中招 → 再讲原理**。顺序反了就没有说服力。
-
-请在课件上单独做一页醒目提示：
-
-> **实验前置操作：打开 DevTools → Network 面板 → 取消勾选 "Disable cache"。**
-> 这个勾选框就是你从来没遇到过这个 bug 的原因。
-
-### 第一步：观察默认行为——协商缓存
-
-演示项目用 FastAPI 的 `StaticFiles` 托管 `/static`，它默认会给静态文件发 `ETag` 与 `Last-Modified`。
-
-1. 首次访问页面：`app.js` 状态码 **200**，响应头里有 `ETag: "a1b2c3..."`。
-2. 按 F5 刷新：`app.js` 状态码 **304 Not Modified**，Size 列显示很小。
-
-在这里讲清楚发生了什么：
-
-> 304 意味着——**请求发出去了**。浏览器带上 `If-None-Match: "a1b2c3..."` 问服务器"我手上这份还能用吗"，服务器说"能用，你自己用吧"，不回传内容。
->
-> 这叫**协商缓存**：省了传输，没省往返。
-
-### 第二步：加上强缓存，问题出现
-
-修改静态文件服务，给 `/static` 下的资源加上生产环境常见的响应头（课程提供 `CachedStaticFiles` 类，一行替换即可）：
-
-```python
-# 模拟生产配置：静态资源缓存一小时
-response.headers["Cache-Control"] = "public, max-age=3600"
-```
-
-3. 刷新，再刷新。`app.js` 的 Size 列显示 **(from disk cache)** 或 **(memory cache)**，**状态码栏是灰色的 200**。
-
-> 注意这次和上次的区别：**这一次请求根本没有发出去**。浏览器看了一眼 `max-age=3600`，认为"我一小时内都不用问"，直接从本地拿。这叫**强缓存**。
-
-### 第三步：制造真实事故（痛感发生在这里）
-
-4. 现在修改 `app.js`，把按钮文案从"搜索"改成"立即搜索"。保存。
-5. 刷新页面。**没有变化。**
-6. 再刷新几次。**还是没有变化。**
-
-此时让学生**自己动手**：每个人在自己机器上改一行，刷新，确认自己也复现了。
-
-学生的第一反应一定是 `Ctrl+Shift+R`。让他们做，确实生效了。然后立刻追问：
-
-> 生效了。但是——**你能让你的用户按 Ctrl+Shift+R 吗？**
-
-这就是事故的全貌：你部署了新版本，你自己看是新的（因为你硬刷新了），用户看到的是旧的，而且要持续一小时。更糟的情况是 HTML 是新的、JS 是旧的，两者版本对不上，页面直接崩。
-
-**顺带讲清三种刷新的差别**（学生做实验时一定会撞上，不讲会困惑）：
-
-| 操作 | 行为 |
-|---|---|
-| 地址栏回车 / 点链接进入 | 完全按缓存规则走，强缓存命中就不发请求 |
-| F5 刷新 | 对**主文档**会带 `Cache-Control: max-age=0` 强制校验；**子资源仍可能走强缓存** |
-| Ctrl/Cmd + Shift + R | 全部绕过缓存，重新下载 |
-
-> 这张表解释了一个常见的诡异现象：F5 之后 HTML 是新的、JS 还是旧的。
-
-### 第四步：正确解法——文件名指纹
-
-不是去缩短缓存时间，而是**让新文件有新名字**。
-
-```html
-<!-- 旧 -->
-<script src="/static/app.js" defer></script>
-<!-- 新 -->
-<script src="/static/app.a3f91c.js" defer></script>
-```
-
-内容变了 → 哈希变了 → 文件名变了 → 对浏览器来说这是一个**它从来没见过的 URL**，必然重新下载。旧文件还在缓存里，但再也没人引用它。
-
-配套的缓存策略（**这是本单元的最终结论，请做成醒目页**）：
-
-| 资源类型 | 缓存策略 | 理由 |
+| script 形态 | 执行时机 | 注意 |
 |---|---|---|
-| 带指纹的 JS / CSS / 图片 | `Cache-Control: public, max-age=31536000, immutable` | 名字唯一对应内容，可以永久缓存 |
-| **入口 HTML** | `Cache-Control: no-cache` | 它是入口，**名字不能变**，必须每次校验，否则用户永远拿不到新的资源名 |
-| API 响应 | 通常 `no-store` 或按需设置 | 数据会变；涉及用户隐私的响应不应被中间代理缓存 |
+| 外部经典脚本，无属性 | 遇到时等待并执行，阻塞解析 | 可能在目标 DOM 之前运行 |
+| 外部经典脚本 defer | 文档解析完，DOMContentLoaded 前 | 按文档顺序执行 |
+| async | 下载就绪后尽早执行 | 可能打断解析，不保证相互顺序 |
+| module | 默认延后执行，处理模块依赖图 | async、依赖与顶层 await 等会影响时序；不把复杂模块图简单等同经典 defer |
 
-> 这套"HTML 不缓存 + 资源永久缓存 + 文件名带哈希"的组合，是现代前端的**标准做法**。
->
-> **第 10 次课你打开 `npm run build` 生成的 `dist/` 目录，会看到满屏 `index-a3f91c.js` 这样的文件名——现在你知道它们为什么长这样了。** 第 16 次课部署时，你要自己配置这两条缓存规则。
-
-### 适用条件（请保留）
-
-上面这套策略适用于**静态资源由构建工具产出、有独立入口 HTML 的应用**，也就是本课程的形态。服务端渲染整页、CDN 边缘缓存、带鉴权的私有资源，各有不同的处理方式，本课程不展开。
-
-### 材料
-
-- `CachedStaticFiles` 类（课程提供，用于第二步一行切换）。
-- **高光图**：三次刷新的 Network 面板同屏对照——① 200 带 ETag ② 304 ③ 灰色 200 (from disk cache)。三张图的 **Status 列与 Size 列必须放大到清晰可读**，这两列是全部证据所在。
-- **备用**：若学生浏览器版本导致 Size 列显示文案不同，准备一份 Chrome 标准显示的截图作为对照基准。
-
----
-
-## 七、浏览器运行时：脚本放在哪里，以及解剖台的修复
-
-**约 9 分钟。这一单元闭合解剖台的第一个报错，不能压缩。**
-
-### 内容
-
-浏览器拿到 HTML 后是**从上往下边解析边构建 DOM** 的。解析过程中遇到 `<script>`，行为取决于它的属性。
-
-请用一张时间轴图表示三种情况（横轴是时间，三条泳道：HTML 解析、脚本下载、脚本执行）：
-
-| 写法 | 下载 | 执行时机 | 是否阻塞解析 | 多个脚本的顺序 |
-|---|---|---|---|---|
-| `<script src>` | 立即，**阻塞** | 下载完立即执行 | **是** | 按文档顺序 |
-| `<script src defer>` | 并行，不阻塞 | HTML 解析**完成后**，`DOMContentLoaded` 前 | 否 | **按文档顺序** |
-| `<script src async>` | 并行，不阻塞 | 下载完**立即**执行，可能打断解析 | 部分 | **不保证顺序** |
-| `<script type="module">` | 并行 | 默认具有 defer 行为 | 否 | 按顺序 |
-
-### 回到解剖台：为什么 `listEl` 是 null
-
-现在答案清楚了：`<script src="/static/app.js">` 放在 `<head>` 且没有任何属性，脚本在 HTML 解析到 `<body>` **之前**就执行了，那一刻 `#list` 还不在 DOM 里。
-
-**现场修复，两种方式都演示，让学生看到效果一致**：
+完整页面骨架：
 
 ```html
-<!-- 方式一：加 defer（推荐） -->
-<script src="/static/app.js" defer></script>
-<!-- 方式二：移到 </body> 之前 -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>问题搜索</title>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header><h1>问答社区</h1></header>
+  <main>
+    <form id="search-form">
+      <label for="kw">搜索问题</label>
+      <input id="kw" name="keyword" type="search">
+      <button type="submit">搜索</button>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
+    <ul id="list" aria-busy="false"></ul>
+    <p id="asset-version"></p>
+  </main>
+</body>
+</html>
 ```
 
-刷新，报错消失。
+form 提供提交语义，button 提供焦点与键盘行为，label 提供名称。JS 监听 submit 并 preventDefault 才把原生导航改成局部更新；不是“加 form 什么代码都不用写就得到 AJAX”。页面没有导航需求就不用硬凑 nav 标签。
 
-> **注意演示顺序**：先修复加载时机（加 defer），此时页面可以正常加载和渲染，但仍然是 `innerHTML` 渲染。然后再演示 XSS（搜索恶意标题，弹窗出现）。最后在单元 8.4 修复为 `textContent`。不要跳过 XSS 演示直接修复为 `textContent`，否则学生看不到 `innerHTML` 的实际危害。
+## 六、fetch：用阶段解释，而不是一个 catch 都叫网络失败
 
-### 选择判据
+**课堂 14 分钟。**
 
-| 场景 | 用什么 | 理由 |
-|---|---|---|
-| 脚本要操作 DOM、或依赖其他脚本 | **defer** | 保证 DOM 就绪，保证顺序 |
-| 完全独立的第三方脚本（统计、监控） | async | 不依赖也不被依赖，越早执行越好 |
-| 必须在首次渲染前执行（如防止主题闪烁） | 同步脚本，且**要清楚代价** | 这是有意接受阻塞 |
-| 现代构建工具的产物 | `type="module"`（自带 defer 语义） | 第 10 次课会看到 |
-
-### 顺带修掉解剖台的第二条：语义标签
-
-把 `<div class="btn" onclick>` 换成 `<button>`，把输入框包进 `<form>`：
-
-```html
-<header>
-  <h1>问答社区</h1>
-</header>
-<main>
-  <form id="search-form">
-    <label for="kw">搜索问题</label>
-    <input type="search" id="kw" name="keyword">
-    <button type="submit">搜索</button>
-  </form>
-  <ul id="list"></ul>
-</main>
-```
-
-现场验证三件**你什么代码都没写就得到的行为**：
-1. Tab 能聚焦到按钮，空格 / 回车能触发；
-2. 在输入框里按回车，表单自动提交；
-3. 用浏览器的无障碍检查工具，按钮被识别为 button 且有可访问名称。
-
-> **语义标签不是"规范要求"，是一批你不写代码就能得到的行为。** 用 div 你要自己补 `tabindex`、`role`、键盘事件监听——而 AI 生成 div 汤时，这些它一个都不会补。
->
-> 顺带说明：CSS 布局本课程不考，课程提供统一样式基线（Week 0 已发）。但**结构标签的选择**是本课程要求的，它影响行为，不只是影响样式。
-
----
-
-## 八、四态渲染，以及 fetch 的错误处理
-
-**约 16 分钟。本次课第二个必做实操，是第 12 次课的直接基础，不能压缩。**
-
-### 8.1 先预测，再揭晓（请勿提前露出答案）
-
-给学生看这段代码——**它就是 AI 最常生成的写法**：
+先看一个没有渲染副作用的最小预测函数，避免 `render` 错误干扰结论：
 
 ```js
-async function load() {
+async function observe(fetchImpl = fetch) {
   try {
-    const res = await fetch('/questions?keyword=react');
-    const data = await res.json();
-    render(data);
-  } catch (e) {
-    showError('加载失败');
+    const res = await fetchImpl('/questions?keyword=react');
+    const payload = await res.json();
+    console.log(res.status, payload);
+    return 'parsed';
+  } catch (error) {
+    return error.name;
   }
 }
 ```
 
-提问（**让学生举手表态后再运行**）：
-
-> 如果服务端返回 **500**，上面这段代码会走进 `catch` 吗？
-
-绝大多数学生会说"会"。
-
-**现场演示三种情况，分开看**：
-
-| 场景 | 服务端返回 | 实际发生什么 | 进 catch 吗？ |
+| 输入场景 | fetch 阶段 | 后续阶段 | 上例是否 catch |
 |---|---|---|---|
-| 500 + 合法 JSON | `{"error":"..."}` | `fetch` 正常返回，`res.json()` 解析成功 | **否**，但数据不是期望格式 |
-| 500 + HTML 错误页 | `<html>...</html>` | `fetch` 正常返回，`res.json()` 解析失败 | **是**，`SyntaxError` |
-| 网络失败 | 无响应 | `fetch` 本身 reject | **是**，`TypeError` |
+| 500 + 合法 JSON | fulfilled，res.ok=false | JSON 解析成功 | 仅这段代码通常不会 |
+| 500 + HTML | fulfilled，res.ok=false | res.json 解析失败 | 会，常见 SyntaxError |
+| 无法获得可用响应 | rejected | 未开始解析 | 会；也可能是取消等，不只 DNS |
+| 200 + 错误结构 JSON | fulfilled | JSON 可解析但不满足业务字段 | 上例不校验结构；渲染代码另可能抛错 |
 
-**关键结论**：
+fetch 不因 HTTP 4xx/5xx 自行 reject；它也可能因无效请求、取消、浏览器安全限制等失败。**reject 不证明服务器没执行。** 读取响应正文期间也可能中断。默认 axios 对非成功状态拒绝，但 `validateStatus` 可以改变策略，不能混用两个库的默认行为解释。
 
-> **`fetch` 只有在"没拿到 HTTP 响应"时才 reject。**
->
-> 服务器回了 404、500、502——那都是**成功拿到了响应**，`fetch` 认为自己的任务完成了，`await` 正常返回。
->
-> 判断是否成功必须看 **`res.ok`**（等价于状态码在 200–299 之间）。
->
-> 这一条是 `fetch` 与 axios 的重大差异：**axios 会对 4xx/5xx 主动抛异常，fetch 不会**。你在 AI 生成的代码里同时见过这两种库，它们的错误处理写法**不能互相套用**——这是 AI 混用两套写法时最常出错的地方。
+生产页面按下面阶段分类：
 
-### 8.2 四种状态，而不是两种
+```text
+获得可用响应？否 → request-error
+  是 → HTTP 成功？否 → http-error（不按成功列表解析）
+    是 → 正文可读？否 → body-error
+      是 → JSON 可解析？否 → parse-error
+        是 → 契约正确？否 → contract-error
+          是 → 渲染成功？否 → render-error
+            是 → success / empty
+```
 
-学生的心智模型通常是"成功 / 失败"两态。实际至少四种，而且**失败要分成两类**：
+这是四态中的 error 子类别，不是要求学生记九种 UI 状态。第一课“观察位置”在这里落实为失败阶段。
 
-| 状态 | 触发条件 | 界面该做什么 |
-|---|---|---|
-| **loading** | 请求已发出，未返回 | 显示加载提示；**禁用提交按钮防重复提交** |
-| **success（有数据）** | `res.ok` 且列表非空 | 渲染列表 |
-| **empty** | `res.ok` 但列表为空 | 显示"没有找到相关问题"——**这不是错误** |
-| **error: HTTP 错误** | 拿到响应但 `!res.ok` | 按状态码给不同提示：4xx 提示用户改输入，5xx 提示稍后重试 |
-| **error: 网络失败** | `fetch` reject（断网、DNS 失败、连接被拒） | 提示检查网络并提供重试 |
+## 七、唯一现场必做：实现并验证搜索四态
 
-**empty 单独列出来的理由**：empty 被当成 error 显示"加载失败"，是学生页面最常见的体验 bug。数据为空是正常业务结果。
+**课堂 22 分钟。** 给完整骨架，学生补齐关键分支、核对界面与报文；中途先验证普通结果和空结果，再检查错误与按钮恢复。其余边界课后完成。
 
-**HTTP 错误与网络失败必须分开的理由**：500 说明服务器已经回答了你，只是回答的是"我出错了"——服务是通的，重试可能有用；网络失败说明**根本没连上**，问题在链路前半段。这正好回收第 1 次课三问表里的那条判据：**有没有状态码是一条分界线。**
-
-### 8.3 现场改写（演进到 tag `v2-three-states`）
+### 7.1 请求与数据边界（完整参考）
 
 ```js
+class PageError extends Error {
+  constructor(kind, message, status = null, rid = '') {
+    super(message);
+    this.kind = kind;
+    this.status = status;
+    this.rid = rid;
+  }
+}
+
+async function readSearch(keyword, fetchImpl = fetch) {
+  const query = new URLSearchParams({ keyword, page: '1' });
+  let res;
+  try {
+    res = await fetchImpl(`/questions?${query}`);
+  } catch {
+    throw new PageError('request-error', '未获得可用响应，请检查连接或稍后重试');
+  }
+  const rid = res.headers.get('X-Request-ID') || '';
+  if (!res.ok) {
+    throw new PageError('http-error', `服务返回 HTTP ${res.status}`, res.status, rid);
+  }
+  let text;
+  try {
+    text = await res.text();
+  } catch {
+    throw new PageError('body-error', '响应正文未能完整读取', res.status, rid);
+  }
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    throw new PageError('parse-error', '响应不是有效 JSON', res.status, rid);
+  }
+  if (!payload || payload.success !== true || !Array.isArray(payload.data)
+      || !payload.data.every(q => q && typeof q.title === 'string'
+        && typeof q.body === 'string')) {
+    throw new PageError('contract-error', '响应结构与当前接口契约不一致', res.status, rid);
+  }
+  return { items: payload.data, rid };
+}
+```
+
+这里 `items` 只是前端适配器的内部名称，**线上容器仍是 payload.data**。第三课迁移时只集中修改适配器及受影响字段，不能全局混用两个版本。校验仅覆盖此页需要的字段，不冒称完整 JSON Schema 校验。
+
+500 HTML 在正式实现中直接归 HTTP 错误；只有 2xx 的非法 JSON 才走 parse-error。这与上单元“先不检查 res.ok 的预测片段”是两个明确版本。
+
+### 7.2 DOM 与四态（与上段组成 app.js）
+
+```js
+const formEl = document.getElementById('search-form');
+const kwEl = document.getElementById('kw');
 const listEl = document.getElementById('list');
 const statusEl = document.getElementById('status');
-const btnEl = document.querySelector('#search-form button');
+const btnEl = formEl.querySelector('button');
+let busy = false;
+
+function setState(state, message = '') {
+  statusEl.dataset.state = state;
+  statusEl.textContent = message;
+  listEl.setAttribute('aria-busy', String(state === 'loading'));
+}
+
+function render(items) {
+  const fragment = document.createDocumentFragment();
+  for (const q of items) {
+    const li = document.createElement('li');
+    const title = document.createElement('h3');
+    const body = document.createElement('p');
+    title.textContent = q.title;
+    body.textContent = q.body;
+    li.append(title, body);
+    fragment.append(li);
+  }
+  listEl.replaceChildren(fragment);
+}
 
 async function load(keyword) {
-  setState('loading');
+  if (busy) return;
+  busy = true;
+  btnEl.disabled = true;
+  listEl.replaceChildren();
+  setState('loading', '正在加载……');
   try {
-    const res = await fetch(`/questions?keyword=${encodeURIComponent(keyword)}`);
-
-    if (!res.ok) {                      // ← 关键：HTTP 错误在这里分流
-      setState('http-error', res.status);
-      return;
+    const { items } = await readSearch(keyword);
+    try {
+      render(items);
+    } catch {
+      throw new PageError('render-error', '页面渲染失败，请联系维护者');
     }
-
-    const data = await res.json();
-    if (data.items.length === 0) {
-      setState('empty');
-      return;
-    }
-
-    render(data.items);
-    setState('ok');
-
-  } catch (e) {                          // ← 这里接的是"没拿到响应"
-    setState('network-error');
+    setState(items.length ? 'success' : 'empty',
+      items.length ? `找到 ${items.length} 条结果` : '没有找到相关问题');
+  } catch (error) {
+    const message = error instanceof PageError ? error.message : '页面发生未知错误';
+    const suffix = error instanceof PageError && error.rid ? `；请求编号 ${error.rid}` : '';
+    setState('error', message + suffix);
+    console.error('搜索失败类别：', error instanceof PageError ? error.kind : 'unexpected');
   } finally {
-    btnEl.disabled = false;              // ← 无论走哪条分支，按钮都要恢复
+    busy = false;
+    btnEl.disabled = false;
+    listEl.setAttribute('aria-busy', 'false');
   }
 }
+
+formEl.addEventListener('submit', event => {
+  event.preventDefault();
+  void load(kwEl.value);
+});
 ```
 
-三个必须讲出来的设计点：
+条件：上述 DOM 元素存在，脚本通过 defer 执行；页面初始化失败仍需看 Console，不能声称捕获所有浏览器错误。busy 同时处理按钮和 Enter 导致的重复提交；本课暂串行搜索，第十二课再处理“并发搜索旧结果覆盖新结果”。禁用按钮不等于服务端幂等。
 
-1. **`if (!res.ok)` 之后必须 `return`**，否则会继续往下走去解析错误页。
-2. **`finally` 里恢复按钮**。这是"请求结束了但按钮一直禁用"这类 bug 的根因——恢复代码写在了成功分支里。第 12 次课用 TanStack Query 时，这件事会被库接管，但你要知道它在替你做什么。
-3. **`encodeURIComponent`**：关键词里有 `&` 或 `#` 时不编码会截断参数。这是"搜索带特殊字符就出错"的常见原因。
+`textContent` 只把文本放进文本节点，不是 HTML 清洗器；不能因此认为把用户值放 URL、CSS、事件属性也安全。React 以后可按状态声明 UI，不是自动修复一切不安全 DOM 使用。
 
-### 8.4 渲染：textContent 而不是 innerHTML
+### 7.3 教师夹具与验收条件
 
-回到解剖台的第三条。现场把渲染改掉：
+核心页面只访问 `/questions`。教师在隔离实验应用中提供 `/lab/http/questions`，可配置 slow、500 JSON、500 HTML、200 非法 JSON、200 错结构、empty 等场景；**该端点和静态页当前待制作，不声称 M0 支持 `?fail=500`**。实验副本临时切换请求地址，交付前回到 `/questions`。
+
+在不运行服务的阶段，可向 `readSearch` 传入返回 `Response` 或抛异常的 fetchImpl 验证分支。这是模拟结果，没有真实 Network 请求，不能提交为浏览器报文证据。
+
+| 基础证据 | 观察与判定 |
+|---|---|
+| 正常 / empty | 200 合格容器，空列表不是失败 |
+| loading | 受控延迟中显示加载，结束恢复按钮 |
+| HTTP 500 | 即使正文 HTML，也按 HTTP 错误处理 |
+| 无可用响应 | Offline 或本地受控失败；恢复网络后可再次搜索 |
+| 数据异常 | 200 非法 JSON 和错误结构与网络失败分开 |
+| 无害恶意标题 | 安全版本按文字显示；不执行 HTML |
+
+浏览器 Offline 是可控演示条件，不推广为所有 reject 都是断网。不要用访问陌生域名替代“等价网络失败”，它可能引入 CORS、代理与 DNS 等不同变量。
+
+## 八、缓存与状态载体：课堂导读，保留完整自学材料
+
+**课堂 10 分钟；完整缓存实验 B 档选做。**
+
+### 8.1 缓存实验先固定条件
+
+独立页面、无 Service Worker、同一浏览器会话，记录浏览器版本。检查并取消 Disable cache，不假设其默认值。缓存只针对实验 JS，入口 HTML 为 `Cache-Control: no-cache`，API 不混进静态实验。
+
+JS 中真实存在版本标记：
 
 ```js
-function render(items) {
-  listEl.replaceChildren();                    // 清空
-  for (const q of items) {
-    const li  = document.createElement('li');
-    const h3  = document.createElement('h3');
-    const p   = document.createElement('p');
-    h3.textContent = q.title;                  // ← 当作纯文本，不解析
-    p.textContent  = q.body;
-    li.append(h3, p);
-    listEl.append(li);
-  }
-}
+document.getElementById('asset-version').textContent = '资源版本：A';
 ```
 
-重新搜索那条恶意标题的问题：**这次页面上老老实实显示出了 `<img src=x onerror=...>` 这串字符，没有弹窗。**
+教师提供实验静态服务：响应 ETag 与内容对应；协商阶段设 no-cache，强缓存阶段设 `public, max-age=3600`。可以用以下受控处理器表达实验原理，完整静态部署留第十六课：
 
-> `innerHTML` 把字符串**当代码解析**，`textContent` 把它**当文字显示**。区别只在这一点。
->
-> 判据：**任何来自用户、来自接口、来自 URL 的内容，默认都用 `textContent`。** 确实需要渲染富文本时，必须先经过白名单清洗——第 15 次课讲。
+```python
+import hashlib
+from fastapi import Request, Response
 
-**顺带记一笔代价**：原来的 `innerHTML +=` 每加一条就把整个列表字符串重新解析一遍，100 条数据就是 100 次全量重建，还会清空已绑定的事件监听。第 11 次课 React 接管这件事之后，你就不用手写这些了——但你要知道它替你做了什么。
+ASSET_VERSION = "A"
+ASSET_POLICY = "no-cache"
 
-### 材料
+@app.get("/lab/cache/app.js", include_in_schema=False)
+def cache_asset(request: Request):
+    source = f"document.getElementById('asset-version').textContent='资源版本：{ASSET_VERSION}';"
+    etag = '"' + hashlib.sha256(source.encode()).hexdigest() + '"'
+    headers = {"Cache-Control": ASSET_POLICY, "ETag": etag}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(source, media_type="text/javascript", headers=headers)
+```
 
-- 演示接口需支持故障注入：`/questions?fail=500` 返回 500，`/questions?fail=slow` 延迟 3 秒（用于观察 loading 态），`/questions?keyword=zzzz` 自然返回空列表。
-- 网络失败的制造方式：**DevTools Network 面板 → Throttling 下拉选 Offline**。比拔网线可控，且能一键恢复。
-- **高光图**：四种状态下的界面截图 + 对应的 Network 面板截图，**两两对照排列**。要能看清"HTTP 500 有状态码"与"Offline 时那条请求显示 failed 且没有状态码"的区别——这是本单元最重要的一组证据。
+这是只处理本实验单个精确 ETag 的示例，不是完整 If-None-Match 弱比较、列表或通配符实现。版本与策略为教师控制常量，不接受用户输入。可用浏览器条件请求或 curl 显式 If-None-Match 作对照。
 
----
-
-## 九、C 档结论卡与 Lighthouse
-
-**约 5 分钟。明确告诉学生"这几页是课后查的，不要求现在理解推导"。时间不够时 Lighthouse 整体移到课后。**
-
-### 9.1 HTTP 版本结论表
-
-| 版本 | 关键变化 | 对你写代码的影响 |
+| 阶段 | 控制动作 | 观察，不强求某个界面颜色 |
 |---|---|---|
-| HTTP/1.1 | 一条连接同时只能处理一个请求；浏览器对每个域名最多约 6 条连接 | **请求数是瓶颈**——这是上一代前端优化的全部前提 |
-| HTTP/2 | 一条连接上多路复用，头部压缩 | **请求数不再是主要瓶颈** |
-| HTTP/3 | 换到 QUIC（基于 UDP），改善弱网与连接迁移 | 对应用代码基本透明 |
+| 首次获取 | 新实验 URL 或清理仅实验资源，policy=no-cache | 200、实际正文、ETag |
+| 协商 | 相同内容与 URL，确认带 If-None-Match | 匹配时服务端返回 304，无新正文；浏览器复用旧正文 |
+| 强缓存入场 | 切 max-age 后先确保真实 200 获取新头 | 确认响应包含新策略，不能只改服务器就假设缓存已更新 |
+| 观察复用 | 同一 URL 普通链接导航 / 新开同源文档，版本仍 A | 看缓存来源、请求头与服务器访问记录 |
+| 版本变更 | 服务器 JS 改 B，旧 URL 仍有新鲜缓存 | 可能继续 A；若浏览器选择验证，记录真实原因 |
+| 指纹更新 | 发布实际存在的新内容文件，HTML 引用新名字 | 核对取到 B 与新资源名 |
 
-内部机制（HPACK、帧、QUIC 握手）→《计算机网络》。
+F5、硬刷新、普通导航、扩展及缓存驱逐行为并不完全相同。不能承诺“F5 必 304”或“连按刷新必强缓存”。同一 URL 重新获取的结果也与已有响应缓存头有关。
 
-### 9.2 已失效的老优化判定表（**本页请重点制作**）
-
-| 老做法 | 当年为什么有效 | 现在为什么该停 |
-|---|---|---|
-| **雪碧图**（把小图拼成一张大图） | h1 下请求数是瓶颈 | h2 多路复用后收益基本消失；且改一张小图导致整张大图缓存失效 |
-| **域名分片**（把资源分散到多个子域） | 绕开每域约 6 连接的限制 | h2 下**有害**：强行拆成多条连接，额外的 DNS 与 TLS 握手成本 |
-| **把所有 JS 合并成一个文件** | 减少请求数 | 改一行就导致整个大包缓存失效；现代做法是**按路由拆包**（第 10 次课） |
-| **内联所有小资源到 HTML** | 省一次请求 | 内联的内容无法被单独缓存，每次 HTML 更新都要重传；仅对极少量关键 CSS 仍有意义 |
-
-**这张表下方请加一段话（这是它的真正用途）**：
-
-> 你去问 AI"怎么优化前端加载速度"，它有相当概率给你其中几条。原因不是它"错了"——这些建议在 2014 年的技术文章里是正确的，而那些文章正是它的训练材料。
->
-> **这正是本课程反复要建立的判断：任何技术建议都有它成立的前提条件。前提变了，建议就该失效。** 你的价值就在于知道前提是什么。
-
-### 9.3 Lighthouse（B 档，课后完成）
-
-对自己的页面跑一次 Lighthouse，只要求能说出三个指标各自在衡量什么：
-
-| 指标 | 衡量什么 | 一句话理解 |
-|---|---|---|
-| **LCP** 最大内容绘制 | 主要内容多久出现 | 用户多久看到东西 |
-| **INP** 交互到下次绘制 | 交互后多久有反馈 | 点下去卡不卡 |
-| **CLS** 累积布局偏移 | 页面元素乱跳的程度 | 要点的按钮会不会突然挪开 |
-
-**不要求做优化，也不要求分数达标。** 优化推导涉及渲染流水线，本课程不展开。只要求：看到报告时能读懂它在说哪一类问题。
-
-### 9.4 其他结论卡（一页带过）
-
-| 问题 | 结论 | 展开位置 |
-|---|---|---|
-| 事件循环、宏任务微任务 | JS 单线程，异步任务排队执行；本课程只要求"不要在主线程做耗时同步计算" | 自学 |
-| CSS 布局与响应式 | 本课程不考，用课程样式基线 | Week 0 速查表 |
-| 为什么静态页放到另一个端口打开就报 CORS | 同源策略。**今天我们把页面和接口放在同一个源上，刻意绕开了它** | 第 12 次课 |
-
----
-
-## 十、作业与欠账登记
-
-**约 5 分钟。**
-
-### 作业一：修复搜索页 + 报文证据
-
-对象是第 1 次课的 M0 项目中的静态页面。要求：
-
-1. 结构标签语义化：至少正确使用 `header / main / nav / form / label / button / ul-li`；按钮必须是 `<button>`，不接受 `<div onclick>`。
-2. 脚本加 `defer`（或置于 body 末尾），并在提交物里写明**你选择的理由**。
-3. 实现完整四态：loading / 有数据 / **empty** / error，且 error 区分 **HTTP 错误**与**网络失败**两种提示。
-4. 所有来自接口的文本用 `textContent` 渲染。
-5. 提交 **4 张截图**：分别是 loading、empty、HTTP 500、Offline 四种状态下的**界面 + Network 面板同屏**。
-
-（用 `?fail=500` 与 DevTools Offline 制造后两种状态。）
-
-### 作业二：方法与状态码对表
-
-对你项目现有的全部端点（第 1 次课的 `/getQuestions`、`/getQuestionDetail`，加上你自己补的 `/questions/{qid}`、`/healthz`），逐个填这张表：
-
-| 端点 | 现在的方法 | 应该用什么方法 | 理由（引用安全/幂等/可缓存中的哪一条） | 现在的状态码 | 应该返回什么 | 理由 |
-|---|---|---|---|---|---|---|
-
-**要求**：理由必须引用本次课的判据，不接受"因为规范这么说"。找出你认为需要修改的地方并实际改掉。
-
-> **注意**：如果判断当前端点已经符合规范，无需修改，请说明理由。判断正确且无需修改，同样可以得分。
-
-**注意**：改完之后，第 1 次课的 `verify_m0.py` 里对路径的断言可能会失败。这是**预期的**——请同步更新你的验收脚本。这件事本身就是学习内容：**契约变了，验收也要跟着变**。
-
-### 作业三：缓存实验报告（B 档，课后自学）
-
-回答两个问题：
-1. 如果你现在要部署这个项目，`index.html`、`app.js`、`/questions` 接口响应三者分别该设什么缓存头？为什么 HTML 和 JS 的策略是相反的？
-2. 取消勾选 Disable cache 后，修改代码刷新页面，观察是否看到变化。用户会遇到这个问题吗？什么情况下会？你打算怎么防止？
-
-> **课堂与课后边界**：缓存实验为课后自学内容。课堂已完成搜索页修复与四态演示；方法矩阵、状态码细分、Cookie/Storage 完整讨论、HTTP 版本与"老优化"表为课后自学。
-
-### 本次课新增的欠账登记（请学生记进手册）
-
-| 欠账 | 何时还 |
+| 指令 / 策略 | 含义 |
 |---|---|
-| `innerHTML` 与 XSS 的完整攻防 | 第 15 次课 |
-| Cookie 自动携带 → CSRF | 第 15 次课 |
-| token 放 Cookie 还是 localStorage 的取舍 | 第 14 次课 |
-| 401 vs 403 vs 404 的选择 | 第 14 次课 |
-| 409 与并发冲突 | 第 8 次课 |
-| 303 与 PRG 模式 | 第 5 次课 |
-| `Form(...)` 与 Pydantic 两套解析路径 | 第 3、5 次课 |
-| 文件名指纹从哪来（构建产物） | 第 10 次课 |
-| 跨域为什么本课没遇到 | 第 12 次课 |
-| loading/error 状态由库接管 | 第 12 次课 |
-| `innerHTML +=` 全量重建的代价 | 第 11 次课 |
+| no-cache | 允许存储，但复用前需要验证；不是不缓存 |
+| no-store | 不存储此响应；不是清除所有过去缓存 |
+| max-age | 在新鲜期内可复用；不是永久保存保证 |
+| 指纹资源长缓存 | 内容变则 URL 变，入口 HTML 及时验证；旧文件需保留合理发布窗口 |
 
----
+文件名指纹是常见静态构建策略，不是唯一解法。HTML 可以存储，使用 no-cache 便于发现新的资源引用。个性化 API 的缓存涉及 private、认证与权限，不能一律公开缓存。
 
-## 十一、素材清单与制作说明
+### 8.2 状态载体条件表
 
-### 必需素材（缺了讲不下去）
+| 载体 | 自动发送 | JS / 服务器可见性 | 边界 |
+|---|---|---|---|
+| 查询串 | 请求目标的一部分 | 双方通常可见 | 长度和日志风险因环境而异 |
+| Cookie | 满足作用域与策略时由浏览器附带 | HttpOnly 阻止 JS 直接读取；服务器可读收到的 Cookie | Domain、Path、Secure、SameSite、fetch credentials、浏览器隐私策略共同作用 |
+| localStorage | 不自动附带 | 同源脚本可读；须主动发送服务端才可见 | 容量因浏览器而异，XSS 可威胁其中凭据 |
+| sessionStorage | 不自动附带 | 同源页面脚本可读 | 还受顶层浏览上下文生命周期影响 |
+| JS 内存 | 不自动附带 | 运行中的页面代码可见 | 刷新通常重置 |
 
-| 素材 | 说明 |
-|---|---|
-| 演示仓库新增 tag `v2-ai-page` | 解剖台反例：div 汤 + head 同步脚本 + `innerHTML` 拼接。**需验证三个预期问题都能稳定复现**（null 报错、回车不提交、alert 弹出） |
-| tag `v2-three-states` | 修复后的目标状态：语义标签 + defer + 四态 + textContent |
-| `/echo` 端点 | 回显 Content-Type、解析结果、原始 body 前 200 字符 |
-| 故障注入参数 | `?fail=500`、`?fail=slow`（延迟 3s）、空结果关键词 |
-| `CachedStaticFiles` 类 | 一行切换，给静态资源加 `Cache-Control: max-age=3600` |
-| seed 数据新增一条恶意标题记录 | `<img src=x onerror="alert('xss')">`，**仅弹无害提示，不读取任何数据** |
-| 高光图 A：三次刷新缓存对照 | 200+ETag / 304 / 灰色 200 (from disk cache)。**Status 列与 Size 列必须放大** |
-| 高光图 B：四种状态的界面 + Network 双栏对照 | 重点体现"500 有状态码 / Offline 无状态码" |
-| 高光图 C：四种请求编码的报文对照 | 放大 Content-Type 行与 body 区域，纵向排列同页 |
-| 图 D：脚本加载时间轴 | 三条泳道（解析 / 下载 / 执行），对比同步、defer、async |
-| 表 E：已失效的老优化判定表 | 纯表格，但需要配下方那段"为什么 AI 会给过时建议"的说明 |
+HTTP 无状态不等于服务端“不能保存任何状态”。服务器可存会话；请求如何关联会话要有协议。Cookie 自动携带是 CSRF 的条件之一，不是“只要目标同域一定带上”。HttpOnly 也不消灭 XSS 发起同源操作的风险。
 
-### 可后补
+## 九、作业与后续引用
 
-- Lighthouse 报告截图（B 档内容，可用文字描述替代）。
-- HTTP 版本结论表配图（纯文字表格足够）。
+**课堂 5 分钟。**
 
-### 备用材料
+A 档基础必交：
+1. 在合格 M0 上交付搜索页，保持 GET 路径与 `success/data`；现有后端验收不能因页面改写退化。
+2. 四态与错误类别记录：普通、空结果、加载、HTTP 500、无可用响应；200 解析/结构异常可用注明“模拟”的分支检查，浏览器报文证据必须来自真实请求。
+3. 安全渲染与键盘提交证据；有 request-id 时显示或记录，前端显示 id 可复用第一课 B 档，不把截图硬性要求扩大成设计完整报障系统。
+4. 对 M0 搜索、详情、探针填写“实际方法/状态→判断→依据”。若已正确就保留并说明，不要求改三处、不改弱验收。
 
-| 风险 | 备用方案 |
-|---|---|
-| 学生浏览器的 Size 列显示文案与演示不一致 | 提供 Chrome 标准显示的基准截图 |
-| 某些学生的浏览器扩展干扰缓存行为 | 提示使用无痕窗口重做；准备预录的 60 秒缓存实验录像 |
-| Offline 模式在部分环境不生效 | 改用一个不存在的域名发请求制造 DNS 失败，效果等价 |
-| 故障注入端点未就绪 | 准备四种状态的静态截图，标注"预录演示" |
+B 档：按受控条件完成缓存实验；HTTP 版本与性能阅读；可选择 Lighthouse 报告解读。INP 是交互指标，普通 Lighthouse 导航报告不能保证给出真实 INP；区分实验室 TBT 等代理指标和需要交互 / 现场数据的指标，不要求三个指标都凭一张报告测得。
 
-### 环境与运行条件
+HTTP/1.1 的连接与并发限制依实现；h2 多路复用降低某些请求成本，不等于请求数量永远不重要。文件合并、域名分片、内联、雪碧图均要结合握手、包体、缓存粒度和测量判断，不能列成“全部失效”。完整构建取舍第十课再用。
 
-延用第 1 次课环境（Python 3.12 / FastAPI / PostgreSQL 16+，Week 0 已装）。
+下一课承接：修好的页面与 M0 后端；第三课会明确更改响应结构、增加创建和出口模型，必须同步本课 `readSearch` 与 `render`。本课不实现 PATCH、认证、ORM 或 CORS 配置。
 
-**演示开始时的初始状态**：数据库已 seed（含那条恶意标题记录）、浏览器**无痕窗口**、DevTools 打开并停留在 Network 面板、**"Disable cache" 取消勾选**、Preserve log 勾选。
+## 十、素材和验证状态
 
-**复位方式**：清除站点数据（DevTools → Application → Clear storage）后重新加载即可重演缓存实验。
+已有 M0 工程可提供真实 GET 搜索与探针，但当前仓库没有本底稿的独立静态页、完整故障夹具、缓存服务与录屏。上文是可实施参考，不使用“已验证稳定复现”标签覆盖缺失素材。
 
----
+制作前须补：阶段 A/B/C/D 的页面副本、同源静态挂载、故障响应夹具、版本标记与 ETag 条件、带环境说明的截图。允许以已标注的模拟数据讲原理，但不据此宣称真实浏览器缓存、XSS 或可访问性验收通过。
 
-## 十二、与前后课的衔接（供制作团队理解引用关系）
+本轮直接提取本文 observe、readSearch 和DOM四态代码，在Node v22.14.0用模拟fetch/DOM完成39项断言：覆盖各失败分支、空结果、重复提交拦截、恢复与textContent赋值。缓存处理器在FastAPI 0.141.1 / Starlette 1.6.0中通过精确ETag的200→304和内容变更→200检查；这是临时机制验证，不是已发布的课堂回归包。
 
-**本次课回收的上一次课埋点**：
-- 状态码三大类 → 细化为选择判据（单元 3）
-- 读操作不该用 POST → 用安全/幂等/可缓存三性质给出完整理由（单元 3）
-- "有没有状态码是一条分界线" → 用 HTTP 错误 vs 网络失败重新印证（单元 8）
-- URL `#fragment` 不发给服务器 → 状态载体地图（单元 5）
-
-**本次课埋下、后面回收的点**：见单元 10 的欠账表。其中**必须在课件中做出明显标记、后续课要直接回引**的三处是：
-- 单元 5「Cookie 自动携带」→ 第 15 次课 CSRF 会回到这一页；
-- 单元 6「文件名指纹」→ 第 10 次课打开 `dist/` 时会回到这一页；
-- 单元 8「四种状态 + res.ok」→ 第 12 次课 TanStack Query 会回到这一页说明"库替你做了什么"。
-
-**本次课不承担、请勿提前引入的内容**：CORS 与同源策略的机制（第 12 次课）、Pydantic 与 response_model（第 3 次课）、分层与依赖注入（第 4 次课）、Jinja2 模板与 PRG（第 5 次课）、任何构建工具（第 10 次课）。本次课的前端全部是**手写原生 HTML/JS，无构建步骤**，这是有意的——第 10 次课要让学生对比出"为什么必须构建"。
+最终还要在浏览器核对 defer、Enter/Tab、loading、Offline 恢复、安全文本显示、真实缓存记录。模拟DOM不证明事件载荷在真实浏览器的执行结果；ETag处理器测试不证明浏览器强缓存行为。复位只作用于隔离页面和教学数据，不清空学生整个项目或浏览器其他站点。

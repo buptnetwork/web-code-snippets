@@ -1,750 +1,383 @@
-# 第 5 次课教学底稿
-## 中间件、并发模型、模板与表单闭环 ｜ 交付 M1
+# 第 5 次课教学底稿（修订版）
+## 请求执行方式与 SSR 表单闭环 ｜ 交付 M1
 
----
+## 〇、备课定位与内容取舍
 
-## 〇、给 PPT 制作团队的全局说明
+本课承接第四课的可控重构：同一套业务规则开始服务 JSON 与 HTML 两种客户端，同时检查请求究竟在哪里执行。主线是：**能返回正确结果，还要说明等待发生在哪里、失败如何结束、浏览器下一次会发什么请求。**
 
-本次课 100 分钟，留 5 分钟缓冲。**本次课是四个主题并列，内容量是全课程最大的一次，必须严格控时。** 请在制作时就按下面的分钟数排版，不要让任何一个单元的页数溢出。
+原稿把中间件、四组并发实验、模板、表单、flash 都列为不可压缩的现场任务；加上缓冲实际超过 100 分钟。本版保留完整的机制、分支与课后参考，取消“必须出现固定倍数”“刷新必须插入三条”“常规检查绝不可能发现”的叙事。
 
-**本次课有两个不可压缩的高光**：
+学生不需要先会 React/Vue。课堂使用给定样式和模板骨架，不考 CSS 布局。下面的代码按职责分段，是教学参考，不代表本仓库已经存在独立的第五课演示工程。
 
-1. **并发崩塌定量实验（单元 5，18 分钟）**。这是整门课里"数据说话"最有力的一次。核心不是"异步比同步快"，而是**一个 `async def` 加一句同步阻塞，代码看不出任何问题、单请求测试完全正常、并发一上来吞吐差 50 倍**。请务必把 before/after 数据表做成封面级素材。
-2. **表单闭环与 PRG（单元 8，15 分钟）**。必须现场按 F5 制造出重复发帖，让数据库里真的多出一条。这个"手一抖就多一条"的现场感是说服力的全部。
+### 课堂路线：95 分钟教学 + 5 分钟缓冲
 
-**本次课的课程主题落点**：`async def` + 同步阻塞是 **AI 生成 FastAPI 代码的头号高频错误**，而且它的性质极端恶劣——不报错、不失败、code review 看不出来、单元测试测不出来，只在生产环境的并发峰值下暴露。请在单元 6.4 集中讲这一点，它是本次课与第 0 次课"哪些错误 AI 特别容易犯"的正式接点。
+| 单元 | 分钟 | 课堂处理 |
+|---|---:|---|
+| 一、交付起点与两个现象 | 5 | 教师展示同一业务的两种入口 |
+| 二、解剖台与实验控制 | 8 | 只定位阻塞、POST 结果页两个问题 |
+| 三、中间件与异常路径 | 10 | 教师演示顺序和失败证据；完整代码课后读 |
+| 四、并发模型与调度 | 10 | 主讲框架调度与普通调用的区别 |
+| 五、受控并发实验 | 18 | 学生现场必做；中间停下来核对单请求基线 |
+| 六、端点选择判据 | 8 | 沿一条调用链判断，不盘点全项目 |
+| 七、模板与自动转义 | 10 | 主讲继承、插值、回填和转义 |
+| 八、表单完整闭环 | 20 | 前 10 分钟校验与错误，后 10 分钟提交与 PRG |
+| 九、M1 验收与收尾 | 6 | 展示基础清单，定位课后阅读 |
+| 合计 | 95 | 另留 5 分钟缓冲 |
 
-**若时间不够的压缩顺序**：先压单元 9 的 C 档卡（整体移课后）→ 再压单元 7 的 Jinja2（多数学生有前端基础，可只留自动转义那一页，其余给自读材料）→ 再压单元 3 的中间件顺序演示（第 4 次课已铺好洋葱图，可只讲结论表 + 一次打印验证）。**单元 5、8 不能压缩。**
+**A 档**是所有学生应完成的基础能力，可在课堂、教师演示或课后阅读中获得；**B 档**是选做拓展。flash、CPU、多 worker、纯 ASGI 中间件不占上述主线时间。超时先将中间件完整实现和并发模型跨栈讨论转为课后读，保留并发结果解释与表单两条路径。
 
-**一个需要教师裁决的地方**：单元 3 要把第 4 次课留的"中间件失灵"欠账**完整修好**，而正确的修法需要在两个层次各做一件事（中间件改 `try/finally` + 在 `Exception` handler 里补响应头）。这一段技术链条较深但价值很高。如果你希望简化为只修日志、响应头留到课后，请告知，可省 4 分钟。
+### 跨课交接基线
 
----
+- 保留 `GET /questions`、`GET /questions/{qid}`、`POST /questions` 三个核心 JSON 端点，不要求补回旧稿中的六端点清单。
+- 第三课集合契约为 `QuestionListOut`：`items/total/page`；查询参数统一为 `keyword/page/page_size`，`page_size` 默认 20、上限 50。第四课依赖中的内部 `Page.size` 可以保留，但对外必须接 `page_size`，不能悄悄换成 `size`。
+- 第三课详情/创建响应沿用 `id/title/body/created_at/author`，创建成功为 201。第一课的 `success/data` 是更早阶段，若项目尚未迁移，先记录契约变更并同步客户端，不在实验中混用两种格式。
+- `/healthz` 继续保留：200 为 `{"status":"ok","db":"ok"}`；依赖不可用为 503 和 `{"status":"degraded","db":"down"}`。它不是可选功能，也不强行套业务错误体。
+- JSON 业务错误沿用 `code/message/detail/request_id`；HTML 错误渲染页面，两种表现共用业务异常。未知错误不得暴露 SQL、栈、凭据或用户原始正文。
+- 标题唯一是本课程已有业务约定。不得撤掉它，只为演示刷新造成重复数据。
+- M1 仍使用给定同步持久层；需要查库的端点使用 `def`。复用第三课先 `strip`、后约束的校验器；第八单元展示同一模型如何接入表单，两种入口一起回归。
 
-## 一、开场：把第 4 次课那张洋葱图接回来
+## 一、开场：增加界面，不复制业务
 
-**约 4 分钟。**
+**课堂 5 分钟。**
 
-内容：
+让学生对照一次 JSON 创建和一次 HTML 表单提交：传输格式不同，但“标题长度”“正文长度”“标题冲突”等规则不应复制两份。
 
-**直接把第 4 次课单元 5.5 的洋葱层次图放上来**，不要重画，就用同一张图——这次它是主角。
+```text
+JSON 请求 → JSON 入口 ─┐
+                      ├→ 同一个 schema → service → repository → 数据库
+HTML 表单 → 表单入口 ─┘
+```
 
-第 4 次课我们发现：`AppError` 的处理器让中间件恢复正常了，但真正未预期的异常（`RuntimeError`）会穿透中间件，让日志和响应头都失效。当时的结论是一句判断：
+讲：第四课分层的收益不是保证以后“业务层一行不用改”，而是让变化有边界。新增 HTML 主要改变输入适配和输出表现；合格第四课的 service 已返回DTO，不含HTTP输出或隐藏提交，本课直接复用。若学生实现偏离该基线，先按交接检查修正，不把旧缺陷当作全班共同起点。
 
-> **当你发现"某段代码在某些情况下不执行"，先问它在哪一层，而不是先改它的逻辑。**
+本课结束时应能回答：
 
-今天把这句话做实。然后在同一张图上再加一层理解：**这些层不只有前后顺序，它们还跑在同一个事件循环里——所以其中任何一层阻塞了，整条链上所有请求一起卡住。**
+1. 同步函数何时在线程池，何时仍在事件循环中？
+2. 一次正常请求和一次未知异常，日志与响应头各在哪一层生成？
+3. 表单校验失败怎样保留用户输入？
+4. 成功创建何时才可以发送 303？
+5. PRG 解决什么，不解决什么？
 
-本次课结束时你应当能回答：
+## 二、解剖台：一次只保留一个预期缺陷
 
-- 两个中间件，谁先执行？依据是什么？（现场打印出来看）
-- 为什么第 4 次课那个中间件在异常时失灵，**为什么单改中间件修不好**？
-- `async def` 里写 `time.sleep(1)` 会发生什么？**能定量说出来吗？**
-- 一个新端点，你怎么决定写 `def` 还是 `async def`？
-- HTML 表单提交后按 F5，为什么会多发一条？303 凭什么能解决它？
-- 校验失败时为什么**不能**重定向？
+**课堂 8 分钟。** 故障代码是人为控制的教学样例，不宣称来自某次真实 AI 输出。真实 AI 产物需另外保存来源和上下文。
 
-讲：
-
-> 今天这节课有一个特点：**前四次课讲的都是"正确性"，今天有一半在讲"能不能扛住"。**
->
-> 这两件事的失败方式完全不同。正确性错了，你会看到报错、看到 422、看到错误的数据。**扛不住这件事不报错——它在你的开发机上完全正常，在演示时完全正常，在只有你一个人用的时候完全正常。**
->
-> 所以今天我要教你的不是"怎么写异步"，是**怎么把这类看不见的问题变成一张有数字的表**。
-
----
-
-## 二、解剖台：两个不报错的 bug
-
-**约 10 分钟。**
-
-### 情境设定
-
-> 这是你第 4 次课重构后的项目，加上了两个新东西：一个"发帖"的 HTML 页面，一个"抓取外部链接标题"的辅助端点。AI 帮你写的，你测了，都对。
->
-> 然后：
-> 第一，你把项目发给三个同学一起试用。**三个人同时点一下，页面转圈 3 秒才出来。** 你自己一个人测的时候是 0.1 秒。
-> 第二，有个同学发了一条问题，网络卡了一下，他按了 F5。**数据库里现在有三条一模一样的问题。**
-
-### 代码（tag: `v5-broken`，可运行，两个问题均可稳定复现）
+### 2.1 阻塞反例
 
 ```python
-# app/routers/questions.py —— AI 补出来的两个端点
-import time, requests
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.templating import Jinja2Templates
+import time
+from fastapi import APIRouter
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
-
-@router.get("/questions/{qid}/link-title")
-async def fetch_link_title(qid: int, conn=Depends(get_conn)):
-    q = svc.get(conn, qid)
-    resp = requests.get(q.link_url, timeout=5)      # ← 同步 HTTP 调用
-    return {"title": parse_title(resp.text)}
-
-
-@router.get("/ui/questions/new")
-async def new_question_page(request: Request):
-    return templates.TemplateResponse(
-        "question_form.html", {"request": request, "errors": {}, "values": {}})
-
-
-@router.post("/ui/questions")
-async def submit_question(
-    request: Request,
-    title: str = Form(...),
-    body: str = Form(...),
-    conn=Depends(get_conn),
-):
-    q = svc.create(conn, title, body, author_id=1)
-    # 直接把详情页渲染出来返回
-    return templates.TemplateResponse(
-        "question_detail.html", {"request": request, "q": q})
+@router.get("/lab/a")
+async def blocking_wait():
+    time.sleep(0.5)
+    return {"ok": True}
 ```
 
-```html
-<!-- app/templates/question_detail.html —— 节选 -->
-<h1>{{ q.title }}</h1>
-<div class="body">{{ q.body | safe }}</div>     <!-- ← 记住这里 -->
-```
+单请求看似正常；多请求共享一个 worker 时，等待期间事件循环不能处理其他任务。延迟可能影响同 worker 的健康检查，但多 worker 或独立探针会改变现象，不能推广成“整个部署必然挂掉”。
 
-### 现场演示顺序
+本例不查询数据库、不抓真实网址，不需要不存在的 `link_url` 字段。`time.sleep` 只模拟同步等待；真实调用还要考虑超时、连接池、失败与限流。
 
-**第一个：三个人一起点，就慢了**
-
-先单请求：
-
-```bash
-time curl -s localhost:8000/questions/1/link-title > /dev/null
-# real 0m0.52s   ← 正常
-```
-
-再三个并发：
-
-```bash
-for i in 1 2 3; do curl -s localhost:8000/questions/1/link-title & done; wait
-# 最后一个：1.6s
-```
-
-提问：**这个端点的代码里，哪一行导致了这个现象？**
-
-学生通常答不出来，或者猜"是 requests 慢"。指出：
-
-> `requests.get` 本身的耗时没变，还是 0.5 秒。变的是**第二个和第三个请求要排队等第一个**。
->
-> 而且注意：这个函数写的是 `async def`——它看起来是异步的，是"高并发"的写法。**它恰恰是最糟的组合。** 单元 5 会用数字把这件事说清楚。
-
-再追加一个更隐蔽的观察：
-
-> 更糟的是：现在卡住的**不只是这个端点**。三个人在抓链接标题的时候，你去访问 `/healthz`——它也卡住了。
->
-> **一个端点的阻塞，会让整个服务的所有端点一起变慢。** 这一条要记住，单元 4 会解释为什么。
-
-**第二个：F5 就多一条**
-
-在浏览器里打开发帖页，填好，提交。页面显示详情。
-
-**然后按 F5。**
-
-浏览器弹出"确认重新提交表单？"，点确定。**数据库里多了一条。** 再按一次，第三条。
-
-```sql
-SELECT id, title, created_at FROM questions ORDER BY id DESC LIMIT 3;
---  9 | 怎么学 React | 2025-03-20 10:22:31.442
---  8 | 怎么学 React | 2025-03-20 10:22:28.105
---  7 | 怎么学 React | 2025-03-20 10:22:24.887
-```
-
-> 注意这个 bug 的性质：**代码没有任何错误。** POST 处理正确、校验正确、入库正确、返回的 HTML 正确。
->
-> 错的是**它对浏览器行为的假设**。浏览器认为"当前页面是一次 POST 的结果"，所以刷新就是重发那次 POST。这是浏览器的正确行为，是我们没有告诉它该怎么办。
-
-**第三个（不在情境里，顺手指出）**
-
-把详情页模板里的 `{{ q.body | safe }}` 高亮：
-
-> 记住这个 `| safe`。今天单元 7 会讲它关掉了什么，**第 15 次课会用它演示一次完整的 XSS**。今天先把它当成一笔欠账记下。
-
-### 顺手回收第 4 次课的成果（**这一段请务必保留，它是对上次课的正向反馈**）
-
-> 在进入正题之前，我要你们注意一件事。
->
-> 刚才那个 `submit_question`，它处理的是 **HTML 表单**，不是 JSON。它的 Content-Type 是 `application/x-www-form-urlencoded`，参数用 `Form(...)` 接，返回的是 HTML 不是 JSON。**这是一个和之前六个端点完全不同的客户端。**
->
-> 但你看这一行：
->
-> ```python
-> q = svc.create(conn, title, body, author_id=1)
-> ```
->
-> **和 JSON 端点调的是同一个 service 函数。** 业务规则（标题不能重复）、数据访问、事务边界，一行都没有重写。
->
-> 这就是第 4 次课分层的回报。当时我说"分层的回报全在被修改这件事上"——今天是第一次兑现：**加一个全新的客户端类型，`services/` 和 `repositories/` 零改动。**
-
-### 欠账清单
-
-| 发现的问题 | 本次课处理 | 何时还 |
-|---|---|---|
-| `async def` 里调同步阻塞 | **单元 5、6 回收** | — |
-| 一个端点阻塞拖垮全服务 | **单元 4 解释** | — |
-| POST 后直接返回 HTML → 刷新重复提交 | **单元 8 回收** | — |
-| 第 4 次课：中间件在未预期异常下失灵 | **单元 3 回收** | — |
-| `\| safe` 关掉了自动转义 | 单元 7 指出机制 | **第 15 次课**（XSS 完整演示） |
-| `author_id=1` 硬编码 | 记一笔 | 第 14 次课 |
-| 表单提交没有防重放/防 CSRF | 记一笔 | 第 15 次课 |
-| 外部 HTTP 调用没有重试与熔断 | 记一笔 | 第 16 次课 |
-
----
-
-## 三、现场必做 A：中间件的顺序，以及把欠账彻底修好
-
-**约 12 分钟。**
-
-### 3.1 先做一个预测题
-
-现场加两个中间件，**注意书写顺序**：
+### 2.2 POST 直接返回详情页
 
 ```python
-# app/main.py
+# 预期缺陷片段：其余校验、事务和错误处理沿用修复版。
+# 创建成功后仍返回 POST 的结果页，而不是重定向。
+return templates.TemplateResponse(
+    request=request,
+    name="question_detail.html",
+    context={"q": question},
+)
+```
+
+在 Network 中保留日志，提交后刷新，观察浏览器是否确认重发 POST。浏览器行为可能不同，备用证据使用预录记录；手工重发请求只能证明重放后果，不能冒充浏览器 F5 证据。
+
+**本项目的预期**：第一次创建成功，再次同标题 POST 应被业务规则或数据库唯一约束挡住，返回 409。问题仍是浏览器停留在 POST 结果页，重复发送写请求；不是要求数据库一定新增重复行。
+
+讲：单次成功断言没有覆盖并发或重放场景，但代码审查、针对性的静态规则、并发测试和失败路径测试都可能发现这些问题。不把“现有检查未覆盖”说成“检查不可能发现”。
+
+## 三、中间件：顺序与异常不是同一个问题
+
+**课堂 10 分钟，完整实现为 A 档课后阅读。**
+
+### 3.1 先打印顺序
+
+```python
 @app.middleware("http")
-async def mw_a(request: Request, call_next):
+async def mw_a(request, call_next):
     print("A enter")
-    resp = await call_next(request)
+    response = await call_next(request)
     print("A exit")
-    return resp
+    return response
 
 @app.middleware("http")
-async def mw_b(request: Request, call_next):
+async def mw_b(request, call_next):
     print("B enter")
-    resp = await call_next(request)
+    response = await call_next(request)
     print("B exit")
-    return resp
+    return response
 ```
 
-提问（让学生举手表决）：**打印顺序是什么？**
+正常响应的顺序为 `B enter → A enter → A exit → B exit`。最后注册的是最外面的**用户中间件**，不是整个应用的最外层。
 
-多数人会猜 `A enter → B enter → B exit → A exit`（按书写顺序）。
-
-实际输出：
-
-```
-B enter
-A enter
-A exit
-B exit
+```text
+ServerErrorMiddleware（未知异常的兜底响应）
+  → 用户中间件 B
+    → 用户中间件 A
+      → ExceptionMiddleware（已注册业务异常、HTTP 错误）
+        → 路由 / 依赖 / 端点
 ```
 
-### 3.2 打印出来看（延续第 3、4 次课的同一个动作）
+对于未知异常，`call_next` 可能抛出而不是返回响应。先定位边界，再决定改什么。认证授权依赖适合本课程的按端点需求，但并非所有系统都禁止认证中间件。
+
+### 3.2 日志与响应头分别处理
+
+以下适用于普通非流式响应，且 `debug=False`。第四课已给出最小finally日志和500补头，本课深化顺序并新增HTML错误表现；不要同时安装两份关联中间件或撤回学生已有正确实现。沿用第一课 request-id（含合法点号）：接受符合约束的标识，否则重新生成；不把不可信长字符串直接写日志。
 
 ```python
-for i, mw in enumerate(app.user_middleware):
-    print(i, mw.cls.__name__, mw.kwargs.get("dispatch", None))
-```
+import logging
+import re
+import time
+import uuid
+from fastapi import Request
+from fastapi.responses import HTMLResponse, JSONResponse
 
-输出：
+logger = logging.getLogger("app.requests")
+RID = re.compile(r"[A-Za-z0-9._-]{1,64}\Z")
 
-```
-0 BaseHTTPMiddleware  <function mw_b at 0x...>     ← 后写的在索引 0
-1 BaseHTTPMiddleware  <function mw_a at 0x...>
-```
-
-**结论（醒目页）**：
-
-> **`add_middleware`（以及 `@app.middleware`）是往列表头部插入的。所以：**
->
-> **最后注册的中间件在最外层，请求最先经过它，响应最后经过它。**
->
-> 这和你的直觉相反，也和路由的规则相反（第 3 次课：路由是**先注册先匹配**）。**同一个框架里两套顺序语义，必须分别记。**
-
-把第 4 次课的洋葱图补全成本次课的版本：
-
-```
-   ┌────────────────────────────────────────────────┐
-   │ ServerErrorMiddleware        （框架，最外）      │  ← Exception handler 在这层
-   │ ┌────────────────────────────────────────────┐ │
-   │ │ mw_b        （最后注册）                    │ │
-   │ │ ┌────────────────────────────────────────┐ │ │
-   │ │ │ mw_a      （先注册）                    │ │ │
-   │ │ │ ┌────────────────────────────────────┐ │ │ │
-   │ │ │ │ ExceptionMiddleware （框架）         │ │ │ │  ← AppError / 422 handler 在这层
-   │ │ │ │ ┌────────────────────────────────┐ │ │ │ │
-   │ │ │ │ │ 路由 → 依赖 → 端点              │ │ │ │ │
-   │ │ │ │ └────────────────────────────────┘ │ │ │ │
-   │ │ │ └────────────────────────────────────┘ │ │ │
-   │ │ └────────────────────────────────────────┘ │ │
-   │ └────────────────────────────────────────────┘ │
-   └────────────────────────────────────────────────┘
-```
-
-### 3.3 顺序判据
-
-| 中间件 | 应该在 | 理由 |
-|---|---|---|
-| CORS | **最外层**（最后注册） | 预检请求 OPTIONS 要在任何其他逻辑之前被应答；出错的响应也必须带 CORS 头，否则浏览器连错误信息都读不到 → **第 12 次课会现场踩这个坑** |
-| request-id / 日志 | 靠外（早注册？不，靠外 = 晚注册） | 要覆盖尽可能多的请求，包括 404 |
-| GZip | 靠内于 CORS | 要压缩最终响应体 |
-| 认证 | **不要写成中间件** | 回收第 4 次课单元 8 的判据 |
-
-> 判据：**"要对所有请求生效、要改响应"的往外放；"只关心业务"的往内放或者别写成中间件。**
-
-### 3.4 修好第 4 次课的欠账（**本单元的核心**）
-
-回顾病情：`RuntimeError` 时，中间件的日志不打印、`X-Request-Id` 响应头没有。
-
-**先试最直觉的修法：try/finally。**
-
-```python
 @app.middleware("http")
 async def timing(request: Request, call_next):
-    rid = uuid.uuid4().hex[:12]
+    incoming = request.headers.get("X-Request-ID", "")
+    rid = incoming if RID.fullmatch(incoming) else uuid.uuid4().hex
     request.state.request_id = rid
-    t0 = time.perf_counter()
+    started = time.perf_counter()
+    outcome = "error"
+    logger.info("[%s] --> %s %s", rid, request.method, request.url.path)
     try:
         response = await call_next(request)
-        response.headers["X-Request-Id"] = rid
+        outcome = str(response.status_code)
+        response.headers["X-Request-ID"] = rid
         return response
     finally:
-        cost = (time.perf_counter() - t0) * 1000
-        logger.info("rid=%s %s %s %.1fms", rid, request.method,
-                    request.url.path, cost)
-```
+        logger.info("[%s] <-- %s %.1fms", rid, outcome,
+                    (time.perf_counter() - started) * 1000)
 
-重新触发 `RuntimeError`，观察：
-
-- 日志 ✅ **打印了**
-- 响应头 ❌ **还是没有**
-
-**停下来提问：为什么响应头还是没有？**
-
-引导回那张洋葱图：
-
-> 异常从端点抛出，穿过 `ExceptionMiddleware`（没有匹配的 handler），穿过我们的中间件（`finally` 执行了日志），到达 `ServerErrorMiddleware`。
->
-> **500 响应是 `ServerErrorMiddleware` 生成并发出的——它在我们外层。** 那个响应对象从来没有经过我们的中间件，我们根本碰不到它。
->
-> 所以：**这个问题的两半发生在两个不同的层次，只在一个层次修是不够的。**
-
-**正确的修法：在异常处理器里补。**
-
-```python
-# app/exception_handlers.py —— 改第 4 次课写的兜底处理器
 @app.exception_handler(Exception)
 async def handle_unexpected(request: Request, exc: Exception):
-    rid = getattr(request.state, "request_id", "-")
-    logger.exception("unhandled rid=%s", rid)
+    rid = getattr(request.state, "request_id", uuid.uuid4().hex)
+    logger.error("unhandled rid=%s", rid,
+                 exc_info=(type(exc), exc, exc.__traceback__))
+    headers = {"X-Request-ID": rid}
+    if request.url.path.startswith("/ui/"):
+        return HTMLResponse("服务器内部错误，请稍后重试。", 500, headers=headers)
     return JSONResponse(
         status_code=500,
-        content=_body("internal_error", "服务器内部错误", None, rid),
-        headers={"X-Request-Id": rid},          # ← 补这一行
+        content={"code": "internal_error", "message": "服务器内部错误",
+                 "detail": None, "request_id": rid},
+        headers=headers,
     )
 ```
 
-再测一次：日志 ✅、响应头 ✅、响应体里有 request_id ✅。
+教师在隔离副本分两步复演：只加 `finally` 时日志恢复，外层生成的 500 不一定带头；再由兜底处理器添加头。业务 409 则由内层处理器转响应，正常经过用户中间件。主线保留第四课已正确的配对日志与补头；日志中的error表示未拿到响应，不是假定实际HTTP状态。
 
-**三行结论（醒目页）**：
+边界必须留在学生可读正文中：
 
-> 1. **中间件能保证"我的代码一定执行"（`try/finally`），但不能保证"我能拿到响应"。**
-> 2. 未预期异常的响应由外层框架生成，**要改它只能在异常处理器里改**。
-> 3. 所以一条横切逻辑，有时候**必须在中间件和异常处理器两处各写一半**。
+- 这里计时截至拿到响应或异常，不等于流式响应体完整发送时间。
+- `finally` 覆盖正常 Python 控制流中的退出；进程强制终止等不能据此保证日志落盘。
+- 响应已经开始发送后再发生错误，不能重新发送一份 JSON 500；后台任务失败也不能改写已发响应。
+- 自定义纯 ASGI 外包装也可统一处理响应头，兜底处理器不是唯一方案。
+- 日志中记录内部栈仍需权限、脱敏和保留策略，不因“不发给客户端”就可任意记录敏感信息。
 
-〔C 档一句话：如果不想在两处重复写，可以用 `contextvars` 存 request_id，日志和处理器都从 contextvar 里读，不依赖 `request.state` 传递。这在有后台任务、有多层调用时更干净。课后自读。〕
+### 3.3 CORS 与上下文：导读，不在本课搭跨域项目
 
-### 3.5 顺手提一个坑
-
-> `@app.middleware("http")` 用的是 `BaseHTTPMiddleware`，它有若干已知的边角问题（读取请求体后端点读不到、和流式响应交互异常、有额外的任务开销）。
->
-> 本课程规模下它够用。但你如果看到有人写"纯 ASGI 中间件"（直接 `async def __call__(self, scope, receive, send)`），**那不是在炫技，是在避开这些坑**。第 3 次课那 8 行裸 ASGI 应用就是它的骨架。
-
-### 材料
-
-- tag `v5-broken`（起始）、`v5-middleware`（本单元结束）。
-- 截图：`app.user_middleware` 的打印输出；两个中间件的 enter/exit 打印顺序。
-- **高光图**：补全版洋葱图（六层），需与第 4 次课那张同风格、可叠加对照。
-- 截图：try/finally 修法下"日志有、响应头无"的对照（curl -i 输出 + 终端日志同屏）。
-
----
-
-## 四、三种并发模型：一句话结论
-
-**约 10 分钟。这一单元是单元 5 实验的理论准备，请控制在 10 分钟，不要展开。**
-
-### 4.1 WSGI 与 ASGI 的一句话差别
-
-把第 3 次课那 8 行裸 ASGI 应用调出来，旁边放 WSGI 版本：
+`app.add_middleware(CORSMiddleware, ...)` 仍在 `ServerErrorMiddleware` 内部。若跨域客户端也必须读取外层产生的 500，可在全部路由注册后包装整个应用：
 
 ```python
-# WSGI：一次函数调用完成一个请求
-def app(environ, start_response):
-    start_response("200 OK", [("Content-Type", "text/plain")])
-    return [b"hello"]
+from starlette.middleware.cors import CORSMiddleware
 
-# ASGI：一个协程，可以在 await 处让出控制权
-async def app(scope, receive, send):
-    await send({"type": "http.response.start", "status": 200, "headers": [...]})
-    await send({"type": "http.response.body", "body": b"hello"})
+# api 是已经注册路由与异常处理器的 FastAPI 实例。
+app = CORSMiddleware(
+    app=api,
+    allow_origins=["https://ui.example.com"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+    expose_headers=["X-Request-ID"],
+)
 ```
 
-**一句话结论（醒目页）**：
+只允许指定源，不为课堂方便开放带凭据的任意跨域。第十二课再做浏览器读取错误响应的完整实验。
 
-> **WSGI 的函数一旦开始执行就必须跑完，期间它占着一个线程。**
->
-> **ASGI 的协程可以在 `await` 处暂停、把线程让给别的请求、等结果回来再继续。**
->
-> 所以 ASGI 能用一个线程处理成百上千个"正在等 IO"的请求——**前提是它们真的在 `await`，而不是在阻塞。**
+`BaseHTTPMiddleware` 有任务与上下文传播边界，具体行为需按版本验证，不沿用“读一次 body 端点就必然读不到”的笼统结论。`contextvars` 也不是跨任务、跨进程、后台任务的万能传值机制。纯 ASGI 改写为 B 档阅读。
 
-最后半句要重读，它是今天所有问题的根源。
+## 四、并发模型：先区分调度者
 
-### 4.2 三种模型的结论表（**本单元核心，做成一页**）
+**课堂 10 分钟。**
 
-| 模型 | 一个"执行单元"处理 | 切换由谁决定 | 并发上限受限于 | 适合 |
-|---|---|---|---|---|
-| **多进程** | 1 个请求 | 操作系统 | 内存（每进程几十 MB） | CPU 密集；隔离性要求高 |
-| **线程池** | 1 个请求 | 操作系统（可抢占） | 线程数（默认几十） | **阻塞的 IO 调用**（同步库） |
-| **事件循环** | 成百上千个请求 | **代码自己**（`await` 处让出） | 单核 CPU | **await 的 IO 调用**（异步库） |
-
-**三个必须点出来的推论**：
-
-1. **事件循环是协作式的。** 它靠你在 `await` 处主动让出。**你不 await，它就没有任何办法把线程拿回来**——没有超时、没有抢占、没有报错。这是单元 5 崩塌的机制。
-2. **CPU 密集在三种模型里都只能靠多进程。** 线程池救不了（Python 的 GIL），事件循环更救不了。判据：**如果一段代码在算而不是在等，那只有进程数能提升它的吞吐。**
-3. **uvicorn 单 worker 就是一个事件循环 + 一个线程池。** 这解释了解剖台第一个现象的后半段——为什么 `/healthz` 也卡住了：**它们共享同一个事件循环，循环被占死，谁都别想走。**
-
-### 4.3 FastAPI 的调度规则（**这是本课最关键的一条机制**）
-
-做成醒目页，字要大：
-
-> **你写 `async def`，框架把你的函数放进事件循环里执行。**
-> **你写 `def`，框架把你的函数扔进线程池里执行。**
->
-> 依赖函数也一样，各自独立判断。
-
-四种组合的后果：
-
-| 你写的 | 你调用的 | 结果 |
+| 模型 | 核心机制 | 主要限制 |
 |---|---|---|
-| `def` | 同步阻塞 | ✅ 正确：阻塞发生在线程池，事件循环不受影响 |
-| `async def` | `await` 异步库 | ✅ 正确：在 await 处让出，并发能力最强 |
-| `async def` | **同步阻塞** | ❌ **灾难：阻塞发生在事件循环里，整个服务串行化** |
-| `def` | `await`（`asyncio.run`） | ❌ 报错或行为异常，不要这么写 |
+| 进程 | 独立内存与执行环境；每进程仍可有事件循环和线程池 | CPU 配额、内存、各进程数据库连接池总量 |
+| 线程池 | 同步等待占住线程，但事件循环可以继续处理其他任务 | 容量令牌、线程资源、下游连接与并发限制 |
+| 事件循环 | 协程在可挂起的等待点让出执行权 | 循环上的 CPU 工作、阻塞调用、连接数和下游能力 |
 
-> 第三行就是解剖台那个 bug，也是单元 5 要量化的对象。
->
-> 请注意它为什么危险：**它不报错。** 其他三种组合里，错的那种会直接报错让你发现。**只有这一种，Python 没有任何办法知道你调用的函数是不是阻塞的。**
+它们可以组合，不能把“一个进程”画成“只能处理一个请求”。WSGI 是同步调用接口，ASGI 是异步消息接口；协议本身不替应用决定 worker 数和数据库调用方式。
 
----
+### 4.1 FastAPI 的规则及适用范围
 
-## 五、现场必做 B：并发崩塌定量
-
-**约 18 分钟。本次课最高光，绝对不能压缩。**
-
-### 5.1 实验设计（先讲清设计，再跑）
-
-三个端点，**业务逻辑完全等价**：都"等 0.5 秒然后返回"。
+- **由框架调用的**同步端点与同步依赖，通常在线程池中执行。
+- 异步端点/异步依赖在事件循环中执行；可挂起的异步 I/O 才能让其他任务前进。不是每个 `await` 都一定发生切换。
+- **你直接调用的普通函数**仍在当前执行位置运行。`async def` 里调用 `svc.get()`，不会因为 `get` 是 `def` 就自动进入线程池。
 
 ```python
-# app/routers/lab.py —— 实验端点
-import time, asyncio
+# 错误示意：同步查询发生在事件循环线程。
+async def bad_endpoint():
+    return sync_repository_query()
 
-@router.get("/lab/a")                      # 组合三：灾难
-async def a():
-    time.sleep(0.5)
-    return {"mode": "async def + time.sleep"}
-
-@router.get("/lab/b")                      # 组合二：正确
-async def b():
-    await asyncio.sleep(0.5)
-    return {"mode": "async def + await"}
-
-@router.get("/lab/c")                      # 组合一：正确
-def c():
-    time.sleep(0.5)
-    return {"mode": "def + time.sleep"}
-
-@router.get("/lab/d")                      # CPU 密集对照
-def d():
-    t0 = time.perf_counter()
-    while time.perf_counter() - t0 < 0.5:  # 忙等，模拟计算
-        pass
-    return {"mode": "def + CPU bound"}
+# 同步栈的简洁选择：框架将端点放入线程池。
+def sync_endpoint():
+    return sync_repository_query()
 ```
 
-**服务启动参数（必须固定，否则数据不可比）**：
+### 4.2 CPU 与等待不能混为一谈
+
+通常启用 GIL 的 CPython 中，多个线程不能同时执行大量 Python 字节码；线程池可隔离阻塞等待，却不保证纯 Python 计算吞吐增加。原生扩展可能释放 GIL，其他运行时也可能不同。
+
+CPU 工作应先优化算法或用合适的原生实现，再考虑进程池、后台任务和资源预算。即使放到线程池，长计算仍可能通过 CPU 争抢影响服务；不能把它说成万能修复。
+
+## 五、现场必做：三种等待，同一份测量
+
+**课堂 18 分钟。** 先单请求，再提高并发；先保证响应正确，再解释数字。
+
+### 5.1 对照代码
+
+在第二单元 `/lab/a` 之外加两条，三条返回完全相同的响应：
+
+```python
+import asyncio
+
+@router.get("/lab/b")
+async def async_wait():
+    await asyncio.sleep(0.5)
+    return {"ok": True}
+
+@router.get("/lab/c")
+def thread_wait():
+    time.sleep(0.5)
+    return {"ok": True}
+```
+
+实验工程只在本地开启 `/lab/*`，不注册到最终交付或公开服务。参考启动命令供独立演示工程使用：
 
 ```bash
 uvicorn app.main:app --workers 1 --log-level warning
 ```
 
-> **`--workers 1` 是这个实验的前提。** 多 worker 会把崩塌掩盖掉一部分，让你以为问题没那么严重——**而这正是很多团队在生产环境里"感觉还行"的原因：他们用多 worker 掩盖了单 worker 的串行化。**
+不启用 reload；使用同一机器、相同 Python/依赖锁定版本、相同客户端连接池。脚本必须复用客户端，不把建连接时间差异混成服务端性能。
 
-压测脚本（课程提供，避免装工具）：
+### 5.2 测量协议
+
+课程制作阶段需提供并验证 `bench.py`，不能把下列文件名当成本仓库已有命令。参数协议：URL、并发、请求总数；输出总时长、成功/失败/超时数、吞吐、成功请求延迟 p50/p95。
 
 ```bash
-python scripts/bench.py --url http://localhost:8000/lab/a --concurrency 1  --total 8
-python scripts/bench.py --url http://localhost:8000/lab/a --concurrency 10 --total 40
-python scripts/bench.py --url http://localhost:8000/lab/a --concurrency 50 --total 200
-# 对 b / c / d 重复
+python scripts/bench.py --url http://127.0.0.1:8000/lab/a --concurrency 1 --total 20
+python scripts/bench.py --url http://127.0.0.1:8000/lab/a --concurrency 10 --total 20
 ```
 
-脚本输出：总耗时、吞吐（req/s）、p50、p95。
+对 b、c 重复，得到六组。每个请求从实际开始发送到响应体读完计时；并发控制器的等待不混入单请求延迟，总时长则包括整批排队。超时单独计数，不能删掉失败后声称 p95 很低。基础实验客户端超时建议 30 秒。
 
-### 5.2 先跑并发 1（**这一步是整个实验的关键，不要跳**）
+| 端点 | worker | 并发 | 总请求 | 成功/失败/超时 | 总时长 | 成功吞吐 | p50/p95 |
+|---|---:|---:|---:|---|---|---|---|
+| a / b / c | 1 | 1 / 10 | 20 | 实测 | 实测 | 实测 | 实测 |
 
-```
-/lab/a  concurrency=1  →  2.0 req/s   p50 502ms   p95 508ms
-/lab/b  concurrency=1  →  2.0 req/s   p50 501ms   p95 505ms
-/lab/c  concurrency=1  →  2.0 req/s   p50 503ms   p95 511ms
-```
+这是一张**待填表**，不是已测数据。课堂单轮用于观察；要下性能结论，预热后多轮重复并记录波动。少量样本的 p95 只作说明，不当作生产容量报告。
 
-**停在这里，把三行数据留在屏幕上，然后说**：
+### 5.3 如何解释，而不是背倍数
 
-> 三个端点，**在并发 1 下的表现完全一样**。
->
-> 这意味着：
-> - 你在开发机上点一下，测不出来；
-> - 你写一个单元测试断言"响应时间小于 1 秒"，测不出来；
-> - 你做 code review，看到 `async def` 觉得挺现代的，看不出来；
-> - **你把这段代码给 AI 看，问它"有没有性能问题"，它也未必看得出来——因为它不知道 `parse_title` 里那个 `requests.get` 是同步的。**
->
-> **这类 bug 的定义就是：在你能做的所有常规检查里，它都是好的。**
+- 单并发时主要在等 0.5 秒，因此三个版本可能接近。
+- 忽略开销的理想模型中，a 的吞吐约受 `1 / 0.5s` 限制；真实结果还受网络、队列和计时方式影响。
+- b 可以同时等待；c 由线程池容纳多个同步等待。二者都受客户端和服务端容量约束，不能直接宣称异步总更快。
+- AnyIO 默认通常有 40 个线程容量令牌，它不是本实验永久固定的线程数，且可能被其他同步工作共享。读取实际配置再解释瓶颈。
+- 如果数据不符合预期，先核对进程数、实验代码、请求总数、超时和测量方法；不以偏离某个百分比直接判定实验错误。
 
-### 5.3 提升并发，看崩塌
+讲：有说服力的是“受控变量 + 可重复证据 + 机制解释”，不是在对照图上预先写好 47 倍。
 
-**填这张表（这是本次课的封面级素材）**：
+## 六、把实验结论带回项目
 
-| 端点 | 组合 | 并发 1 | 并发 10 | 并发 50 | 并发 50 的 p95 |
-|---|---|---|---|---|---|
-| `/lab/a` | `async def` + `time.sleep` | 2.0 req/s | **2.0** | **2.0** | **≈ 25 s** |
-| `/lab/b` | `async def` + `await` | 2.0 | 19.6 | **95** | **≈ 0.52 s** |
-| `/lab/c` | `def` + `time.sleep` | 2.0 | 19.6 | **76** | **≈ 0.65 s** |
-| `/lab/d` | `def` + CPU 忙等 | 2.0 | **2.0** | **2.0** | ≈ 25 s |
+**课堂 8 分钟；CPU 与 worker 计算课后自学。**
 
-〔制作团队请在演示机上实测填入真实数据，上表为理论预期值，用于校验实验是否正确搭建。允许 ±20% 偏差；若 `/lab/a` 在并发 50 下吞吐明显高于 2.0，说明 worker 数没设成 1。〕
+### 6.1 选择判据
 
-**四条观察，逐条讲**：
+| 调用链 | 本课程选择 | 需要复查的条件 |
+|---|---|---|
+| 同步 SQLAlchemy、同步 SDK、阻塞文件 I/O | `def` 端点/依赖 | 线程与连接池是否饱和；是否有线程亲和要求 |
+| 原生异步 I/O，正确使用异步驱动 | `async def` + `await` | 是否还藏着同步查询或长计算 |
+| 很短的纯内存处理 | 均可，保持项目一致性 | 不为“更现代”改写 |
+| 长时间 CPU 工作 | 单独评估算法、进程或任务系统 | 不靠改成 `async def` 解决 |
 
-**观察一：`/lab/a` 的吞吐完全不随并发增长，恒定在 2.0。**
+只把 `requests` 换为 `httpx.AsyncClient`，但保留同步 `conn.execute()`，不是“全程异步”。已有同步项目不必因此整栈迁移。
 
-> 2.0 req/s = 1 / 0.5s。**这就是完全串行。** 50 个并发请求，它一个一个做，最后一个等了 25 秒。
->
-> 事件循环被 `time.sleep` 占死了，期间它不能接受新连接、不能处理别的请求、不能响应健康检查。**服务在这 25 秒里对外表现为"挂了"。**
-
-**观察二：`/lab/a` 和 `/lab/b` 的代码差别有多小。**
-
-把两段代码并排放大：
-
-```python
-async def a():
-    time.sleep(0.5)            # 差别就在这一行
-
-async def b():
-    await asyncio.sleep(0.5)
-```
-
-> **一个 `await`，五个字符，吞吐差 47 倍，p95 差 48 倍。**
->
-> 这是我今年最想让你们记住的一张对照图。
-
-**观察三：`/lab/c` 也很好，但有上限（76 而不是 95）。**
-
-> `def` 端点跑在线程池里，线程池默认大小约 40（AnyIO 默认值）。所以上限约 40 / 0.5s = 80 req/s。
->
-> 并发 50 时有一小部分请求要排队等线程，所以 p95 略高于 0.5 秒。
->
-> **结论：`def` + 同步阻塞是"正确且够用"，不是"最优"。** 它的天花板是线程池大小；异步的天花板是单核 CPU。对本课程规模，两者都远远够。
-
-**观察四：`/lab/d` 写的是 `def`，为什么也崩了？**
-
-> 因为它**不在等，它在算**。线程池有 40 个线程，但 Python 的 GIL 让它们没法真正并行执行 Python 字节码。
->
-> **判据：`def` 能救"阻塞的等待"，救不了"CPU 密集的计算"。** 后者只有两条路：换进程（`ProcessPoolExecutor` 或多 worker）、或者把这件事移出请求路径（放进任务队列 → 第 16 次课）。
-
-### 5.4 修复解剖台的那个端点
-
-```python
-# 修法一：改成 def，让框架放线程池（最小改动，本课程首选）
-@router.get("/questions/{qid}/link-title")
-def fetch_link_title(qid: int, conn=Depends(get_conn)):
-    q = svc.get(conn, qid)
-    resp = requests.get(q.link_url, timeout=5)
-    return {"title": parse_title(resp.text)}
-```
-
-```python
-# 修法二：全程异步（要换库：requests → httpx.AsyncClient）
-@router.get("/questions/{qid}/link-title")
-async def fetch_link_title(qid: int, conn=Depends(get_conn)):
-    q = svc.get(conn, qid)
-    async with httpx.AsyncClient(timeout=5) as client:
-        resp = await client.get(q.link_url)
-    return {"title": parse_title(resp.text)}
-```
-
-**必须点出修法二的隐藏代价**（这是一次取舍训练）：
-
-> 修法二看起来更"正确"，但注意它要求什么：
->
-> - `requests` 换成 `httpx`——一个新依赖；
-> - 这个端点还依赖 `get_conn`，而我们的数据库连接是**同步的 SQLAlchemy**。也就是说这个 `async def` 端点里还藏着一个同步阻塞（那次数据库查询）；
-> - 要彻底异步，数据库也得换成 `asyncpg` + SQLAlchemy 的异步引擎，那意味着 `deps.py`、`repositories/` 全部要改。
->
-> **判据：异步是全链路的。链上有一环是同步的，整条链的收益就打折甚至归零。**
->
-> 所以本课程的选择是**修法一**：项目是同步栈，端点就写 `def`。这不是将就，这是一致性。
->
-> 〔什么时候值得上全异步栈：单机需要扛数千并发长连接、或大量外部 HTTP 调用。不是"因为异步更现代"。〕
-
-### 5.5 B 档作业的起点
-
-> 作业里你要重跑这个实验，并且加一组：**把 `--workers 1` 改成 `--workers 4`，重测 `/lab/a`。**
->
-> 先预测：吞吐会变成多少？为什么？**这个预测是作业的一部分。**
-
-### 材料
-
-- `scripts/bench.py`：httpx + asyncio 压测脚本，参数 `--url --concurrency --total`，输出吞吐/p50/p95，**必须在三种操作系统上验证可跑**。
-- tag `v5-lab`：含四个实验端点。
-- **封面级素材**：5.3 那张四行五列的数据表，`/lab/a` 那一行的三个 2.0 用红色高亮。
-- **封面级素材**：`a()` 与 `b()` 两段代码并排图，差异行高亮，下方标注"47×"。
-- 截图：并发 1 下三个端点数据完全相同的终端输出（**这张图的说服力可能比崩塌图更大**）。
-- 备用：预录 90 秒实验录像（压测在教室网络下可能不稳）。
-
----
-
-## 六、def 还是 async def：判据
-
-**约 10 分钟。含本次课的课程主题落点。**
-
-### 6.1 决策规则（醒目页，字要大）
-
-> **看你的函数体里有没有"会等待但不 await"的调用。**
->
-> **有 → 写 `def`。没有 → 随便，但写 `async def` 能拿到更高上限。**
-
-展开成一张可执行的清单：
-
-| 函数体里出现了 | 写什么 |
-|---|---|
-| 同步 ORM / `conn.execute()` | `def` |
-| `requests.*` / `urllib` | `def` |
-| `open().read()` / 文件操作 | `def` |
-| `time.sleep()` | `def`（但先想想为什么要 sleep） |
-| 同步的 redis / 第三方 SDK | `def` |
-| 大量计算、图片处理、加解密 | `def`，**而且要考虑移出请求路径** |
-| 只有 `await` 的异步库调用 | `async def` |
-| 什么 IO 都没有（纯内存计算，很快） | 都行 |
-
-### 6.2 三个容易忽略的地方
-
-**一、依赖函数各自独立判断。**
-
-```python
-def get_conn():                    # 同步依赖 → 框架放线程池 ✅
-    with engine.begin() as conn:
-        yield conn
-
-async def get_current_user(...):   # 如果里面有同步查库 → ❌ 错了
-    user = repo.find_user(conn, uid)   # 同步阻塞在事件循环里
-```
-
-> 第 4 次课我们写的依赖全是 `def`，**那是有意的**。今天你知道原因了。
-
-**二、`async def` 里想调同步代码，有正规办法。**
+混合场景可显式卸载完整同步工作单元：
 
 ```python
 from fastapi.concurrency import run_in_threadpool
 
-@router.get("/x")
-async def x():
-    data = await run_in_threadpool(blocking_call, arg)   # 显式扔线程池
+# 连接在同一个同步工作单元内获取、使用并释放。
+def load_summary(qid):
+    with engine.connect() as conn:
+        row = repo.find_detail(conn, qid)
+        return {"id": row.id, "body": row.body}
+
+async def mixed_endpoint(qid):
+    data = await run_in_threadpool(load_summary, qid)
+    return data
 ```
 
-> 但请注意：如果你整个函数只是为了包一个同步调用，**那直接写 `def` 更简单**。`run_in_threadpool` 的用途是"这个函数大部分是异步的，只有一处必须同步"。
+此片段只是卸载机制参考；本课没有必要为它新增业务端点。不把已经创建的 Session/Connection 放进多个并行任务共享；若驱动要求同线程，资源生命周期也要在同一个工作单元内。
 
-**三、`async def` 里绝对不要做的两件事**：不要 `time.sleep`（用 `asyncio.sleep`）、不要跑长时间计算（挪到线程池或进程池）。
+### 6.2 B 档：固定工作量 CPU 实验
 
-### 6.3 worker 数量：经验结论与它的前提
+```python
+def cpu_work(n: int) -> int:
+    result = 0
+    for i in range(n):
+        result = (result + i * i) % 1_000_000_007
+    return result
+```
 
-| 场景 | 起点 | 前提 |
-|---|---|---|
-| CPU 密集为主 | `workers = CPU 核数` | 再多只会增加切换开销 |
-| IO 密集 + 同步代码（`def` 端点） | `workers = 2 × 核数 + 1` | gunicorn 文档的经验值；**前提是每个 worker 内存占用可控** |
-| IO 密集 + 全异步 | `workers = 核数` 就够 | 并发靠事件循环，不靠 worker 数 |
-| 容器环境 | **先查容器的 CPU limit，不是宿主机核数** | 这一条最容易错 |
+先校准 n，使单任务耗时便于观察，然后在各并发组**保持 n 不变**，核对返回值。不要用“忙等直到墙钟过了 0.5 秒”当固定计算量：并发争抢时每任务执行的循环次数不同，会产生虚假的吞吐提升。
 
-**必须补的一段**（这是取舍训练，不是记公式）：
+### 6.3 B 档：worker 与连接池
 
-> 这些数字是**起点，不是答案**。
->
-> 每个 worker 都是一个独立进程：独立的内存、**独立的数据库连接池**。4 个 worker × 每池 10 连接 = 40 个数据库连接。**你的 PostgreSQL 默认最大连接数是 100。** 加到 16 个 worker，数据库先挂。
->
-> 判据：**worker 数量不是一个可以单独决定的参数，它和连接池大小、数据库上限、容器内存限制是一组约束。**
->
-> 〔第 16 次课部署时会把这组约束一起算一遍。今天只要知道它们互相牵制。〕
+没有通用于 FastAPI 的 `2 × 核数 + 1` 答案。从单 worker 基线开始，按 CPU 配额、内存、延迟目标增加并测量。
 
-### 6.4 课程主题落点：为什么这是 AI 的头号错误
+```text
+部署实例数 × 每实例 worker 数 × (pool_size + max_overflow)
+    + 迁移、后台任务、管理连接的预算
+    ≤ 数据库可用连接额度
+```
 
-**这一小节是本次课与课程主题的正式接点，请完整制作。**
+这是容量预算，不是活跃连接数的实时等式。多 worker 也会复制内存与连接池。第十六课再结合部署限制计算。
 
-先给出现象：
+### 6.4 AI 协作的可执行约束
 
-> 你让 AI "给我写一个 FastAPI 端点，查数据库返回问题列表"。
->
-> 它有**很高的概率**给你 `async def`，然后在里面用同步的 SQLAlchemy。
+给 AI 的上下文应包括实际数据库驱动、同步/异步调用链、超时预算与验收方法。例如：“本项目使用同步 SQLAlchemy；请复用 service，说明端点为何用 `def`，并列出需要压测的等待点。”
 
-三个原因，值得讲清楚：
+审查调用链、针对性静态规则与并发测试互补。简单 grep 会漏掉包装函数，也会误判异步 `.execute()`，不宣称能覆盖某个固定比例。AI 输出正确时保留方案并给验证证据，不为了凑错而改坏代码。
 
-| 原因 | 说明 |
-|---|---|
-| **训练数据的偏向** | FastAPI 的宣传语就是"高性能异步框架"，教程和博客里 `async def` 占压倒多数。**AI 学到的是"FastAPI 端点长什么样"，不是"这个端点该不该是异步的"** |
-| **它看不到你的调用栈** | 它不知道 `svc.create()` 里面最终调的是同步的 `conn.execute()`。**判断阻塞需要跟进好几层，而它通常只看到你给它的那个文件** |
-| **没有任何反馈信号** | 代码能跑、测试能过、类型检查能过、linter 不报警。**AI 没有任何机会知道自己错了** |
+## 七、Jinja2：最小模板足以完成 M1
 
-然后是关键的一段：
+**课堂 10 分钟。** 模板负责表现，业务规则仍由 schema/service 决定。
 
-> 我要你们注意这个错误的**性质**，因为它和前几次课见过的都不一样：
->
-> | | 怎么被发现 |
-> |---|---|
-> | 第 3 次课：返回了密码哈希 | 肉眼看响应体能发现（虽然容易漏） |
-> | 第 4 次课：错误格式不统一 | 前端接的时候一定会发现 |
-> | **今天：`async def` + 阻塞** | **在开发和测试阶段，没有任何一种常规检查能发现** |
->
-> 所以它需要的护栏也不一样。前两种可以靠 schema、靠统一处理器——**结构上堵住**。这一种堵不住，因为"一个函数是不是阻塞的"在 Python 里没有类型可以表达。
->
-> 那怎么办？三层：
->
-> 1. **约定**：本项目所有端点和依赖一律写 `def`，除非你能说出全链路都是 await 的。**用一致性消除判断成本。**
-> 2. **检查**（可机械化）：在 CI 里 grep——`async def` 的函数体里出现 `requests.`、`.execute(`、`time.sleep` 就失败。这是个粗糙的检查，但它能抓住 90% 的情况。**→ 第 9 次课会写它。**
-> 3. **压测**（兜底）：把今天这个实验做成一条基线，发布前跑一次。**数据是唯一不会被糊弄的东西。**
->
-> **判据：当一类错误无法在结构上堵住时，就用"约定 + 机械检查 + 定量兜底"三层来兜。** 这三层都不依赖某个人当天足够细心。
-
----
-
-## 七、Jinja2 最小集与自动转义
-
-**约 10 分钟。若时间紧，只保留 7.3 自动转义那一页，其余转自读材料。**
-
-### 7.1 为什么本课程要教一点模板
-
-> 你们多数人会用 React 或 Vue。那为什么还要学 Jinja2？
->
-> 三个理由，都很实际：
-> 1. **M1 需要一个能点的界面**，不引入前端构建链是最快的路；
-> 2. **管理后台、邮件模板、导出报表**——真实项目里服务端渲染从来没消失；
-> 3. **第 8 次课讲前后端分离时，你需要一个"不分离"的对照物**才能说清分离解决了什么、代价是什么。
->
-> 所以今天只讲最小集：**够用，不深入。**
-
-### 7.2 最小集（五个东西）
+### 7.1 基础模板
 
 ```html
-<!-- app/templates/base.html -->
-<!DOCTYPE html>
-<html>
-<head><title>{% block title %}问答{% endblock %}</title></head>
+<!-- app/templates/base.html：独立演示工程中的建议位置 -->
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>{% block title %}问答{% endblock %}</title></head>
 <body>
-  <nav>...</nav>
+  <nav><a href="/ui/questions">问题列表</a> <a href="/ui/questions/new">提问</a></nav>
   {% block content %}{% endblock %}
 </body>
 </html>
@@ -753,559 +386,271 @@ async def x():
 ```html
 <!-- app/templates/question_list.html -->
 {% extends "base.html" %}
-{% block title %}问题列表{% endblock %}
 {% block content %}
-  <ul>
+<ul>
   {% for q in questions %}
-    <li><a href="/ui/questions/{{ q.id }}">{{ q.title }}</a>
-        （{{ q.created_at.strftime('%m-%d') }}）</li>
-  {% else %}
-    <li>还没有问题</li>
-  {% endfor %}
-  </ul>
+  <li><a href="/ui/questions/{{ q.id }}">{{ q.title }}</a></li>
+  {% else %}<li>还没有问题</li>{% endfor %}
+</ul>
 {% endblock %}
 ```
 
-| 要素 | 作用 |
-|---|---|
-| `{{ 变量 }}` | 插值，**默认 HTML 转义** |
-| `{% if %}` / `{% for %}...{% else %}` | 控制流；`for-else` 处理空列表很顺手 |
-| `{% extends %}` + `{% block %}` | 布局继承——**一个 base 页，各页只填 block** |
-| `{% include %}` | 片段复用 |
-| 过滤器 `\| length` `\| default('-')` | 小的展示变换 |
-
-**一条判据**：
-
-> **模板里只做展示，不做判断。**
->
-> 看到模板里出现"如果用户是作者且问题未关闭且当前时间小于截止时间就显示按钮"这种条件，就该把它算成一个布尔值（`can_edit`）在 service 里算好传进来。
->
-> 理由和第 4 次课分层一样：模板里的逻辑**测不到、看不见、AI 改起来最容易出错**。
-
-### 7.3 自动转义：第三道结构性护栏（**本单元核心**）
-
-现场做一个实验。发一条问题，标题写：
-
+```html
+<!-- app/templates/question_detail.html -->
+{% extends "base.html" %}
+{% block title %}{{ q.title }}{% endblock %}
+{% block content %}
+<h1>{{ q.title }}</h1>
+<p class="body">{{ q.body }}</p>
+{% endblock %}
 ```
+
+CSS 可用 `white-space: pre-wrap` 保留正文换行，不必为此插入 `|safe`。课堂主讲插值、循环空态、继承；include、宏、自定义过滤器留自读。
+
+模板可以有简单展示条件，也可以测试。复杂授权/业务判断应在服务端集中执行；隐藏按钮从来不等于实施权限检查。
+
+### 7.2 自动转义的边界
+
+使用 `Jinja2Templates` 配置的 HTML 环境会自动转义；裸 `jinja2.Environment()` 或 `Template()` 不一定开启。不能把集成默认值当成所有 Jinja2 用法的保证。
+
+只在本地隔离样例中，将以下内容放入 **body 字段**，并观察同一个 `q.body` 渲染位置：
+
+```text
 <script>alert('xss')</script>
 ```
 
-打开列表页。看到的是：
+先用 `{{ q.body }}`，查看响应源码里的实体；再在隔离反例改为 `{{ q.body | safe }}` 对照，最后恢复转义。若浏览器 CSP 阻止执行，也应记录条件，不把“没弹窗”当无漏洞证明。
 
-```
-<script>alert('xss')</script>
-```
+自动 HTML 转义不等于任何上下文都安全：脚本、CSS、URL 协议等需要各自的处理。M1 不渲染用户富文本，不使用 `|safe`；第十五课再讲白名单清洗。
 
-**页面上原样显示这行文字，没有弹窗。** 查看网页源码：
+跨栈阅读只保留准确结论：EJS 的 `<%=` 会转义、`<%-` 不会；换模板引擎应检查实际语法与配置，不能据此推断某生态的事故率。
 
-```html
-<li><a href="...">&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;</a></li>
-```
+## 八、表单：同一套校验，两种响应
 
-> Jinja2 **默认**把 `<`、`>`、`&`、`"`、`'` 转成了 HTML 实体。恶意标签变成了普普通通的文字。
->
-> **注意"默认"这个词。** 你什么都没做，这道防护就在那里。
+**课堂 20 分钟。** 先完成失败分支，再验证提交成功与 PRG。
 
-把它归到本课程的主线上（醒目页）：
+### 8.1 共享 schema，不退回手写长度判断
 
-> **这是本课程第三道结构性护栏。**
->
-> | 次课 | 护栏 | 它自动挡住了什么 |
-> |---|---|---|
-> | 第 3 次课 | `response_model` | 没声明的字段出不去 |
-> | 第 4 次课 | 全局异常处理器 | 内部错误信息不会泄漏给客户端 |
-> | **今天** | **Jinja2 自动转义** | **用户输入不会变成可执行的 HTML** |
->
-> 三者的共同点：**默认安全，不依赖开发者记得做某件事。**
-
-然后是 `| safe`：
-
-```html
-<div class="body">{{ q.body | safe }}</div>     <!-- 解剖台里的那一行 -->
-```
-
-改成 `| safe` 再试一次：**弹窗出现了。**
-
-> `| safe` 的意思是"我保证这段内容是安全的，别转义"。
->
-> **它是一个手动关闭护栏的开关。**
->
-> 什么时候真的需要它？当你要渲染用户写的 Markdown 转成的 HTML 时。那时候正确的做法是：**Markdown 转 HTML 之后先过一遍白名单清洗（sanitize），清洗后的结果才配用 `| safe`。**
->
-> 判据：**`| safe` 后面跟的内容，必须来自一个你能指出名字的清洗函数。** 直接跟用户输入就是漏洞。
->
-> 〔**第 15 次课**会完整做一遍：从这一行开始，演示 XSS 能偷到什么，然后做清洗。今天你只要知道这个开关在哪、它关掉了什么。〕
-
-### 7.4 C 档卡（一句话各一条）
-
-- 宏 `{% macro %}`：复用带参数的片段，比 `include` 更适合表单控件、分页条。
-- 自定义过滤器：`templates.env.filters["ago"] = humanize_ago`——把时间格式化逻辑从模板里拿出来。
-- `TemplateResponse` 必须传 `{"request": request}`，因为 `url_for` 需要它。
-- 模板目录组织：`templates/base.html` + `templates/questions/*.html` + `templates/_partials/*.html`。
-
----
-
-## 八、现场必做 C：表单闭环与 PRG
-
-**约 15 分钟。本次课第二高光，不能压缩。**
-
-### 8.1 先把 F5 的机制讲清楚
-
-回到解剖台的重复发帖，画一张时序图：
-
-```
-用户填表 → POST /ui/questions → 服务端插入 → 返回 200 + HTML
-                                                    │
-                    浏览器地址栏：/ui/questions       │  ← 注意这里
-                    浏览器记住的："这页是 POST 来的"   │
-                                                    ▼
-用户按 F5 → 浏览器："我要重放刚才那次 POST" → 又插入一条
-```
-
-> **问题的根源是：浏览器认为"当前页面 = 一次 POST 的结果"，所以刷新就是重放那次 POST。**
->
-> 这不是浏览器的 bug，是 HTTP 的语义：POST 不是幂等的，浏览器不敢自己决定要不要重发，所以它问你，而用户永远会点"确定"。
->
-> 顺带回收第 2 次课：**GET 幂等、POST 不幂等**，当时这是一句抽象的话。现在它变成了数据库里多出来的两条记录。
-
-### 8.2 PRG：Post / Redirect / Get
-
-```
-用户填表 → POST /ui/questions → 插入 → 303 See Other, Location: /ui/questions/9
-                                            │
-                          浏览器自动发起 →  GET /ui/questions/9 → 200 + HTML
-                                            │
-                    浏览器地址栏：/ui/questions/9
-                    浏览器记住的："这页是 GET 来的"
-                                            ▼
-                      用户按 F5 → 重放 GET → 只是再查一次 ✅
-```
+下例复列第三课已经采用的共享模型，JSON 与表单使用同一份定义，不另复制一套规则。标题与正文上限沿用第三课；标签最多五个，标签格式和规范化若另有规则，也必须集中维护。
 
 ```python
-from fastapi import status
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+class QuestionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(min_length=5, max_length=200)
+    body: str = Field(min_length=10, max_length=20000)
+    tags: list[str] = Field(default_factory=list, max_length=5)
+
+    @field_validator("title", "body", mode="before")
+    @classmethod
+    def strip_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
+```
+
+`"    字    "` 清洗后不满足长度，应失败。原始输入保留在表单 values 中，清洗后的 payload 才传给业务层。M1 表单只提供标题与正文，tags 使用默认空列表；已有 JSON 标签行为不得被新表单实现破坏。
+
+### 8.2 表单和模板适配
+
+环境必须包含 `python-multipart`，否则使用 `Form` 可能在注册路由时就报错。以下模板调用采用当前 Starlette 的 request-first/关键字形式，不使用旧的位置参数写法。
+
+```python
+from fastapi import Form, Request
 from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
+from pydantic import ValidationError
+
+templates = Jinja2Templates(directory="app/templates")
+
+def render_form(request, values, errors, status_code=200):
+    return templates.TemplateResponse(
+        request=request, name="question_form.html",
+        context={"values": values, "errors": errors},
+        status_code=status_code,
+    )
+
+# 静态 /new 在动态 /{qid} 之前注册。
+@router.get("/ui/questions/new")
+def new_question_page(request: Request):
+    return render_form(request, {"title": "", "body": ""}, {})
 
 @router.post("/ui/questions")
 def submit_question(
-    title: str = Form(...),
-    body: str = Form(...),
-    conn=Depends(get_conn),
+    request: Request, conn: ConnDep,
+    title: str = Form(""), body: str = Form(""),
 ):
-    q = svc.create(conn, title, body, author_id=1)
-    return RedirectResponse(
-        url=f"/ui/questions/{q.id}",
-        status_code=status.HTTP_303_SEE_OTHER,
+    values = {"title": title, "body": body}
+    request.state.form_values = values
+    try:
+        payload = QuestionCreate.model_validate(values)
+    except ValidationError as exc:
+        errors = {}
+        for error in exc.errors():
+            field = str(error["loc"][0]) if error["loc"] else "form"
+            errors.setdefault(field, error["msg"])
+        return render_form(request, values, errors, 422)
+
+    # 业务/数据库错误向外抛，先让事务边界回滚，再转成 HTML。
+    question = svc.create(conn, payload, author_id=1)
+    return RedirectResponse(f"/ui/questions/{question.id}", status_code=303)
+```
+
+`ConnDep` 见下一节；`svc.create(conn, payload, author_id)` 是参考适配接口，内部可调用已有 repository，但不得自己提交。返回能在当前事务内取到 id 的对象或 DTO。若现有函数接收多个参数，集中适配，不要求为了照抄签名重写全部业务。
+
+手工 `model_validate` 抛 `ValidationError`；FastAPI 对请求自动校验产生的是 `RequestValidationError`。两者不可混写。上述页面只映射已知字段的错误消息，不把完整异常输入回传；国际化错误文案可以后续集中处理。
+
+```html
+<!-- app/templates/question_form.html -->
+{% extends "base.html" %}
+{% block content %}
+<form method="post" action="/ui/questions">
+  <label>标题 <input name="title" value="{{ values.title }}"></label>
+  {% if errors.title %}<p role="alert">{{ errors.title }}</p>{% endif %}
+  <label>正文 <textarea name="body">{{ values.body }}</textarea></label>
+  {% if errors.body %}<p role="alert">{{ errors.body }}</p>{% endif %}
+  {% if errors.form %}<p role="alert">{{ errors.form }}</p>{% endif %}
+  <button type="submit">发布</button>
+</form>
+{% endblock %}
+```
+
+浏览器字段校验可改善体验，不能替代服务端校验。空值、过长输入、纯空白、清洗后过短均需服务端测试。
+
+### 8.3 提交先于成功响应
+
+复用第四课的函数作用域ConnDep及完整错误翻译，不为HTML再定义一份默认作用域依赖。当前 FastAPI 默认 request scope 在响应发送后退出；仅仅在 `yield` 后写提交并不足够。下例复列已有实现，engine与DuplicateTitle沿用第四课模块。
+
+```python
+from typing import Annotated, Iterator
+from fastapi import Depends
+from sqlalchemy import Connection
+from sqlalchemy.exc import IntegrityError
+
+def get_conn() -> Iterator[Connection]:
+    try:
+        with engine.begin() as conn:
+            yield conn
+    except IntegrityError as exc:
+        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+        if constraint == "questions_title_key":
+            raise DuplicateTitle() from exc
+        raise
+
+ConnDep = Annotated[Connection, Depends(get_conn, scope="function")]
+```
+
+所有依赖这条事务边界的 JSON/HTML 端点应使用同一别名；嵌套 yield 依赖也需核对作用域兼容。上述 `engine.begin()` 正常退出提交、异常退出回滚，提交失败时不应发送已经准备好的 201/303。标题约束冲突仍在事务退出后翻译为DuplicateTitle；第六课解释约束依据，第七课替换为Session，不能因新增HTML丢失JSON原有409行为。
+
+业务冲突不要在写入后由 HTML 路由吞掉异常返回正常响应。让它穿过事务边界，再在全局表现层处理：
+
+```python
+@app.exception_handler(DuplicateTitle)
+async def duplicate_title_handler(request: Request, exc: DuplicateTitle):
+    values = getattr(request.state, "form_values", None)
+    if request.url.path == "/ui/questions" and values is not None:
+        return render_form(request, values, {"title": "标题已存在"}, 409)
+    return JSONResponse(
+        status_code=409,
+        content={"code": "duplicate_title", "message": "标题已存在",
+                 "detail": None,
+                 "request_id": getattr(request.state, "request_id", "-")},
     )
 ```
 
-**现场验证**：提交 → 看地址栏变了 → **按 F5 三次** → 数据库里还是一条。
+此函数登记在前述 `app` 上；不在 service 中判断 `/ui/`。若使用统一 `AppError` 处理器，将这个分支并入原处理器，不重复维护冲突规则。
 
-### 8.3 为什么是 303，不是 302
+### 8.4 PRG 与验收证据
 
-这个问题值得单独一页，因为它是"读规范"的一次小训练：
-
-| 状态码 | 规范说什么 | 实际后果 |
-|---|---|---|
-| **301 / 302** | 原本未明确规定重定向后用什么方法 | 历史上浏览器实现不一致；部分客户端会**保留 POST 方法**去请求新地址 |
-| **303 See Other** | **明确要求：改用 GET 请求新地址** | 这正是 PRG 需要的语义 |
-| **307 / 308** | **明确要求：保持原方法和请求体** | POST 后用它 = 重放 POST，**恰好是我们要避免的** |
-
-> **判据：表单提交成功后重定向，用 303。**
->
-> 顺便警惕 307/308：它们的存在是为了让重定向**不改变**方法。用在 PRG 上等于什么都没做——而且 AI 有时会给你 307，因为 FastAPI 的 `RedirectResponse` 默认值是 307。
->
-> **`RedirectResponse` 的默认状态码是 307，你必须显式写 303。** 这是一个"默认值不是你想要的"的实例，值得记住。
-
-### 8.4 校验失败的那条路：**不能重定向**
-
-先提问：
-
-> 用户标题只写了两个字，校验失败。按刚才的思路，是不是也重定向回表单页？
-
-让学生想 20 秒，然后指出问题：
-
-> 如果重定向回 `/ui/questions/new`，浏览器发一个全新的 GET 请求——**用户刚才辛辛苦苦填的那 500 字正文，全没了。**
->
-> 这是真实产品里最招人骂的体验之一。
-
-**正确的分叉（本单元核心，做成一页）**：
-
+```text
+校验失败：POST → 422 HTML（错误 + 原值）；没有业务写入
+业务冲突：POST → 异常 → 回滚 → 409 HTML（错误 + 原值）
+创建成功：POST → 写入 → 提交成功 → 303 Location → GET 详情 → 200 HTML
+刷新详情：GET → 200 HTML；不重发创建请求
 ```
-POST /ui/questions
-   │
-   ├── 校验失败 → 200（或 422）+ 重新渲染表单页
-   │              带上：错误信息 + 用户原来填的值
-   │              ⚠ 不重定向，因为要保住用户的输入
-   │
-   └── 成功    → 303 重定向到详情页
-                  ⚠ 必须重定向，因为要防止刷新重提交
-```
+
+- 本课程选择校验失败直接回填 422；其他产品可用服务器端状态配合重定向保留输入，但不是本课必要复杂度。
+- POST 成功后用 303 明确转向读取；301/302 在现代 HTTP 语义中允许 POST 改为 GET，307/308 则保留方法和请求体。`RedirectResponse` 默认 307，必须显式设 303。
+- PRG 减少成功结果页刷新重放 POST；双击、网络重试、并发请求仍可能重复写入，需要业务唯一约束或幂等机制。第八课继续讨论写操作正确性。
+- `author_id=1` 只用于本地虚构用户；PRG 不提供登录、授权或 CSRF 防护。本阶段不得作为安全完备的公开站点上线。
+
+教师验证时关闭自动跟随重定向，先看 303/Location，再看 GET；浏览器保留 Network 记录。不能只展示最后 200 就宣称 PRG 正确。提交失败用模拟故障验证没有 303，数据库没有新增记录。
+
+### 8.5 B 档：flash 跨过两次请求
+
+flash 不是 M1 必交。最小实现使用 `SessionMiddleware` 的**客户端签名 Cookie 会话**，并非服务器存储内容。签名防篡改、不加密，不能存凭据、敏感正文等。
 
 ```python
-@router.post("/ui/questions")
-def submit_question(
-    request: Request,
-    title: str = Form(""),
-    body: str = Form(""),
-    conn=Depends(get_conn),
-):
-    # HTML 表单路径要自己收窄，因为不能让 422 直接抛给用户看
-    errors = {}
-    if len(title.strip()) < 5:
-        errors["title"] = "标题至少 5 个字"
-    if len(body.strip()) < 10:
-        errors["body"] = "正文至少 10 个字"
+from starlette.middleware.sessions import SessionMiddleware
 
-    if errors:
-        return templates.TemplateResponse(
-            "question_form.html",
-            {"request": request, "errors": errors,
-             "values": {"title": title, "body": body}},   # ← 回填
-            status_code=422,
-        )
-
-    try:
-        q = svc.create(conn, title.strip(), body.strip(), author_id=1)
-    except DuplicateTitle as e:                            # ← 业务错误也要回填
-        return templates.TemplateResponse(
-            "question_form.html",
-            {"request": request, "errors": {"title": e.message},
-             "values": {"title": title, "body": body}},
-            status_code=409,
-        )
-
-    return RedirectResponse(f"/ui/questions/{q.id}", status_code=303)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.secret_key,
+    same_site="lax",
+    https_only=settings.cookie_secure,
+)
 ```
 
-```html
-<!-- question_form.html 节选 -->
-<form method="post" action="/ui/questions">
-  <label>标题
-    <input name="title" value="{{ values.title | default('') }}">
-    {% if errors.title %}<span class="err">{{ errors.title }}</span>{% endif %}
-  </label>
-  <label>正文
-    <textarea name="body">{{ values.body | default('') }}</textarea>
-    {% if errors.body %}<span class="err">{{ errors.body }}</span>{% endif %}
-  </label>
-  <button type="submit">发布</button>
-</form>
-```
+另需 `itsdangerous`。密钥来自外部配置；本地 HTTP 可设 `cookie_secure=False`，生产 HTTPS 必须开启。Cookie 的传输、容量与并发覆盖问题留第十四课。
 
-**现场演示**：故意填错 → 看到错误提示**且正文还在** → 改对 → 提交成功 → F5 不重复。
+在创建路由成功分支给 `request.state.flash_on_commit` 设为 True；由事务依赖在 `with engine.begin()` **成功退出之后**写入 `request.session["flash"] = "发布成功"`。不要在尚未提交时写成功消息，否则提交失败也可能发送带成功提示的 Cookie。此扩展会让依赖需要 `Request`，仅在选做实现中加入。
 
-**一个必须承认的欠账**（不要掩饰）：
+详情 GET 在查到资源后用 `request.session.pop("flash", None)` 取消息，并通过模板 context 的 `flash` 字段传入；模板增加 `{% if flash %}<p>{{ flash }}</p>{% endif %}`。下一次刷新不再出现消息。
 
-> 你们会发现一个问题：**上面那些 `if len(title) < 5` 是手写的校验，第 3 次课刚说过"能表达为约束的不要写成 if"。**
->
-> 我知道。这里的困难是真实的：Pydantic 校验失败会抛 `RequestValidationError`，我们的处理器会返回 **JSON 422**——可是 HTML 表单的用户要的是**一个带回填的页面**，不是一段 JSON。
->
-> 正确的解法是：**让 schema 仍然是唯一的规则来源，但在 HTML 路由上换一种处理方式**——比如手工调用 `QuestionCreate.model_validate()` 并捕获 `ValidationError`，把 `e.errors()` 映射成表单错误字典。这样规则只在 schema 里定义一次。
->
-> **这是 B 档作业的选做项。** 今天课上用手写版本，是为了先把 PRG 这条主线讲透，不被校验的细节打断。**但我不希望你们以为手写校验是对的。**
+## 九、M1 验收与作业
 
-〔挂欠账 → B 档作业；第 8 次课讲前后端分离时会重新讨论"同一套规则服务两种客户端"〕
+**课堂 6 分钟。** 预估基础任务 3 小时左右，拓展自选，不要求全部完成。
 
-### 8.5 flash message：重定向之后怎么说"成功了"
+### 9.1 A 档基础交付
 
-问题：重定向到详情页之后，怎么告诉用户"发布成功"？变量传不过去——那是一次全新的 GET 请求。
-
-> 这是一个状态需要跨越两次请求的场景。办法：**把消息存在服务端会话里，下一次渲染时取出来并删掉。**
-
-```python
-# 极简实现：依赖 SessionMiddleware
-@router.post("/ui/questions")
-def submit_question(request: Request, ...):
-    ...
-    request.session["flash"] = {"level": "success", "text": "发布成功"}
-    return RedirectResponse(f"/ui/questions/{q.id}", status_code=303)
-```
-
-```python
-# app/deps.py —— 取一次就删
-def pop_flash(request: Request) -> dict | None:
-    return request.session.pop("flash", None)
-```
-
-```html
-{% if flash %}<div class="flash {{ flash.level }}">{{ flash.text }}</div>{% endif %}
-```
-
-**三个要说的点**：
-
-1. **"取一次就删"是 flash 的定义。** 用 `pop` 不用 `get`，否则用户每次刷新都看到"发布成功"。
-2. **这是本课程第一次出现服务端会话。** `SessionMiddleware` 用签名 cookie 存数据——它能防篡改，但**不加密**，所以里面不能放敏感信息。
-3 **欠账**：`SessionMiddleware` 的 `secret_key` 从哪来？→ 第 4 次课的 `settings.secret_key`。会话与登录的完整机制、cookie 的 `HttpOnly`/`Secure`/`SameSite` → **第 14 次课**。
-
-### 8.6 小结：HTML 表单与 JSON API 的差异表
-
-**这张表是第 8 次课（前后端分离）的直接铺垫，请保留。**
-
-| | JSON API | HTML 表单 |
-|---|---|---|
-| Content-Type | `application/json` | `application/x-www-form-urlencoded` |
-| 接参 | Pydantic 模型 | `Form(...)` |
-| 校验失败 | 返回 422 JSON，前端自己回填 | **服务端重渲染 + 回填** |
-| 成功 | 返回 201 + 资源体 | **303 重定向** |
-| 谁处理"刷新重提交" | 前端（不会重放） | **服务端（靠 PRG）** |
-| 一次性提示 | 前端状态管理 | **flash（服务端会话）** |
-| 共用的部分 | **`services/` 和 `repositories/` 完全一样** | ← 这就是分层的回报 |
-
-> 最后一行请重读一遍。**今天我们加了一整套 HTML 界面，业务层一行没改。**
-
-### 材料
-
-- tag `v5-prg`（本单元结束状态）。
-- **封面级素材**：两张时序图上下对照——上"POST → 200 HTML → F5 重放 POST → 多一条"，下"POST → 303 → GET → F5 重放 GET → 安全"。
-- **封面级素材**：校验失败/成功的两条路径分叉图。
-- 截图：F5 三次后数据库里三条重复记录的 SQL 查询结果（**修复前**）；以及修复后 F5 三次仍只有一条。
-- 截图：填错后的表单页，错误提示 + 正文仍在。
-- 截图：XSS 实验的两种结果（转义后原样显示 / `| safe` 后弹窗）。
-
----
-
-## 九、C 档结论卡
-
-**约 4 分钟。时间不够整体跳过，转为课后自读。**
-
-### 9.1 CORS 中间件为什么必须最外层
-
-> 浏览器的跨域预检（`OPTIONS`）请求，**在任何业务逻辑之前就要被正确应答**。如果 CORS 中间件在内层，预检请求可能先被路由匹配、被认证中间件拦下，然后浏览器直接判定跨域失败。
->
-> 更隐蔽的一条：**错误响应也必须带 CORS 头。** 如果你的 500 响应没有 `Access-Control-Allow-Origin`，浏览器会拒绝把响应交给 JS——前端只能看到一个"Network Error"，**连你精心设计的统一错误体都读不到**。
->
-> 而 500 响应是 `ServerErrorMiddleware` 生成的（单元 3 讲过它在最外层），所以 CORS 必须更外或紧邻其外。
->
-> → **第 12 次课会现场踩这个坑**，那时回到这一页。
-
-### 9.2 一句话结论卡
-
-| 问题 | 结论 | 展开处 |
-|---|---|---|
-| `BaseHTTPMiddleware` 的坑 | 读过 body 后端点读不到；与流式响应交互异常；有额外开销。规模上来后改纯 ASGI 中间件 | 自读 Starlette 源码 |
-| `contextvars` 传 request_id | 比 `request.state` 更通用，后台任务里也能拿到 | 自读 |
-| `run_in_threadpool` 与线程池大小 | AnyIO 默认约 40，可通过 `anyio.to_thread.current_default_thread_limiter()` 调整 | 第 16 次课 |
-| CPU 密集怎么办 | 进程池，或移出请求路径进任务队列 | 第 16 次课 |
-| `| safe` 与 Markdown | 先 sanitize 白名单清洗，再 safe | **第 15 次课** |
-| Jinja2 宏与过滤器组织 | 见单元 7.4 | 自读 |
-
-### 9.3 跨栈落点对照
-
-| 能力 | FastAPI | Flask | Django | Express | Spring |
-|---|---|---|---|---|---|
-| 中间件 | `add_middleware` / ASGI | `before_request` / WSGI middleware | `MIDDLEWARE` 列表 | `app.use()` | `Filter` / `Interceptor` |
-| 顺序语义 | **后注册在外** | 列表顺序 | 列表顺序（**先声明在外**） | **先注册先执行** | `@Order` |
-| 模板自动转义 | Jinja2 默认开 | Jinja2 默认开 | DTL 默认开 | **EJS 默认不转义**（`<%= %>` 转义，`<%- %>` 不转义） | Thymeleaf 默认开 |
-| PRG 支持 | 手写 303 | 手写 303 | `redirect()` + messages 框架 | `res.redirect(303)` | `redirect:` 前缀 |
-| flash | 需 SessionMiddleware | `flash()` 内建 | `messages` 内建 | `connect-flash` | `RedirectAttributes` |
-
-> 注意第二行：**各框架的中间件顺序语义不一致，Express 和 FastAPI 正好相反。** 换栈时这是必查项，不要靠记忆。
->
-> 注意第三行：**不是所有模板引擎都默认转义。** 用 EJS 的项目 XSS 风险显著更高——这不是语言问题，是默认值问题。
-
----
-
-## 十、M1 交付与作业
-
-**约 6 分钟。本次课是里程碑交付，请给足时间讲清验收标准。**
-
-### 10.1 M1 交付清单
-
-> M1 的目标：**一个能点、能用、结构清楚的最小问答应用。**
->
-> 它不需要好看，不需要功能多。它需要**每一处都说得出为什么这么写**。
-
-**功能要求**：
-
-| # | 内容 | 验收方式 |
-|---|---|---|
-| 1 | 六个 JSON 端点（第 3 次课清单） | `/docs` 全部可试通 |
-| 2 | 三个 HTML 页面：列表、详情、发帖表单 | 浏览器完整走一遍 |
-| 3 | 发帖表单闭环：校验失败回填、成功 303、flash 提示 | **现场按 F5 三次，数据不重复** |
-| 4 | `/healthz` 返回依赖状态 | 停掉数据库后返回 503 |
-
-**结构要求（沿用并累加前几次课的硬性标准）**：
-
-| # | 要求 | 自检 |
-|---|---|---|
-| 5 | 分层目录，`services/` 无 `import fastapi` | `scripts/check_layering.sh` |
-| 6 | 每个路由函数 ≤ 10 行 | 同上 |
-| 7 | 所有端点有 `response_model`（HTML 端点除外） | 同上 |
-| 8 | 错误响应统一为 `code/message/detail/request_id` | 同上 |
-| 9 | 配置走 pydantic-settings，`.env` 不入仓，`.env.example` 已提交 | 同上 |
-| 10 | 所有端点与依赖的 `def`/`async def` 选择正确 | **作业三逐个说明** |
-| 11 | 日志含 request_id，**异常路径也有** | 触发 500 后查日志 |
-| 12 | 模板中 `\| safe` 出现处 **≤ 0 处**（M1 阶段一律不许用） | grep |
-
-**交付物**：
-
-- Git 仓库（含完整提交历史，**不要 squash**——历史是过程的证据）；
-- `README.md`：启动步骤、`.env` 说明、已知欠账清单；
-- `docs/decisions.md`：**至少三条设计决定及理由**（格式见下）。
-
-`docs/decisions.md` 的格式（每条不超过 5 行）：
-
-```
-## D-003 外链抓取端点使用 def 而非 async def
-- 决定：写成 def，由框架放入线程池
-- 理由：函数体内 requests.get 与 conn.execute 均为同步阻塞
-- 备选方案：改 httpx.AsyncClient + 异步驱动
-- 未采用的原因：数据库层仍为同步 SQLAlchemy，全链路改造成本不划算
-- 何时应重新考虑：该端点 QPS 超过线程池上限时
-```
-
-> 最后一行"何时应重新考虑"是我特别要求的。**一个决定如果没有失效条件，它就不是决定，是信仰。**
-
-### 10.2 作业一：阻塞实验数据表（B 档，必交）
-
-重跑单元 5 的实验，提交完整数据表，**至少包含**：
-
-| 端点 | worker 数 | 并发 | 吞吐 req/s | p50 | p95 |
-|---|---|---|---|---|---|
-
-行数要求：`/lab/a` `/lab/b` `/lab/c` `/lab/d` × 并发 {1, 10, 50} = 12 行，**外加** `/lab/a` 在 `--workers 4` 下的 3 行。
-
-**必答三问**（这才是作业的重点）：
-
-1. 你在跑 `--workers 4` 之前**预测**吞吐是多少？实测是多少？差异说明了什么？
-2. `/lab/c` 在并发 50 时为什么达不到 100 req/s？上限由什么决定？
-3. `/lab/d` 写的是 `def`，为什么也串行了？**如果要提高它的吞吐，你有哪两条路，各自的代价是什么？**
-
-### 10.3 作业二：PRG 与表单闭环（随 M1 交付）
-
-- 提交发帖表单的完整流程截图三张：校验失败（含回填）、成功后地址栏、F5 三次后的数据库查询结果；
-- 说明为什么用 303 而不是 302 或 307；
-- **B 档选做**：把手写的 `if len(title) < 5` 改成复用 `QuestionCreate` schema，捕获 `ValidationError` 后映射成表单错误字典。**做了这一项的，单元 8.4 那笔欠账就算你自己还了。**
-
-### 10.4 作业三：`def`/`async def` 判据说明（**本次课的课程主题作业**）
-
-**第一部分：全项目盘点。** 列出项目中所有端点和依赖，填表：
-
-| 函数 | 位置 | `def` / `async def` | 函数体内的阻塞调用 | 是否正确 | 理由 |
-|---|---|---|---|---|---|
-
-**第二部分：AI 对照实验（必做）。**
-
-1. 用这个提示词请 AI 写一个新端点（原样使用，抄进作业）：
-
-   > 给我的 FastAPI 项目加一个端点 `GET /questions/{qid}/summary`，它从数据库读取问题正文，调用外部 HTTP 接口（`https://api.example.com/summarize`）做摘要，返回摘要文本。
-
-2. **原样保存** AI 的输出。
-
-3. 回答：
-
-   | 问题 | 你的回答 |
-   |---|---|
-   | AI 写的是 `def` 还是 `async def`？ | |
-   | 它用了什么库做 HTTP 调用？那个库是同步还是异步？ | |
-   | 按单元 6.1 的判据，它对吗？**引用判据表里的具体一行** | |
-   | 如果直接上线，在并发 50 时会发生什么？**估算吞吐** | |
-   | 这个错误能被 code review 发现吗？能被单元测试发现吗？为什么？ | |
-   | 你打算用单元 6.4 的哪一层护栏来防住它？具体怎么做？ | |
-
-**评分重点是最后两问。** 前面几问答对不难，能说清"为什么常规检查抓不住它"才说明你真的理解了这类错误的性质。
-
-### 本次课新增的欠账登记
-
-| 欠账 | 何时还 |
+| 项目 | 验收证据 |
 |---|---|
-| CORS 中间件位置与错误响应的 CORS 头 | **第 12 次课** |
-| `\| safe` 与 XSS 完整演示、sanitize | **第 15 次课** |
-| 会话、cookie 属性、登录 | **第 14 次课** |
-| `author_id=1` 硬编码 | 第 14 次课 |
-| 表单缺少 CSRF 防护 | **第 15 次课** |
-| HTML 表单复用 schema 校验（若未做 B 档选做） | 第 8 次课 |
-| `async def` 检查进 CI | **第 9 次课** |
-| 压测基线固化 | 第 9、16 次课 |
-| CPU 密集移出请求路径 | **第 16 次课** |
-| 外部 HTTP 调用的超时、重试、熔断 | 第 16 次课 |
-| worker 数 × 连接池 × 数据库上限的联合计算 | 第 16 次课 |
-| 纯 ASGI 中间件改写 | 课后自读 |
+| 三个核心 JSON 端点、健康检查保持有效 | 契约快照与正常/异常响应；不改旧验收规则掩盖回归 |
+| HTML 列表、详情、发帖页 | 列表空态、详情不存在与正常导航均可用 |
+| JSON/表单复用 schema 与 service | 同一组长度、空白边界输入；两入口规则一致 |
+| 失败回填 | 422 和标题冲突 409；正文保留且转义；失败没有业务新增 |
+| 成功 PRG | POST 的 303/Location 与后续 GET；刷新不重发 POST |
+| 提交与异常边界 | 提交失败没有 201/303；日志和普通 500 响应头可关联 |
+| 同步/异步选择 | 一个代表性端点，沿 service/repository 指到实际阻塞调用 |
+| 六组基础并发记录 | a/b/c × 并发 1/10；可使用课堂数据，注明来源和环境 |
 
----
+原有配置外置、`.env` 不入仓、分层依赖方向继续保持；不设路由行数上限，不要求所有 HTML/健康响应套 JSON 业务模型。同步数据库测试应使用故障替身或隔离依赖，勿为演示停掉其他人的数据库。
 
-## 十一、素材清单与制作说明
+### 9.2 AI 协作与判据说明
 
-### 必需素材
+在本次实际工作中选一段模板、表单适配或调用链建议，保存提示词与输出，说明：符合哪些规则、怎样验证、是否修改以及原因。若建议正确，提交保留理由即可。
 
-| 素材 | 说明 |
+更新已有技术方案手册的一小节，不重复交多份相同截图。推荐记录一个决定：“本项目数据访问保持同步，因此端点使用 def；当等待量、资源预算与测量支持时再评估异步改造。”不要求每课凑满若干条 ADR。
+
+### 9.3 B 档选做
+
+任选一项，建议不超过一小时：flash；固定工作量 CPU 对照；并发 50 或多 worker 对照；纯 ASGI 中间件阅读与改写。交真实结果和局限，不以预测必须失败或吞吐必须提升评分。
+
+## 十、素材、运行条件与验收状态
+
+本底稿修订不等于独立演示工程、截图和压测脚本已经交付。制作前需要补齐：
+
+- 独立的第五课工程及依赖锁：Python 3.12、支持函数作用域依赖的 FastAPI、匹配的 Starlette、Pydantic v2、同步 SQLAlchemy、Jinja2、python-multipart、httpx；flash 另需 itsdangerous。
+- 正常 M1 起点与三个互不混杂的反例阶段：阻塞、POST 结果页、局部模板 `safe`；用明确版本或副本标识，不冒称已有 Git tag。
+- `bench.py` 六组基础测量、预录备用证据、普通 500 的头与日志、422/409 回填截图和 PRG 的 Network 记录。
+- 教师需验证依赖注册、模板调用、数据库提交故障与浏览器刷新行为。只构建课件不能替代这些验收。
+
+本轮在 FastAPI 0.141.1 / Starlette 1.6.0 的进程内最小应用中验证：依赖退出抛异常时，默认 request scope 已返回 200，而 function scope 返回 500；另用 Pydantic 2.13.5 核对先 strip 再做标题长度约束。前者是提交失败时机的模拟，不是完整数据库提交测试。当前第一课 Python 环境未安装 Jinja2、python-multipart，本轮未安装新依赖；完整表单/模板、浏览器 PRG 和真实 HTTP 并发压测仍待验收。
+
+所有实验用虚构数据和可丢弃副本；先确认库名、连接串与当前工作目录。复位只重建该演示副本，不覆盖学生未提交代码，不对真实项目批量灌脏数据。现场故障超过约半分钟，可切预录材料，注明机器、版本、日期和模拟条件。
+
+## 十一、与后续课衔接
+
+| 内容 | 后续位置 |
 |---|---|
-| tag `v5-broken` | 起始版：含 `async def` + `requests`、POST 直接返回 HTML、模板里的 `\| safe`。**三个问题必须稳定复现** |
-| tag `v5-middleware` | 单元 3 结束状态 |
-| tag `v5-lab` | 含 `/lab/a~d` 四个实验端点 |
-| tag `v5-prg` | 单元 8 结束状态 |
-| tag `v5-m1` | M1 参考交付状态 |
-| `scripts/bench.py` | 压测脚本。**必须在 macOS / Windows / Linux 各验证一次**；输出格式固定以便学生填表 |
-| `scripts/check_layering.sh` | 扩展第 4 次课版本，新增 M1 的 7、10、12 三条检查 |
-| **封面级素材 A** | 单元 5.3 的四行数据表，`/lab/a` 行三个 `2.0` 红框高亮 |
-| **封面级素材 B** | `a()` / `b()` 两段代码并排，差异行高亮，底部"47×" |
-| **封面级素材 C** | 单元 5.2 并发 1 下三端点数据完全相同的截图，配字"所有常规检查都通不过这道题" |
-| **封面级素材 D** | PRG 前后两张时序图上下对照 |
-| 高光图 E | 补全版六层洋葱图（**与第 4 次课同风格，需可叠加**） |
-| 高光图 F | 校验失败 / 成功 两条路径分叉图 |
-| 表 G | 三种并发模型结论表 |
-| 表 H | `def`/`async def` 决策清单 |
-| 表 I | JSON API vs HTML 表单差异表（**第 8 次课要复用**） |
-| 表 J | 三道结构性护栏累计表（第 3、4、5 次课各一道） |
-| 截图 | `app.user_middleware` 打印；中间件 enter/exit 顺序 |
-| 截图 | try/finally 修法下"日志有、头无"的同屏对照 |
-| 截图 | F5 三次 → 三条重复记录的 SQL 结果（修复前 / 修复后各一张） |
-| 截图 | XSS 实验：转义后原样显示 / `\| safe` 后弹窗 |
-| 截图 | 表单校验失败页（错误提示 + 正文保留） |
+| 数据库约束与并发唯一性 | 第六课；不把已有合格 M1 改坏 |
+| Session、提交失败、持久化实现替换 | 第七课 |
+| PRG 之外的写入正确性与幂等 | 第八课 |
+| 回归与故障验证固化 | 第九课 |
+| 跨域读取、CORS 与客户端错误 | 第十二课 |
+| 登录、身份与 Cookie | 第十四课 |
+| XSS、CSRF 和公开站点安全 | 第十五课 |
+| 外部服务等待、部署资源预算 | 第十六课；不承诺在本课实现任务队列 |
 
-### 可后补
+第六课先用小型可手算数据说明约束与 NULL，再在隔离性能库观察索引。完整模板参考、错误路径、容量判据保留在课件中，课堂不必逐条展开。
 
-- 跨栈落点对照表、C 档一句话卡（纯文字）。
-- Jinja2 语法示例（代码已在文中）。
-
-### 备用材料
-
-| 风险 | 备用方案 |
-|---|---|
-| **教室网络导致压测数据抖动**（最高风险） | 实验端点全部用 `sleep` 而非真实网络调用，**不依赖外网**；另备预录 90 秒实验录像 |
-| `/lab/a` 在演示机上没有完全串行 | 检查 `--workers 1`、检查是否有 `--reload`（reload 模式会影响行为）；底稿给出了理论值用于自检 |
-| AI 现场调用失败（作业三演示） | 准备一份预先生成并验证的"`async def` + `requests`"输出作为讲评素材，标注"预录产物" |
-| 浏览器不弹"确认重新提交"（部分浏览器已改行为） | 备用：用 curl 手工重放 POST 演示同一后果；或用旧版行为的录屏 |
-| SessionMiddleware 未装 / secret_key 未配 | `v5-prg` tag 已配好；flash 部分可降级为"用 query 参数 `?flash=created` 传递"，**并说明它的缺点（可被伪造、会留在地址栏）** |
-| 时间超支 | 按单元 0 的压缩顺序执行；Jinja2 单元有独立自读材料 `docs/jinja2_minimal.md` |
-
-### 环境与运行条件
-
-延用前序环境。**新增依赖**：`jinja2`、`itsdangerous`（SessionMiddleware 需要）、`httpx`（压测脚本）、`requests`（作为反例保留）。
-
-**演示开始时的初始状态**：工作区在 tag `v5-broken`；数据库已 seed；服务以 `--workers 1` 且**不带 `--reload`** 启动（reload 会影响并发实验）；浏览器打开发帖表单页；另开一个终端准备跑压测。
-
-**复位方式**：`git checkout v5-broken -- app/ && make reset-db`。
-
----
-
-## 十二、与前后课的衔接
-
-**本次课回收的前序埋点**：
-
-| 来源 | 埋点 | 回收位置 |
-|---|---|---|
-| 第 1 次课 | 中间件在异常路径失灵（第 4 次课修一半） | **单元 3.4 彻底修好** |
-| 第 2 次课 | GET 幂等 / POST 不幂等 | 单元 8.1（变成数据库里多出的两条记录） |
-| 第 2 次课 | 四种请求编码中的 `x-www-form-urlencoded` | 单元 8（`Form(...)`，还清欠账） |
-| 第 3 次课 | 8 行裸 ASGI 应用 | 单元 4.1（对照 WSGI）、单元 3.5 |
-| 第 3 次课 | "结构性护栏" | 单元 7.3（自动转义是第三道） |
-| 第 3 次课 | "能表达为约束的不要写成 if" | 单元 8.4（如实承认 HTML 路径的困难） |
-| 第 4 次课 | 洋葱层次图 | **单元 1、3.2 直接复用并补全** |
-| 第 4 次课 | 中间件顺序 | 单元 3.1–3.3 |
-| 第 4 次课 | 所有依赖都写 `def`"这是有意的" | **单元 6.2 揭晓原因** |
-| 第 4 次课 | 分层的回报在"被修改"时 | **单元 2 结尾 + 单元 8.6 兑现：加整套 HTML，业务层零改动** |
-| 第 4 次课 | `settings.secret_key` | 单元 8.5（SessionMiddleware 用它） |
-| 第 4 次课 | 认证不该写成中间件 | 单元 3.3 顺序表 |
-
-**本次课埋下、后面必须回引的五处**（请在课件中明显标记）：
-
-- **单元 7.3 的 `| safe`** → 第 15 次课从这一行开始做 XSS 完整演示；
-- **单元 9.1 CORS 必须最外层** → 第 12 次课会先踩坑再回到这一页；
-- **单元 8.6 那张 JSON vs HTML 对照表** → 第 8 次课讲前后端分离时直接复用，回答"分离解决了什么、代价是什么"；
-- **单元 6.4 三层护栏中的"CI 机械检查"** → 第 9 次课实现；
-- **单元 6.3 worker × 连接池 × 数据库上限** → 第 16 次课联合计算。
-
-**本次课不承担、请勿提前引入**：ORM 与 Session（第 7 次课）、测试（第 9 次课）、前后端分离与 CORS 实操（第 12 次课）、认证与会话完整机制（第 14 次课）、XSS / CSRF 防护（第 15 次课）、任务队列与部署（第 16 次课）。
-
-**给第 6 次课的提示**：本次课交付的 M1 里，`GET /questions` 用的是 `LIMIT/OFFSET` 分页且数据量很小（seed 只有几十条）。**第 6 次课请在 M1 的基础上把数据灌到十万级**，让 OFFSET 分页和缺索引的问题自己浮出来——这是"痛感在前"的下一次应用。
+参考：FastAPI 的 Request Forms、Templates、Advanced Dependencies；Starlette Middleware；RFC 9110 的 303 See Other。制作演示工程时以锁定版本对应的官方文档和实测为准。

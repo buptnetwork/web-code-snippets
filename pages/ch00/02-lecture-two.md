@@ -22,6 +22,32 @@ layout: section
 
 ---
 
+# 讲二怎么学：会读，不要求从零写框架
+
+<div grid="~ cols-2 gap-6" class="mt-6 text-sm">
+<div class="p-5 rounded-lg border border-teal-500/40 bg-teal-500/5">
+<h3>阅读主线</h3>
+<p>读出参数、类型与默认值；认出属性访问、with 与结果转换。</p>
+<p>区分函数对象和调用；说明 @ 登记时机、return / raise 后的执行顺序。</p>
+<p>async / await 只读形状；0.12 亲手启动搜索服务并发一次请求。</p>
+</div>
+<div class="p-5 rounded-lg border border-sky-500/40 bg-sky-500/5">
+<h3>教师演示／课后回看</h3>
+<p>包装器和 MiniApp 内部实现由教师导读，允许暂停与回看。</p>
+<p>不要求手写嵌套装饰器、实现路由器或解释线程池。</p>
+<p>分层、依赖注入与统一异常设计，不作为第一课的先修门槛。</p>
+</div>
+</div>
+
+<div class="mt-5 p-3 rounded-lg bg-amber-500/10 text-sm">用给定源码和输出解释行为即可；讲一已练过的工具不重做整套。把日志关联与四处取证留给第一课。</div>
+
+<!--
+教学单元：讲二导读；本页：主线与阅读深度，不另加课时。
+原有 60 分钟包含教师演示与思路导读，不要求学生同步写完示例。包装器和 MiniApp 是阅读材料，不变成独立编码作业；代码阅读自检仍覆盖装饰器登记时机。
+-->
+
+---
+
 # 0.7 类型注解：不会自动检查实参类型
 
 <div class="text-xs opacity-55 -mt-1 mb-3">写了 <code>x: int</code>，不代表 Python 会自动拒绝其他类型。<b class="text-amber-600 dark:text-amber-400">注解不是运行时类型检查器。</b></div>
@@ -128,7 +154,7 @@ def get_questions(keyword: str = "", page: int = 1):
 
 <div grid="~ cols-2 gap-6">
 <div>
-<div class="text-xs tracking-widest opacity-60 mb-2">MiniApp 的初始化节选</div>
+<div class="text-xs tracking-widest opacity-60 mb-2">教师导读 · MiniApp 初始化节选</div>
 
 ```python
 class MiniApp:
@@ -183,7 +209,7 @@ print(message)
 ```
 
 <div class="mt-3 text-sm">前缀 <code>f</code> ＋花括号中的表达式。先计算，再放进字符串。</div>
-<div class="mt-3 p-3 rounded-lg bg-amber-500/10 text-sm">第一课反例用它拼 SQL。<b>读懂语法不代表认可安全性</b>；只在本地虚构数据上运行，参数化留第 6 次课。</div>
+<div class="mt-3 p-3 rounded-lg bg-amber-500/10 text-sm">第一课反例用它拼 SQL。<b>读懂语法不代表认可安全性</b>，仅限本地虚构数据；第 3 次用参数化模板，第 6 次解释原理。</div>
 </div>
 </div>
 
@@ -331,7 +357,7 @@ print(hello.__name__)  # hello → 有属性，说明是对象
 </div>
 
 <div>
-<div class="text-xs tracking-widest opacity-60 mb-2">无参装饰器：<code>@</code> 就是一行赋值的简写</div>
+<div class="text-xs tracking-widest opacity-60 mb-2">教师演示／回看 · 无参装饰器的展开</div>
 
 <<< @/snippets/lesson00/decorator_demo.py#log_call {lines:true,maxHeight:'235px'}
 
@@ -357,7 +383,7 @@ clicks: 2
 
 # 0.10 带参数的装饰器：先取得，再应用
 
-<div class="text-sm opacity-70 mb-3">以第一课的搜索路由为例。两步都发生在执行函数定义时，不是收到请求后才发生。</div>
+<div class="text-sm opacity-70 mb-3">用第一课 v1 / v2 的旧 POST 路由读两步：执行函数定义时登记，不是收到请求后才登记。</div>
 
 <div grid="~ cols-[0.85fr_1.15fr] gap-6" class="mt-4">
 
@@ -429,7 +455,7 @@ def get_questions():
 
 # 0.10 读一个小例子：MiniApp 的注册过程
 
-<div class="text-sm opacity-70 mb-2">已提供的阅读模型：字典保存对应关系，不要求照着设计自己的框架。</div>
+<div class="text-sm opacity-70 mb-2">教师演示／课后回看：字典保存对应关系，只追登记与调用，不要求复写或设计框架。</div>
 
 <<< @/snippets/lesson00/decorator_demo.py#miniapp {lines:true}
 
@@ -445,7 +471,7 @@ route 方法就是标准的两步：外层接住路径和方法，返回里面�
 
 # 0.10 用它登记两个函数：路由表长这样
 
-<div class="text-xs tracking-widest opacity-60 mb-2">登记两个函数（注意 <code>@app.route(...)</code> 的两步展开，就写在右边注释里）</div>
+<div class="text-xs tracking-widest opacity-60 mb-2">教师演示／课后回看 · 对照注释中的两步展开，找到登记时机</div>
 
 <<< @/snippets/lesson00/decorator_demo.py#register {lines:true}
 
@@ -476,7 +502,7 @@ class: text-center
 ---
 
 <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 font-bold text-sm tracking-wide">
-⏸ 暂停跟做 9 · 跑一遍 MiniApp，看到路由表
+阅读练习 9 · 教师演示／课后回看 MiniApp
 </div>
 
 <div class="mt-5 max-w-3xl mx-auto text-left">
@@ -508,12 +534,12 @@ hi
 
 </div>
 
-<div class="mt-4 inline-flex items-center gap-2 text-teal-700 dark:text-teal-300 font-bold">
-✓ 做完再继续
+<div class="mt-4 text-sm text-teal-700 dark:text-teal-300 font-bold">
+能解释登记与调用时机即可；本脚本可自行复演，不要求独立编写
 </div>
 
 <!--
-（跟做 9）在课件仓库根目录执行命令。模块顶层执行到装饰器时，route 和 decorator 已被调用，所以先打印注册；此时尚未调用 list_posts / create_post。随后主入口调用 handle 才得到处理结果。
+（阅读练习 9）教师在课件仓库根目录执行，学生对照源码与输出说明时机；自行复演可选。模块顶层执行到装饰器时，route 和 decorator 已被调用，所以先打印注册；此时尚未调用 list_posts / create_post。随后主入口调用 handle 才得到处理结果。
 
 直接运行脚本与第一次导入模块都可能执行顶层定义，但只有直接运行本文件时进入这里的 __main__ 分支。不能说注册发生在“任何函数调用之前”或“程序运行之前”。
 -->
@@ -569,9 +595,9 @@ response = await call_next(request)
 
 ---
 
-# 0.12 第一课环境：先启动单文件搜索服务
+# 0.12 环境必做：启动服务，只发一次请求
 
-<div class="text-sm opacity-70 mb-3">终端进入配套的 <code>snippets/ch01/m0-tracer</code> 目录，使用 Python 3.12。</div>
+<div class="text-sm opacity-70 mb-3">进入 <code>snippets/ch01/m0-tracer</code>，使用 Python 3.12；只确认 v1 能运行，不提前做取证。</div>
 
 ```bash
 uv sync --frozen
@@ -584,7 +610,7 @@ uv run uvicorn v1_ai_raw:app --host 127.0.0.1 --port 8000
 <div><b>环境边界</b><br>本步骤使用默认 SQLite 虚构教学数据；先确认没有继承其他 DATABASE_URL。不连接真实业务库，不部署公网。</div>
 </div>
 
-<div class="mt-4 text-sm">关闭服务用 Ctrl+C。/docs 的 CDN 不可用时，在第二终端使用下一条命令：</div>
+<div class="mt-4 text-sm">/docs 与 curl 二选一发请求；CDN 不可用时用下方 curl。核对结果后 Ctrl+C 停服务。</div>
 
 ```bash
 curl -i -X POST "http://127.0.0.1:8000/getQuestions?keyword=react&page=1"
@@ -597,7 +623,7 @@ curl -i -X POST "http://127.0.0.1:8000/getQuestions?keyword=react&page=1"
 
 ---
 
-# 0.12 配置从哪里读？看 os.getenv
+# 0.12 配置阅读参考：看 os.getenv
 
 <div grid="~ cols-2 gap-6" class="mt-5">
 <div>
@@ -645,8 +671,8 @@ uv run --env-file .env uvicorn v1_ai_raw:app
 </div>
 <div class="p-4 rounded-lg border border-gray-400/40">
 <h3>后续展开</h3>
-<p>第 3 次：校验、Pydantic。</p>
-<p>第 4 次：分层、Depends、配置与统一异常。</p>
+<p>第 3 次：输入／输出契约与 Pydantic。</p>
+<p>第 4 次：保契约重构，再批准错误体迁移。</p>
 <p>第 5 次：中间件与异步；第 6 / 7 次：SQL / ORM。</p>
 </div>
 </div>
