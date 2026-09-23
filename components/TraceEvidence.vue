@@ -52,7 +52,7 @@ page = {{ evidence.joined.variables.page }}</pre>
           <div class="boundary">同步端点在线程池中运行，不能在这个栈里硬找 uvicorn 和中间件。用 <b>rid</b> 把跨线程的事实接起来。</div>
         </section>
       </div>
-      <div class="evidence-source">实际停点输出重排，不是 IDE 界面。Python {{ evidence.python }} / FastAPI {{ evidence.versions.fastapi }} / debugpy {{ evidence.versions.debugpy }}；真实 IDE 截图与录像待补。</div>
+      <div class="evidence-source">实际停点输出重排，不是 IDE 界面。Python {{ evidence.python }} / FastAPI {{ evidence.versions.fastapi }} / debugpy {{ evidence.versions.debugpy }}。</div>
     </template>
 
     <template v-else-if="view === 'sql'">

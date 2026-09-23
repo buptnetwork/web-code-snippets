@@ -3,7 +3,7 @@ withDefaults(defineProps<{ active?: number; compact?: boolean }>(), { active: 0,
 const stages = [
   { title: '浏览器', sub: '构造请求 / 渲染', point: 1, observation: '报文' },
   { title: '解析与连接', sub: 'DNS / TCP / TLS', point: 0 },
-  { title: '反向代理', sub: '第 16 次课填', point: 0 },
+  { title: '反向代理', sub: '接收 / 转发请求', point: 0 },
   { title: 'ASGI 服务器', sub: 'uvicorn', point: 0 },
   { title: '中间件链', sub: '进入 / 离开', point: 2, observation: '应用日志' },
   { title: '路由与参数', sub: '匹配 / 校验', point: 0 },

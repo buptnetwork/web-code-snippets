@@ -5,15 +5,16 @@ layout: section
 # 讲一 · HTTP协议报文与工具链
 
 <div class="pt-3 text-sm opacity-60">
-0.1 跑在哪里 · 0.2 HTML·URL·HTTP 报文 · 0.3 JSON · 0.4 终端与工具链 · 0.5 读报错 · 0.6 调试器（高光）
+0.1 跑在哪里 · 0.2 HTML·URL·HTTP 报文 · 0.3 JSON · 0.4 终端与工具链 · 0.5 读报错 · 0.6 调试器
 </div>
 
 <div class="mt-8 text-xs opacity-50">
-本讲约 60 分钟 · 工具操作必须动手，知识全表按需查阅
+工具操作必须动手，知识全表按需查阅
 </div>
 
 <!--
 课前课第一讲。这一讲不讲任何框架，只干一件事：把"你写的代码到底跑在哪儿、报错怎么读、调试器怎么用"这三件高风险的前置项打通。
+教学预算：本讲约 60 分钟；这是备课估时，不作为已核对的录播时长或学生完成用时。
 
 这一讲有六节，其中 0.6 调试器保留二十五分钟。优先完成标注的工具跟做与切帧练习；HTML 标签全表、状态码全表和 mini 的完整 CRUD 流程作认读参考，不逐项要求掌握。
 -->
@@ -37,10 +38,11 @@ layout: section
 </div>
 </div>
 
-<div class="mt-5 p-3 rounded-lg bg-amber-500/10 text-sm">第一课会继续使用这些工具，不重做整套课前练习；课堂时间留给真实搜索请求的观察与取证。</div>
+<div class="mt-5 p-3 rounded-lg bg-amber-500/10 text-sm">第一课会继续使用这些工具，观察真实搜索请求，并核对不同位置留下的证据。</div>
 
 <!--
 教学单元：讲一导读；本页：区分必须操作与参考内容，不另加课时。
+第一课不重做整套课前练习，课堂时间留给真实搜索请求的观察与取证。
 详细材料保留在本讲。熟悉的语法和查表页可快进，但停点、切帧与请求工具要亲手验证；遇到困难先回看对应工具页，不提前要求设计框架。
 -->
 
@@ -81,7 +83,7 @@ layout: section
 </div>
 
 <div v-click class="mt-6 p-3.5 rounded-lg bg-amber-500/10 border-l-4 border-amber-500 text-sm">
-这是<span class="font-bold">两个进程</span>，通常在两台机器上；它们之间<span class="font-bold">只有报文往来</span>，没有别的联系。这门课接下来十六次，一大半时间在讲右边那个方框里的事。
+这是<span class="font-bold">两个进程</span>，通常在两台机器上；它们之间<span class="font-bold">只有报文往来</span>，没有别的联系。
 </div>
 
 <!--
@@ -334,7 +336,7 @@ URL 你们每天在用，但可能没拆过。看这一行，六段：协议、�
 <div v-click class="mt-4 grid grid-cols-2 gap-4 text-sm">
 <div class="p-3 rounded bg-gray-500/8">
   <div class="text-xs tracking-widest opacity-60 mb-1.5">先认脸、不求深解的四个头</div>
-  <code class="text-xs">content-type</code>（体是什么格式）· <code class="text-xs">content-length</code>（体多长）· <code class="text-xs">location</code>（新资源在哪）· <code class="text-xs">cookie</code>（第 13 次课正题）
+  <code class="text-xs">content-type</code>（体是什么格式）· <code class="text-xs">content-length</code>（体多长）· <code class="text-xs">location</code>（新资源在哪）· <code class="text-xs">cookie</code>（请求携带的 Cookie 数据）
 </div>
 <div class="p-3 rounded bg-gray-500/8">
   <div class="text-xs tracking-widest opacity-60 mb-1.5">方法与状态码只记轮廓</div>
@@ -344,6 +346,7 @@ URL 你们每天在用，但可能没拆过。看这一行，六段：协议、�
 
 <!--
 现在用 HTTP/1.1 的文本示意读四部分：起始行、头、空行、体。不要把该排版说成 HTTP/2 或 HTTP/3 的线上字节。
+Cookie 在此只认读请求头的含义，完整机制留第 13 次课。
 
 注意中间这个空行——它是头和体的唯一分界，没有它服务端不知道头到哪儿结束。学生最容易忽略它，所以我把它标红。
 
@@ -570,7 +573,7 @@ curl -i -X POST http://127.0.0.1:8000/echo -H 'content-type: application/json' -
 
 # 0.3 JSON 的形状
 
-<div class="text-xs opacity-55 -mt-1 mb-3">快讲。重点只有一件事：看着一段嵌套 JSON 说出「这是对象，里面有个数组，数组里是对象」。</div>
+<div class="text-xs opacity-55 -mt-1 mb-3">读懂嵌套 JSON：辨认最外层对象、其中的数组与数组中的对象。</div>
 
 <div grid="~ cols-[1fr_1.1fr] gap-6" class="mt-2">
 
@@ -619,6 +622,7 @@ curl -i -X POST http://127.0.0.1:8000/echo -H 'content-type: application/json' -
 </div>
 
 <!--
+本页快讲，重点是让学生用对象、数组和嵌套关系描述结构。
 JSON 就六种值，对象、数组、字符串、数字、布尔、null。没别的了。
 
 三个坑，你们写的时候一定会踩：JSON 里是小写的 true false null，Python 里是大写的 True False None。还有键必须用双引号，单引号 JSON 不认。
@@ -631,7 +635,7 @@ JSON 就六种值，对象、数组、字符串、数字、布尔、null。没�
 
 # 0.4 终端、进程与项目工具链
 
-<div class="text-xs opacity-55 -mt-1 mb-3">纯操作节，必须逐条跟做。直接预防第 1 次课的四类现场事故：工作目录不对、端口被占、虚拟环境没激活、<code>.env</code> 被误提交。</div>
+<div class="text-xs opacity-55 -mt-1 mb-3">请逐项检查工作目录、端口、运行环境与 <code>.env</code> 的提交边界，并完成对应的跟做练习。</div>
 
 <div grid="~ cols-2 gap-x-6 gap-y-3" class="mt-2 text-sm">
 
@@ -692,6 +696,7 @@ JSON 就六种值，对象、数组、字符串、数字、布尔、null。没�
 
 <!--
 这一节全是操作，你们必须跟着做，光看没用。它直接预防第 1 次课教案里记录的四类现场事故。
+备课检查点：工作目录不对、端口被占、运行环境不对、.env 被误提交。使用 uv run 时不要求学生另行激活虚拟环境。
 
 先说工作目录：按具体示例指定目录运行。第一课在 snippets/ch01/m0-tracer 启动；os.getenv 只读取进程环境，创建 .env 不会自动生效，要显式加载。讲二 0.12 会让学生实际启动单文件搜索服务。
 
@@ -984,7 +989,7 @@ class: text-center
 
 # 0.6 调试器：暂停后能多看什么
 
-<div class="text-xs opacity-55 -mt-1 mb-3">本节保留动手时间。日志记录经过，调试器观察停点状态；两者互补，不是二选一。</div>
+<div class="text-xs opacity-55 -mt-1 mb-3">日志记录经过，调试器观察停点状态；两者互补，不是二选一。</div>
 
 <div grid="~ cols-2 gap-6" class="mt-2">
 
@@ -1032,6 +1037,7 @@ class: text-center
 
 <!--
 这二十五分钟是这一讲最重要的，我建议你们看两遍。
+本节保留动手时间，优先让学生亲手命中断点、切换栈帧并解释变量。
 
 临时 print 只输出你写下的表达式；调试器允许在停点查看当前帧变量、沿当前线程调用栈切换。日志适合保留经过，断点会改变运行时序，两者都有边界。
 
@@ -1075,7 +1081,7 @@ class: text-center
 clicks: 5
 ---
 
-# 0.6 高光 · 三层嵌套的压栈弹栈
+# 0.6 三层嵌套的压栈弹栈
 
 <div class="text-xs opacity-55 -mt-1 mb-1">跟着点 <b>5</b> 下，盯住右边栈的高度怎么变。断点打在 <code>return total</code>。</div>
 

@@ -9,11 +9,12 @@ layout: section
 </div>
 
 <div class="mt-8 text-xs opacity-50">
-讲解约 60 分钟，暂停跟做另计 · 只为读懂代码，不提前设计框架
+读懂代码，不要求从零设计框架
 </div>
 
 <!--
 课前讲二只为读懂第 1 次课的单文件搜索案例。学生已经练过启动程序、读报文和切换栈帧；这一讲补上函数签名、对象访问和执行顺序。
+教学预算：讲解约 60 分钟，暂停跟做另计；不是已核对的录播时长。
 
 节奏建议：注解 6 分钟、对象与表达式 14 分钟、异常 8 分钟、装饰器 16 分钟、async 4 分钟、启动与 import 5 分钟、阅读边界与自检 7 分钟。暂停跟做单独计时。
 
@@ -39,10 +40,11 @@ layout: section
 </div>
 </div>
 
-<div class="mt-5 p-3 rounded-lg bg-amber-500/10 text-sm">用给定源码和输出解释行为即可；讲一已练过的工具不重做整套。把日志关联与四处取证留给第一课。</div>
+<div class="mt-5 p-3 rounded-lg bg-amber-500/10 text-sm">用给定源码和输出解释行为；遇到不熟悉的工具操作，可回看讲一的对应练习。</div>
 
 <!--
 教学单元：讲二导读；本页：主线与阅读深度，不另加课时。
+讲一已练过的工具不重做整套，把日志关联与四处取证留给第一课。
 原有 60 分钟包含教师演示与思路导读，不要求学生同步写完示例。包装器和 MiniApp 是阅读材料，不变成独立编码作业；代码阅读自检仍覆盖装饰器登记时机。
 -->
 
@@ -323,12 +325,13 @@ raise RuntimeError("故意触发")
 </div>
 </div>
 
-<LessonLink>第一课观察 /boom：已有记录中，哪些留下了，哪些没有？今天只提供预测执行顺序的工具，不提前补全异常处理。</LessonLink>
+<LessonLink>第一课观察 /boom：已有记录中，哪些留下了，哪些没有？请根据 return / raise 的执行顺序预测，再与实际输出核对。</LessonLink>
 
 <div class="mt-4 text-sm opacity-75">回想 mini 的退出码：机器也需要可识别的失败信号。HTTP 应怎样表达失败，在第一课用实际报文核对。</div>
 
 <!--
 教学单元：0.9；本页：正常返回与异常传播。
+课前只提供预测执行顺序的工具，不提前补全异常处理。
 先区分语言层面的 return 与 raise，再引出第一课的观察问题。不能把返回值方式一概判错，也不能声称抛异常就自动得到正确的业务状态码。mini 只是运行练习，不承诺第一课把它原封不动改成 Web 分层项目。
 -->
 
@@ -553,7 +556,7 @@ hi
 <div class="space-y-4">
 <div><b>async def</b>：本例定义协程函数。调用时得到协程对象，函数体要在被等待或调度后才执行。</div>
 <div><b>await</b>：等待结果时可能挂起，让事件循环处理其他任务；不保证每遇到 await 就切换。</div>
-<div>普通 Python 文件里，await 写在 async 函数内；暂不讨论异步生成器等其他形态。</div>
+<div>普通 Python 文件里，await 写在 async 函数内。</div>
 </div>
 <div>
 <div class="text-xs tracking-widest opacity-60 mb-2">v2_traceable.py · 中间件的一行</div>
@@ -571,6 +574,7 @@ response = await call_next(request)
 
 <!--
 教学单元：0.11；本页：async 阅读边界。
+暂不讨论异步生成器等其他形态，保持本例协程函数与等待表达式的阅读范围。
 只读表达式的作用，不提前给出完整中间件和请求关联方案。同步端点交给工作线程的机制留第 5 次课，第一课通过实际停点认识观察边界。
 -->
 
@@ -578,7 +582,7 @@ response = await call_next(request)
 
 # 0.12 import 与启动：先确认站在哪个目录
 
-<div class="text-sm opacity-70 mb-4">本例的模块是 .py 文件；mini 是带 __init__.py 的普通包。其他包形态暂不展开。</div>
+<div class="text-sm opacity-70 mb-4">本例的模块是 .py 文件；mini 是带 __init__.py 的普通包。</div>
 
 | 运行方式 | 默认放到搜索路径前面的目录 | 本例用途 |
 |---|---|---|
@@ -590,6 +594,7 @@ response = await call_next(request)
 
 <!--
 教学单元：0.12；本页：运行路径。
+只覆盖本例的模块与普通包，其他包形态暂不展开。
 使用常规 Python 启动设置解释搜索路径，不展开隔离模式和自定义 PYTHONPATH。mini 仅回收讲一的运行经验；这里不推导依赖方向或要求改架构。
 -->
 
@@ -597,7 +602,7 @@ response = await call_next(request)
 
 # 0.12 环境必做：启动服务，只发一次请求
 
-<div class="text-sm opacity-70 mb-3">进入 <code>snippets/ch01/m0-tracer</code>，使用 Python 3.12；只确认 v1 能运行，不提前做取证。</div>
+<div class="text-sm opacity-70 mb-3">进入 <code>snippets/ch01/m0-tracer</code>，使用 Python 3.12；本页检查 v1 的服务启动与搜索结果。</div>
 
 ```bash
 uv sync --frozen
@@ -689,9 +694,9 @@ layout: center
 class: text-center
 ---
 
-# 这张表的另一个用途
+# 遇到不懂的代码，先保持阅读主线
 
-<div class="mt-2 text-sm opacity-75 max-w-2xl mx-auto">这才是本节真正的落点——它本身就是一次示范：<b>面对不懂的代码，正确反应不是恐慌</b>，而是三步。</div>
+<div class="mt-2 text-sm opacity-75 max-w-2xl mx-auto">面对暂时不懂的代码，不必停在第一个疑问上；先用下面三步保持阅读主线。</div>
 
 <div class="mt-8 max-w-3xl mx-auto grid grid-cols-3 gap-4 text-left">
 <div class="p-4 rounded-lg border-2 border-teal-500/40 bg-teal-500/5">
