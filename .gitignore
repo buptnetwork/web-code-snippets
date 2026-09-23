@@ -1,0 +1,21 @@
+# Python 运行缓存与字节码
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# uv / 虚拟环境与本地凭据
+.venv/
+.env
+
+# 第一次课的隔离演示与验证运行产物
+ch01/m0-tracer/*.db
+ch01/m0-tracer/*.log
+ch01/m0-tracer/m0-verify-*/
+ch01/m0-tracer/.capture/
+
+# 课前课代码素材运行产物
+lesson00/todos.json
+
+# IDE / 系统
+.idea/
+.DS_Store
