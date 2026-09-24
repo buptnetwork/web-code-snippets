@@ -1,313 +1,345 @@
-# 第 4 次课教学底稿（完整整改版）
-## 可控重构：依赖、职责与错误边界
+# 第 4 次课教学底稿（第四版）
+## 依赖注入与统一错误出口
 
-## 〇、备课定位与起点
+> **备课基线**：[第四版大纲](../syllabus-v4.md)第 4 课与[新版第 3 课交接](lesson-03.md)。本稿重新编写，尚未移交归档；独立工程、故障设施与课件需随后制作。旧稿的数据库技术栈、事务方案和验证记录不作为本轮已完成项。
 
-本课不是“把全部重复清零”，而是**在回归保障下，把一项共享规则放到可指认的位置，并说明哪些行为没有改变**。课件可以保留完整代码、异常时序与配置参考，课堂只要求学生独立完成一个重构任务。
+## 〇、这次课要建立什么
 
-取消本课20分钟诊断小测。按95分钟教学＋5分钟缓冲安排，不在正文或作业中重新加回小测。
+**讲给学生的目标句**：你能把重复的资源获取收敛进一个依赖，并让约定范围内的错误从统一出口返回。
 
-起点是第三课合格交付：
-- `GET /questions`：keyword/page/page_size；page≥1，page_size默认20、范围1—50；`items/total/page`。
-- `GET /questions/{qid}`、`POST /questions`：`QuestionOut`，创建201，作者由服务端固定夹具提供。
-- Query/Path/Pydantic 已生效，title/body先strip再长度校验；不退回手工if和静默修正。
-- `/healthz` 必保留200 ok/ok、数据库故障503 degraded/down。
-- 同步SQLAlchemy Core、已有Engine连接池；创建模板先提交再返回成功；标题唯一约束和标签关联不能丢。
-- request-id沿用M0合法格式 `[A-Za-z0-9._-]{1,64}` 与进入/离开日志；未知异常路径是明确的历史观测缺口。
+核心解释目标是：**依赖什么时候求值、资源什么时候释放、提交与响应谁先发生。** 第 3 课已有正确的 SQLite 读写和服务层显式提交；今天改变资源传递方式，再明确迁移错误契约，不重新设计输入模型或数据库。
 
-### 95分钟课堂路线
+课堂路线：**回归三端点 → 正常连接依赖 → 教师接列表 → 学生接创建与详情 → 提交前后故障对照 → 统一错误 → request-id 与探针升级**。不把“先发成功再提交”的错误方案作为学生主线起点。
 
-| 单元 | 分钟 | 课堂处理 |
-|---|---:|---|
-| 一、回归基线与真实变更 | 5 | 主讲 |
-| 二、正确但重复的代码 | 10 | 教师统计实际位置，不预填数字 |
-| 三、连接依赖与事务时序 | 14 | 教师演示资源与失败边界 |
-| 四、一次共享规则重构 | 22 | 唯一学生现场必做，中途运行回归 |
-| 五、错误契约与表现层 | 14 | 教师演示，完整处理器课后读 |
-| 六、抽取业务职责 | 12 | 主讲一条创建链，参考实现课后读 |
-| 七、配置与横切逻辑 | 10 | 思路导读；认证细节后移 |
-| 八、交接与作业 | 8 | 核对前后行为与取舍 |
-| 合计 | 95 | 另留5分钟缓冲 |
+### 95 分钟教学 + 5 分钟缓冲
 
-A档：基础重构、资源和异常路径验证、错误契约、配置检查，允许课后补齐。B档：依赖工厂、完整依赖树、更多方案比较；认证实现第十四课，完整事务第七课，中间件调度与洋葱细节第五课。超时压缩API罗列和配置现场敲写，不压缩回归结果解释。
-
-## 一、先保存事实：本课有两类不同改动
-
-**课堂5分钟。**
-
-| 阶段 | 允许改变 | 不允许改变 |
+| 分钟 | 教学单元 | 当场产出 |
 |---|---|---|
-| R：纯重构 | 代码位置、资源获取入口、函数边界 | 方法、路径、状态、参数名、默认值、范围、业务规则、成功响应 |
-| E：批准的错误契约迁移 | 普通业务JSON错误统一为code/message/detail/request_id；同步OpenAPI与前端 | 探针200/503形状、既有成功响应和状态语义 |
+| 5 | 回顾三端点里的重复代码 | 标出真实连接入口及不变契约 |
+| 15 | Depends 与资源生命周期 | 依赖求值、复用与清理的位置 |
+| 18 | 教师抽取连接依赖并接列表 | 正常读取；断点核对服务层提交顺序 |
+| 25 | 学生接入创建与详情 | 回归通过；两组故障的响应和数据对照 |
+| 15 | 业务异常与统一错误出口 | 404／409／422／500 的职责与安全正文 |
+| 10 | request-id 模板与探针升级 | 日志与响应关联；数据库失败 503 |
+| 7 | 提交边界、作业与交接 | 一份重构差异及验收说明 |
+| **95** | **合计** | **另留 5 分钟缓冲，无课内小测** |
 
-先跑教师提供的第三课行为检查，再进入R。E阶段独立记录预期差异，不能把“新增错误字段”冒充纯重构。旧快照留作历史，只有批准的变更才更新断言。下文代码按职责分段，不是按文章顺序拼接的单文件：组装时先定义模型/异常和基础设施，再定义依赖/service与router，最后注册处理器、中间件并include_router。迁移时替换旧业务路由声明，不将同方法同路径的新实现追加到旧路由后。
+前置是函数参数、异常与 `try/finally`、`yield` 的形状。先用资源“交出／归还”解释，不要求学生实现生成器调度。超时先压缩完整处理器逐行阅读与参考层，不压缩正常接线、学生任务和两次独立连接回读。
 
-教师回归包应覆盖：正常/空列表、分页边界、详情存在/不存在/非法qid、合法/非法/重复创建、标签保存、输出字段、id与日志、探针失败与恢复。第九课再系统教测试设计和CI，但今天就运行这些检查。
+### 教师提供与学生负责
 
-## 二、起始案例：保留第三课的正确成果
-
-**课堂10分钟。** 以下是第三课已有辅助函数和模型上的端点节选，不是新造一个有四个列表的学生项目。
-
-```python
-from fastapi import Query
-
-@app.get("/questions", response_model=QuestionListOut)
-def list_questions(
-    keyword: str = Query(""), page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=50),
-):
-    with engine.connect() as conn:
-        return read_page(conn, keyword, page, page_size)
-```
-
-创建端点使用第三课 `with engine.begin()`、命名唯一约束翻译、`QuestionOut.model_validate` 和Location；详情使用连接上下文与输出映射。它们可以是正确但资源管理写在各端点中的代码，不能重新引入第三课已修复的错误。
-
-让学生统计实际情况：
-
-| 问题 | 记录什么 | 不预设什么 |
+| 提供物 | 标注 | 学生要求 |
 |---|---|---|
-| 业务端点如何获取和释放连接 | 函数/文件/位置 | 每次都是新的物理连接 |
-| 分页规则有几处 | Query或等价权威定义 | 人人都有4个分页端点 |
-| 错误正文有哪些 | 用真实请求收集 | 一定有5种格式或11处错误 |
-| 创建的业务与SQL混在哪里 | 具体调用位置 | 每个端点都必须新增service |
+| 第 3 课模型、参数化 SQL、SQLite 种子与升级 | 要求会用，保留上课已要求解释的绑定关系 | 不改公开字段与搜索语义，不重建库覆盖已有数据 |
+| `get_conn`、服务层显式提交与异常传播 | 要求解释 | 能接入剩余端点、指出提交和清理的位置 |
+| 统一错误处理器、OpenAPI 注册骨架 | 要求解释 | 解释业务异常与 HTTP 翻译、核对状态和字段；不从零敲完全部处理器 |
+| request-id 中间件与结构化日志模板 | 要求解释 | 解释进入、正常返回、异常离开及外层兜底分别负责什么 |
+| 两个事务故障开关、依赖观察器、回归器 | 黑盒 | 选择固定模式并核对响应、日志与数据，不编写设施 |
 
-本课的真实共享需求是：“三个核心业务端点采用统一的连接生命周期，创建失败先退出事务；错误编号和正文通过表现层集中生成。”只有一个分页端点时，抽分页依赖可以服务清晰边界，但不虚构大量减少修改位置的收益。
+继续使用标准库 sqlite3，不引入 PostgreSQL、SQLAlchemy、ORM、作者字段、用户表或标签关联表。tags 仍存为 JSON 文本；不实现认证、限流、配置框架或分页依赖工厂来挤占本课任务。
 
-漏改一处是否被发现取决于检查覆盖。教师可在隔离副本故意漏接一个依赖或漏改422文档，让**已有回归检查报错**。不要称漏改“没有任何方式发现”，也不要要求学生故意把自己的合格代码改坏。
+## 一、回顾：先分清纯重构与契约迁移
 
-## 三、连接依赖：使用期间有资源，退出时有确定边界
+**课堂 5 分钟。先运行正常列表、详情和一次合法创建，再标出三处 `closing(open_connection())`。**
 
-**课堂14分钟，完整时序A档课后阅读。**
+### 1.1 第 3 课带来的基线
 
-### 3.1 普通函数与依赖的差别
+- `GET /questions`：keyword/page/page_size，默认空字符串／1／20，page≥1、page_size 为 1–50；先清洗关键词，标题或正文做字面子串匹配，样本英文字母不区分大小写，`%`／`_` 不作通配符；id 降序后分页，total 为分页前总数。
+- 列表外壳为 items/total/page；列表、详情与创建均含 id/title/body/tags/created_at。保留正文，无 author 或 version。
+- `GET /questions/{qid}`：仍为 `qid: int`，无正数限制。不存在的整数（包括 0、负数）为业务 404；非整数为请求校验 422。
+- `POST /questions`：title 清洗后长 5–200，body 清洗后长 10–20000；tags 默认空列表、最多 5 项、不额外去重；额外输入字段拒绝。成功 201 + Location，精确重复标题 409。
+- 服务层已在提交前构造 `QuestionOut`，显式 commit 返回后才把结果交给端点；数据访问函数不提交。
+- `/healthz` 此时仅为 200、`{"status":"ok"}`，不查数据库；request-id 与统一错误体尚未引入。
 
-普通上下文管理器也能正确释放资源，测试也可通过传参或替换函数实现；不是“没有Depends就无法测试”。Depends的收益是把需求声明在签名、接入框架生命周期和替换挂点，代价是执行流程更隐式。
+### 1.2 本课按阶段验收
 
-先提供业务异常，不含HTTP状态码：
+| 阶段 | 允许改变 | 不允许悄悄改变 |
+|---|---|---|
+| R：资源重构 | 连接入口、传参和函数位置 | 方法、路径、参数、校验、成功字段、原错误正文和探针行为 |
+| E：错误与观测升级 | 普通 JSON 错误迁为四字段；增加 request-id；探针增加数据库检查与 503 | 既有业务状态码、成功数据、提交位置；探针仍只含 status 字段 |
 
-```python
-class AppError(Exception):
-    """预期的业务失败；HTTP映射放在表现层。"""
+先保存 R 前结果，再在资源正常、单一边界输入等给定条件下核对 R 后等价；进入 E 时才更新批准的错误正文和探针断言。连接移到依赖后，多种失败同时发生时的优先级可能变化，见 3.1，不声称全部故障组合都等价。不能把新增错误字段称为“行为完全没变”。回归器由教师提供，第 9 课再系统学习测试设计。
 
-class QuestionNotFound(AppError):
-    pass
+本稿代码是分阶段参考：沿用第 3 课模型、行映射、查询／插入和创建服务。替换旧路由，不在同一 app 后面追加同方法同路径的第二份声明。E 阶段使用新的应用装配，明确替换 R 的注册结果；静态页挂载由教师保留。
 
-class DuplicateTitle(AppError):
-    pass
-```
+## 二、依赖：声明需要什么，框架在调用前准备
 
-资源依赖参考（engine来自统一数据库模块，不在依赖里反复create_engine）：
+**课堂 15 分钟。约 6 分钟解释签名与 yield，5 分钟观察复用，4 分钟观察清理。**
+
+### 2.1 正常的资源提供者
+
+`Depends(get_conn)` 传的是可调用对象，不写成 `Depends(get_conn())`。框架按请求解析依赖，把返回或 yield 的对象传给端点；不是 Python 类型注解自己打开数据库。
 
 ```python
 from typing import Annotated, Iterator
+
 from fastapi import Depends
-from sqlalchemy import Connection
-from sqlalchemy.exc import IntegrityError
 
 
-def get_conn() -> Iterator[Connection]:
+def get_conn() -> Iterator[sqlite3.Connection]:
+    conn = open_connection()
     try:
-        with engine.begin() as conn:
-            yield conn
-    except IntegrityError as exc:
-        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
-        if constraint == "questions_title_key":
-            raise DuplicateTitle() from exc
-        raise
+        yield conn
+    finally:
+        conn.close()
 
 
-ConnDep = Annotated[Connection, Depends(get_conn, scope="function")]
+ConnDep = Annotated[sqlite3.Connection, Depends(get_conn)]
 ```
 
-数据库错误翻译是基础设施边界，识别的是PostgreSQL/psycopg结构化诊断，不搜索异常字符串。捕获在事务上下文之外，覆盖语句或提交失败，并先回滚/释放再向表现层传播。别的完整性错误不能全报“重复标题”。
+解释三处：获取成功后才 yield；端点使用同一连接；正常或异常退出都进入 finally 关闭。若获取阶段就失败，尚未交出连接，端点不会执行。部分初始化失败的清理由资源工厂自己负责。
 
-R阶段先用以下过渡适配器承接第三课的existing_error与ExistingErrorOut，404/409仍是原三字段；422和未知异常保持旧处理，不能提前迁移。它在事务退出后处理业务异常，不会把失败吞在事务里。E阶段再用第五单元register_handlers替换此适配器；两阶段分别新建应用并重启，不在服务已运行后修改处理器。
+教师的连接工厂仍设 `row_factory=sqlite3.Row`、非自动提交的写事务模式，例如显式 `isolation_level="DEFERRED"`。**本课同步 yield 依赖与同步端点不保证由同一工作线程执行**，工厂须设置 `check_same_thread=False`，并保持每请求独立连接、同一连接不并发使用。该参数取消线程亲和检查，不会自动提供并发安全；不把单个全局连接共享给所有请求。
+
+`conn.close()` 不是成功提交；本例尚未提交的事务会被关闭回滚。正常写入必须由服务层 commit。显式服务层 rollback 负责失败分支，关闭资源是最终清理，不用“反正 close 会处理”代替业务事务边界。
+
+### 2.2 同一请求中的复用：先预测
+
+固定同一个函数对象、同一默认作用域、没有 `use_cache=False`。教师在隔离只读应用中同时直接和间接请求 ConnDep：
 
 ```python
-from fastapi import Request
+def connection_identity(conn: ConnDep):
+    return id(conn)
 
 
-def register_r_handlers(app):
-    @app.exception_handler(QuestionNotFound)
-    async def not_found(request: Request, exc: QuestionNotFound):
-        return existing_error(request, 404, "question_not_found", "问题不存在")
+IdentityDep = Annotated[int, Depends(connection_identity)]
 
-    @app.exception_handler(DuplicateTitle)
-    async def duplicate(request: Request, exc: DuplicateTitle):
-        return existing_error(request, 409, "duplicate_title", "标题已存在")
+
+def dependency_probe(conn: ConnDep, identity: IdentityDep):
+    return {"same_connection": id(conn) == identity}
 ```
 
-R阶段路由responses仍声明ExistingErrorOut。E阶段不再调用register_r_handlers，避免具体异常处理器优先于AppError处理器而保留旧正文。
+教师把它临时注册到隔离实验路径，并在 `get_conn` 获取处计数。预测：是一个还是两个连接？核对结果：一次请求获取一次，两个位置用同一个对象；下一次请求重新获取，最终各自关闭。不能仅比较跨请求 id 数字，Python 可能复用已经释放对象的地址。
 
-### 3.2 成功响应必须晚于提交
+这是请求内依赖缓存，不是全局数据库池。换成不同函数对象、改变缓存配置或生命周期，会改变条件；完整依赖图与工厂是参考层。
+
+### 2.3 默认退出时机与观察边界
+
+当前锁定 FastAPI 的默认 request 作用域，普通响应发送后才退出 yield 依赖。因此：
 
 ```text
-请求 → 依赖进入with，到yield交出Connection
-     → 端点与普通响应数据处理
-     → 函数作用域依赖退出：提交成功 / 异常回滚与释放
-     → HTTP成功响应发送
+依赖获取连接 → yield → 端点调用服务 → 服务提交并返回
+           → 端点返回普通数据 → 输出处理 → 发送响应 → 依赖 finally 关闭
 ```
 
-这是 `scope="function"` 的必要前提，不是默认yield依赖的普遍时序。当前FastAPI默认request作用域在响应发送后退出；此时提交失败可能无法撤回已经发送的201。
+这是普通成功路径，不是所有异常和流式响应的统一事件图。请求失败、输出处理失败时，依赖也会在退出路径清理；未知异常由外层处理。不能把 finally 的执行理解为事务已经成功。
 
-- 所有取连接位置复用同一个ConnDep，子依赖也用它，不能混入无scope的另一份get_conn声明。
-- 需要包裹ConnDep的yield子依赖也须匹配function生命周期；request作用域yield不能依赖生命周期更短的function资源。
-- 正常退出提交；异常穿过上下文后回滚。不能在with内部吞业务错误然后返回一个“正常Response”，否则事务可能照常提交。
-- `yield` 后的普通语句遇异常不保证执行；资源释放靠with或finally。进程被杀、严重运行时故障不是框架可以保证的清理场景。
-- 这是普通短请求策略。流式响应、后台任务不能在依赖已关闭后继续用同一连接。
-- 提交时网络断开可能导致结果未知；“没有返回201”不保证数据库绝未提交，安全重试留第八课。
+教师在获取、yield 后退出、服务 commit 前后设观察点。IDE 断点证明运行到了哪行；**仅凭某一断点与浏览器的肉眼先后，不能精确证明响应启动时刻**，由教师 ASGI 事件观察器辅助核对。TestClient 返回时通常已执行清理，不能据此误判清理发生在响应前。
 
-教师做两个最小验证：事务中插入后抛异常，表内不留行；模拟依赖退出失败，比较request作用域与function作用域客户端状态。第二个是时序模拟，不冒称真实数据库commit失败覆盖。
+其他作用域可改变清理时机，本课不使用退出阶段提交方案。流式响应、后台任务与进程强制终止另有边界，不承诺关闭后的连接还能被继续使用。
 
-### 3.3 Engine、Connection与将来的Session
+## 三、教师构建：接通一个端点，提交位置不移动
 
-Engine配置连接池与方言；Connection是借出的数据库连接使用接口；Session提供ORM工作单元等能力。现在已经有连接池策略，不能写“第七课才有池”。
+**课堂 18 分钟。约 8 分钟接列表并回归，6 分钟沿创建服务追踪，4 分钟核对职责。**
 
-本课把连接/事务入口集中。第七课换Session还涉及模型、repository、查询结果、加载策略和错误翻译，**不保证只改deps.py一个文件**。集中边界减少传播，不让真实差异消失。
+### 3.1 教师接入列表（R 阶段）
 
-## 四、唯一现场必做：一次可验证的共享资源重构
-
-**课堂22分钟。**
-
-任务分成一个连续过程：
-1. 保存R阶段前的检查结果与实际位置数。
-2. 接入ConnDep，先改列表与创建的资源入口；中间跑一次回归。
-3. 详情改同一入口，探针保持独立失败边界。
-4. 检查非法输入仍422、page_size名称没变、成功输出一致、失败没有半截业务数据。
-5. 写一段“集中在哪、哪些没抽、为什么”的说明。
-
-完整service与错误处理器由教师骨架提供，学生不在22分钟内从零敲完所有文件。跟不上时可以使用标明版本的阶段副本继续，缺少的独立改动课后补，不用固定tag名称假装已经有可切换仓库。
-
-### 4.1 分页依赖：内部名称不改变公开参数
+以下片段替换第 3 课列表端点，查询函数保持不变：
 
 ```python
-from dataclasses import dataclass
-from fastapi import Query
-
-PAGE_SIZE_MAX = 50
-
-@dataclass(frozen=True)
-class Page:
-    page: int
-    size: int
-    offset: int
-
-
-def pagination(
+@app.get("/questions", response_model=QuestionListOut)
+def list_questions(
+    conn: ConnDep,
+    keyword: str = Query(""),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=PAGE_SIZE_MAX),
-) -> Page:
-    return Page(page=page, size=page_size, offset=(page - 1) * page_size)
-
-
-PageDep = Annotated[Page, Depends(pagination)]
-
-
-@router.get("/questions", response_model=QuestionListOut)
-def list_questions(conn: ConnDep, pg: PageDep, keyword: str = Query("")):
-    return repo.read_page(conn, keyword, pg.page, pg.size)
+    page_size: int = Query(20, ge=1, le=50),
+):
+    return search_questions(conn, keyword, page, page_size)
 ```
 
-这里router不额外配置`/questions`前缀；如果项目已有前缀，路径相应写空串，不能重复成`/questions/questions`。约束仍是第三课的1—50，输入不合法仍422，不静默改20。
+先核对空关键词三条、react 一条、空结果、第二页，再测 page=0。依赖进入和端点进入不是一件事：本课已经把获取连接移出端点，非法输入时部分依赖可能已运行；只承诺非法输入不进入该业务端点、不执行本次插入，不再声称“422 时一定没有连接”。
 
-`Page.size`是内部字段，HTTP必须叫page_size；也可以内部Query参数叫size并显式alias="page_size"，但本课参考直接沿用公开名字。OpenAPI必须只有page_size，不新增公开size。
+上述 422 回归以资源可正常获取为条件。若连接获取失败且 page=0 同时发生，当前实现可能先返回 500：第 3 课端点内才获取连接，非法参数会先被拒绝；重构后依赖求值可能先失败。这是需记录的失败优先级差异，不是输入规则被放宽，也不靠把连接错误伪装成 422 来保持表面一致。
 
-只用一次也可能因资源生命周期或清晰边界值得抽依赖；复用次数不是唯一判据。若做“上限50→30”变更实验，只在隔离副本明确变更规格并跑边界，回归交接版本恢复50；不把这个实验混进主线纯重构。
+### 3.2 逐行解释第 3 课已有的事务服务
 
-### 4.2 子依赖和缓存（教师导读）
+继续使用第 3 课 `create_question_service(conn, payload)`，不是新增另一套提交方案：
+
+```text
+insert_question（只写入）
+  → find_question（同一连接回读）
+  → QuestionOut.model_validate（提交前检查可返回的字段）
+  → conn.commit（确认本次事务提交）
+  → 返回 DTO 给端点
+```
+
+- 服务层拥有这次创建的事务边界：发生异常先 rollback，再向外抛。内部辅助函数不各自提交，不对同一连接嵌套调用另一个自行提交的用例。
+- 只有已知标题唯一冲突转为 DuplicateTitle。当前 SQLite 基线唯一的 UNIQUE 约束是 questions.title；判断 `SQLITE_CONSTRAINT_UNIQUE` 依赖此前提。NOT NULL 或其他数据库失败不冒充 409。
+- 第 3 课已在提交前显式验证输出记录，因此这一步失败会回滚。但提交后仍可能发生程序错误，不能把“有输出模型”说成全部 500 都没有写入。
+- 底层异常字符串、SQL 与用户输入不直接进入公开错误正文。
+
+### 3.3 职责图只沿一条创建链
+
+| 位置 | 负责什么 | 不负责什么 |
+|---|---|---|
+| 依赖 | 提供有效连接、最后关闭 | 不代替服务提交，不决定 HTTP 状态 |
+| 端点与处理器 | 接收已校验输入、设置状态／头、翻译异常 | 不直接拼 SQL，不把业务层绑死在 HTTP |
+| 服务 | 编排创建、显式提交、失败回滚 | 不创建 JSONResponse，不决定浏览器展示 |
+| 数据访问与行映射 | 参数绑定、执行 SQL、转换存储字段 | 不私自 commit，不替接口更改契约 |
+
+普通函数传参和上下文管理器也能正确管理资源。Depends 增加框架生命周期与可替换挂点，不是“没有它就无法测试”。不以端点行数、文件个数或“零个 with”评分，简单读取可以直接调用数据访问函数。
+
+## 四、学生任务：剩余两端点与两组事务证据
+
+**课堂 25 分钟。建议 10 分钟接创建／详情，5 分钟回归，7 分钟故障对照，3 分钟解释结果。**
+
+### 4.1 独立完成的部分
+
+学生组织连接传参和服务调用，保持输入模型、搜索语义、输出字段与提交位置；自己选一条合法创建数据并回读。教师给出函数签名提示和原服务，不预填完整端点答案。完成后用以下 R 阶段参考核对：
 
 ```python
-from fastapi import Path
+@app.post("/questions", status_code=201, response_model=QuestionOut,
+          responses={409: {"description": "标题已存在"}})
+def create_question(payload: QuestionCreate, response: Response, conn: ConnDep):
+    try:
+        result = create_question_service(conn, payload)
+    except DuplicateTitle as exc:
+        raise HTTPException(status_code=409, detail="标题已存在") from exc
+    response.headers["Location"] = f"/questions/{result.id}"
+    return result
 
 
-def get_question_resource(conn: ConnDep, qid: int = Path(ge=1)) -> QuestionOut:
-    return svc.get(conn, qid)
-
-
-QuestionDep = Annotated[QuestionOut, Depends(get_question_resource, scope="function")]
-
-
-@router.get("/questions/{qid}", response_model=QuestionOut,
-            responses={404: {"model": ErrorOut}})
-def get_question(question: QuestionDep):
-    return question
+@app.get("/questions/{qid}", response_model=QuestionOut,
+         responses={404: {"description": "问题不存在"}})
+def get_question(qid: int, conn: ConnDep):
+    result = find_question(conn, qid)
+    if result is None:
+        raise HTTPException(status_code=404, detail="问题不存在")
+    return result
 ```
 
-要观察缓存，用独立只读实验依赖同时直接与间接请求ConnDep，记录获取次数和对象标识。路径必须包含子依赖声明的qid，无需提前引入PATCH：
+R 阶段仍为默认 detail 错误体，未知错误为默认 500；此时不提前要求四字段。探针暂时仍纯存活。教师保存前后行为对照，不要求学生实现检查框架。
+
+### 4.2 故障开关的固定条件
+
+教师提供独立事务实验副本，使用同样模型、非自动提交 SQLite、独立教学数据。一次只开一个模式，标题不能与已有记录重复；故障发生在 **HTTP 响应启动之前**。使用教师开关，不给公共业务接口增加可由任意客户端触发的故障参数。
+
+| 模式 | 确切注入点 | HTTP | 另开连接查本次标题 |
+|---|---|---|---|
+| normal | 不注入 | 201 | 一条完整记录 |
+| before_commit | INSERT 和回读成功后、commit 尚未调用 | 500 | 没有本次记录 |
+| after_commit | commit 已确认成功返回后、服务返回前 | 500 | 本次记录仍在 |
+
+前两步先预测再运行。不能用同一事务内能看见数据来证明提交；独立连接核对 title/body/tags。500 后手工重试可能遇到 409，并不表示前次必然没保存。
+
+以下是教师故障副本的完整关键路径，**不是学生主线要再加的第二个创建服务**；隔离实验只替换创建服务调用，其余条件不变：
 
 ```python
-@router.get("/lab/dependency-sharing/{qid}", include_in_schema=False)
-def dependency_sharing(conn: ConnDep, question: QuestionDep):
-    return {"id": question.id}
+def create_with_fault(conn, payload, mode):
+    if mode not in {"normal", "before_commit", "after_commit"}:
+        raise ValueError("未知实验模式")
+    try:
+        qid = insert_question(conn, payload)
+        result = QuestionOut.model_validate(find_question(conn, qid))
+        if mode == "before_commit":
+            raise RuntimeError("教师实验：提交前失败")
+        conn.commit()
+        if mode == "after_commit":
+            raise RuntimeError("教师实验：提交确认后失败")
+    except sqlite3.IntegrityError as exc:
+        conn.rollback()
+        if exc.sqlite_errorcode == sqlite3.SQLITE_CONSTRAINT_UNIQUE:
+            raise DuplicateTitle() from exc
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    return result
 ```
 
-同一请求、相同依赖缓存键和一致scope下通常复用；不是全局缓存。改变依赖函数实例、scope、use_cache或安全上下文等会改变行为。打印依赖图有两个节点，不代表一定获取两次连接。
+after_commit 分支里再 rollback，不能撤销已提交事务。实验只证明这两个已知注入位置：**不是提交期间断网的模拟，也不覆盖提交结果未知**。实际提交故障必须按数据库证据分类；不看到 500 就自动重试，不把基础设施失败改成业务 409。
 
-## 五、统一错误契约：明确覆盖与例外
+### 4.3 资源释放怎样核对
 
-**课堂14分钟，教师演示；完整参考A档课后阅读。**
+教师观察器记录每请求获取与关闭次数，覆盖正常、业务冲突、输出校验失败与两种故障。连接获取失败时没有交出资源，不要求出现虚构的“成功关闭”事件。只观察进程正常运行的请求生命周期，不宣称 finally 能抵抗强杀或机器断电。
 
-### 5.1 批准的迁移
+## 五、统一错误：业务说原因，HTTP 边界决定怎样返回
 
-普通业务JSON错误统一为：
+**课堂 15 分钟。约 5 分钟业务异常与表现层，5 分钟四字段／安全投影，5 分钟未知异常与 OpenAPI 对照。完整处理器为课后可读参考。**
+
+### 5.1 E 阶段公开契约
 
 ```json
 {"code":"question_not_found","message":"问题不存在","detail":null,"request_id":"demo-01"}
 ```
 
-code稳定供程序判断；message供人阅读，字段本身是契约的一部分，但客户端不应匹配具体文案。detail只放经过筛选的安全结构；request_id用于关联，不携带用户隐私。
+- code 为稳定机器判据，message 给人读；不按具体消息文字分支。
+- detail 只含经过筛选的结构或 null；不直接返回原始请求、异常文本、SQL、input、ctx。
+- request_id 用于日志关联，不是用户身份、认证凭据或业务幂等键。
 
-**范围**：业务404/409、请求422、框架未匹配路径404/方法405、普通未知异常500。`GET /healthz` 的数据库503保持探针正文。第五课HTML错误返回页面，不能强制所有响应都是JSON。响应已经开始的流式错误、后台失败也不能重新改成此JSON。
+覆盖本课普通 JSON 请求：业务 404／409、请求 422（含坏 JSON）、框架未知路径 404／方法 405、响应启动前的未知异常 500（含输出校验失败）。**`/healthz` 的预期数据库 503 是例外，仍只含 status；第 5 课 HTML 页面错误另走 HTML 表现。** 直接返回 Response 不会自动走异常处理器；流式响应已启动或后台任务失败，不能重新改写成这份 JSON。
 
-### 5.2 业务异常在HTTP边界映射
+### 5.2 业务异常不携带 HTTP 状态码
+
+E 阶段用以下定义**替换**原 DuplicateTitle，并新增缺失资源异常。服务里的名字引用同步指向新定义，不保留两个同名但不同对象的异常类：
 
 ```python
-from typing import Any
-from pydantic import BaseModel
+class AppError(Exception):
+    pass
 
-class ErrorOut(BaseModel):
-    code: str
-    message: str
-    detail: Any = None
-    request_id: str
+
+class QuestionNotFound(AppError):
+    pass
+
+
+class DuplicateTitle(AppError):
+    pass
 
 
 BUSINESS_HTTP = {
     QuestionNotFound: (404, "question_not_found", "问题不存在"),
     DuplicateTitle: (409, "duplicate_title", "标题已存在"),
 }
+
+
+def get_question_service(conn, qid):
+    result = find_question(conn, qid)
+    if result is None:
+        raise QuestionNotFound()
+    return QuestionOut.model_validate(result)
 ```
 
-AppError不放status_code。业务调用者得到“问题不存在/标题重复”；HTTP适配器决定404/409，CLI可决定退出码。HTTPException也是普通异常，在CLI里并非不能捕获；问题是复用者被迫理解HTTP术语，不是必然崩溃或必须重写全部service。
+创建服务继续显式提交、抛 DuplicateTitle；端点不再就地翻译。同一个服务以后可以给 HTML 或 CLI 用，不必知道 HTTP 404 或页面模板。Pydantic DTO 是课程取舍，不宣称完全没有框架依赖。
 
-### 5.3 四类处理器（含框架HTTP错误）
+### 5.3 四类处理器与安全投影
 
 ```python
 import logging
 from http import HTTPStatus
-from fastapi import Request
+from typing import Any
+
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-logger = logging.getLogger("app")
+logger = logging.getLogger("course.requests")
+
+
+class ErrorOut(BaseModel):
+    code: str
+    message: str
+    detail: Any
+    request_id: str
 
 
 def error_response(request, status, code, message, detail=None, headers=None):
     rid = getattr(request.state, "request_id", "-")
     body = ErrorOut(code=code, message=message, detail=detail, request_id=rid)
-    result = JSONResponse(status_code=status, content=body.model_dump(mode="json"),
-                          headers=headers)
-    result.headers["X-Request-ID"] = rid
-    return result
+    response = JSONResponse(status_code=status, content=body.model_dump(mode="json"),
+                            headers=headers)
+    response.headers["X-Request-ID"] = rid
+    return response
 
 
 def register_handlers(app):
     @app.exception_handler(Exception)
     async def unexpected(request: Request, exc: Exception):
-        rid = getattr(request.state, "request_id", "-")
-        logger.error("unhandled rid=%s", rid,
-                     exc_info=(type(exc), exc, exc.__traceback__))
+        logger.error(json.dumps({
+            "event": "request_error",
+            "request_id": getattr(request.state, "request_id", "-"),
+            "error_type": type(exc).__name__,
+        }, ensure_ascii=False))
         return error_response(request, 500, "internal_error", "服务器内部错误")
 
     @app.exception_handler(AppError)
@@ -331,273 +363,215 @@ def register_handlers(app):
         try:
             fallback = HTTPStatus(exc.status_code).phrase
         except ValueError:
-            fallback = "HTTP请求失败"
+            fallback = "HTTP 请求失败"
         return error_response(request, exc.status_code, f"http_{exc.status_code}",
                               messages.get(exc.status_code, fallback), headers=exc.headers)
 ```
 
-注册在应用开始处理请求之前；新增子类需加入映射，不让未识别错误意外披露内部信息。实际产品可为type映射更友好的字段提示，这里固定安全文案，保留loc/type，不回传input、ctx、SQL或任意exc.detail。
+- 捕获 Starlette 的 HTTPException 基类，才能覆盖框架 404／405；保留 Allow、WWW-Authenticate、Retry-After 等必要头。不以此要求学生现在实现认证或限流。
+- RequestValidationError 只代表请求解析／校验失败。服务里直接调用 `model_validate` 失败不是请求 422，仍为服务端错误；不注册“所有 Pydantic 错误都返回 422”的处理器。
+- detail 的 loc 可能包含字段路径与数组下标；模型拒绝额外字段时也可能包含客户端提供的键名。这里去掉原始值，**不把保留 loc 说成已彻底匿名化**；课堂只用虚构数据，错误文本在页面仍用安全文本渲染。
+- 未知异常只公开固定正文；示例结构化日志只记异常类型，不记可能含请求正文的异常字符串。教师在隔离环境通过 IDE 看调用栈；生产诊断需额外受控、脱敏的日志策略，不投影真实秘密。
 
-必须捕获Starlette基类，才能覆盖框架产生的404/405；只捕获FastAPI子类不够。保留 `exc.headers`，尤其405的Allow、401的WWW-Authenticate、429的Retry-After。若应用返回直接Response，不会自动经过这些异常处理器，要单独核对。
+### 5.4 E 阶段端点与文档一起换
 
-### 5.4 OpenAPI与客户端同步
-
-E阶段先定义ErrorOut，再创建业务router，然后登记前述端点：
-
-```python
-from fastapi import APIRouter
-
-API_ERROR_RESPONSES = {
-    422: {"model": ErrorOut, "description": "请求校验失败"},
-    500: {"model": ErrorOut, "description": "未预期错误"},
-}
-router = APIRouter(responses=API_ERROR_RESPONSES)
-```
-
-详情装饰器已声明404，创建装饰器另声明409（第六单元）；列表使用router共享的422/500。第四单元详情节选采用E阶段的ErrorOut，R阶段对应使用ExistingErrorOut。探针在app单独登记HealthOut，避免把业务错误清单误作探针503正文。最后在应用启动前执行 `register_handlers(app)` 和 `app.include_router(router)`，不能仅定义常量而没有接入路由。
-
-按端点实际可能状态在路由声明或router级responses登记，特别覆盖原自动422模型。框架404/405也在契约说明里列出；未知路径本身不是一个可在OpenAPI中枚举的业务operation。添加responses只改变文档，不给处理器自动加运行校验，因此上面的error_response先构造ErrorOut。
-
-客户端按 `code` 决策、用message显示、用detail回填；第二课的HTTP分流仍保留。错误页不是合法JSON时，保留状态级降级提示，不让错误解析再次覆盖最初问题。E阶段快照与运行结果一起核对。
-
-### 5.5 探针例外（不是“零处连接”的扣分项）
+以下替换 R 阶段创建／详情函数，列表函数保持不变；函数由稍后的应用工厂注册，不再保留旧装饰器：
 
 ```python
-from typing import Literal
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-
-class HealthOut(BaseModel):
-    status: Literal["ok", "degraded"]
-    db: Literal["ok", "down"]
+def create_question(payload: QuestionCreate, response: Response, conn: ConnDep):
+    result = create_question_service(conn, payload)
+    response.headers["Location"] = f"/questions/{result.id}"
+    return result
 
 
-@app.get("/healthz", response_model=HealthOut,
-         responses={503: {"model": HealthOut}})
-def healthz():
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-    except SQLAlchemyError:
-        return JSONResponse(status_code=503,
-                            content={"status": "degraded", "db": "down"})
-    return {"status": "ok", "db": "ok"}
+def get_question(qid: int, conn: ConnDep):
+    return get_question_service(conn, qid)
 ```
 
-不能先用普通ConnDep获取连接，再只在探针函数里捕获SELECT错误：连接获取失败发生在进入端点之前，会变成通用500。探针的整个获取与执行放在专用失败边界；可提取为probe函数，但不能丢捕获范围。预期数据库故障503，其他程序错误仍按真实类别处理。
+所有错误都固定四个键，detail 没有内容时也发 null。ErrorOut 的 detail 必填但可为任意安全 JSON，包括 null；复杂字段错误 Schema 的精化留到契约化 API 阶段。
 
-### 5.6 中间件与兜底：分别补日志和响应头
+第 2 课页面检查 `!response.ok`，即使仍显示“服务返回 HTTP 500”也能继续正确分流。若增加 message/request_id 提示，错误正文只读取一次；解析失败保留原 HTTP 状态级提示，不让错误页的二次 JSON 解析覆盖最初失败。四态和 `textContent` 不变，不强迫本课重写页面。
 
-先解释旧M0为什么“正常业务错误有离开日志、未知异常没有”。处理器层次：
+## 六、关联日志与探针：补齐请求之外的共同工作
 
-```text
-ServerErrorMiddleware：未知异常/500处理器
-  → 用户中间件
-    → ExceptionMiddleware：业务异常、HTTPException、请求校验错误
-      → 路由、依赖、端点
-```
+**课堂 10 分钟。约 6 分钟解释中间件正常／异常两条路径，4 分钟检查探针获取失败与恢复。代码模板随包提供，不现场全文抄写。**
 
-内层业务错误转成响应，call_next正常返回；外层兜底在异常穿过用户中间件后才生成500。因此仅注册Exception处理器不能保证旧中间件后半段执行。函数作用域提交失败也遵循异常传播，不能把响应成功提前发走。
-
-本课参考目标保留M0日志格式和合法id，并提供最小安全补齐；课堂只导读，**第五课详细复演顺序和实现边界**：
+### 6.1 request-id 模板必须能解释
 
 ```python
 import re
 import time
 import uuid
 
-@app.middleware("http")
-async def trace_middleware(request: Request, call_next):
-    supplied = request.headers.get("X-Request-ID", "")
-    rid = supplied if re.fullmatch(r"[A-Za-z0-9._-]{1,64}", supplied) else uuid.uuid4().hex
-    request.state.request_id = rid
-    started = time.perf_counter()
-    outcome = "error"
-    logger.info("[%s] --> %s %s", rid, request.method, request.url.path)
-    try:
-        response = await call_next(request)
-        outcome = str(response.status_code)
-        response.headers["X-Request-ID"] = rid
-        return response
-    finally:
-        logger.info("[%s] <-- %s %.1fms", rid, outcome,
-                    (time.perf_counter() - started) * 1000)
+
+def register_trace(app):
+    @app.middleware("http")
+    async def trace(request: Request, call_next):
+        supplied = request.headers.get("X-Request-ID", "")
+        rid = supplied if re.fullmatch(r"[A-Za-z0-9._-]{1,64}", supplied) else uuid.uuid4().hex
+        request.state.request_id = rid
+        started = time.perf_counter()
+        outcome = "error"
+        logger.info(json.dumps({"event": "request_start", "request_id": rid,
+                                "method": request.method}, ensure_ascii=False))
+        try:
+            response = await call_next(request)
+            outcome = response.status_code
+            response.headers["X-Request-ID"] = rid
+            return response
+        finally:
+            logger.info(json.dumps({
+                "event": "request_end", "request_id": rid, "outcome": outcome,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 1),
+            }, ensure_ascii=False))
 ```
 
-finally补日志；error_response给外层500补响应头。未知异常日志中的error不是观察到的实际HTTP状态，不伪造为500；计时到call_next返回或抛异常，不是流式传输完成。实际应用 `debug=False` 才采用该普通兜底正文，debug模式可能显示调试响应；不能说处理器让debug开关不再重要。
+本课首次引入合法格式 `[A-Za-z0-9._-]{1,64}`。缺失或非法时生成 uuid 十六进制 id；客户端提供合法值可以保留，不保证全局唯一或可信。不要放敏感信息，不把 id 当权限证据。模板记录 method，不记可能含用户输入的 query、body 或动态路径；独立教师启动配置启用该 logger 的 INFO 级别与消息输出，单有 `logger.info` 代码不等于已经配置日志出口。
 
-若学生已采用等价正确实现，不撤回它来制造缺口。当前目标修复/boom后，历史M0验证器对/boom缺日志/缺头的“预期失败”断言需要在新阶段明确更新，旧阶段测试保留不动。
+一条请求对应同一 id 的 start/end；普通错误还有相同 id 的响应头及正文。教师启动器可配置 `logging.basicConfig(level=logging.INFO, format="%(message)s")`；这是独立进程的日志配置约定，不要求覆盖已有应用的日志系统。
 
-## 六、职责抽取：只沿一条创建链讲清楚
-
-**课堂12分钟，完整参考课后读。**
-
-### 6.1 三类职责与一个独立schema
-
-| 位置 | 关心什么 | 判断是否值得抽 |
-|---|---|---|
-| router / handlers | HTTP方法、参数、状态、表现形式 | 对外契约是否可见且一致 |
-| schema / mapper | 输入约束、输出字段、数据映射 | 是否避免暴露数据库内部结构 |
-| service | 标题唯一等业务规则、编排 | 是否有规则或多个数据访问动作 |
-| repository | SQL、行映射和数据访问 | 是否可以更换实现而限定影响 |
-| deps / config | 生命周期、共享准备、配置 | 是否有稳定权威入口 |
-
-不按路由≤10行打分，不用“有循环就错”代替语义判断。简单读取可以router直接调repository；也可为了统一业务入口经service，但要说明成本。循环导入是否当场报错取决于导入时访问顺序，不是假定一条反向import必然报同一异常。
-
-### 6.2 创建链参考
-
-repository复用第三课已经正确的 `find_detail`、`read_page`、`insert_question_with_tags`；移动完整逻辑，不删除tags分支。可额外保留预查以改善提示：
-
-```python
-def find_by_title(conn, title):
-    return conn.execute(text("SELECT id FROM questions WHERE title = :title"),
-                        {"title": title}).scalar_one_or_none()
-```
-
-service不import FastAPI、不创建Response、不commit：
-
-```python
-def get(conn, qid):
-    result = repo.find_detail(conn, qid)
-    if result is None:
-        raise QuestionNotFound()
-    return QuestionOut.model_validate(result)
-
-
-def create(conn, payload: QuestionCreate, author_id: int):
-    if repo.find_by_title(conn, payload.title) is not None:
-        raise DuplicateTitle()
-    qid = repo.insert_question_with_tags(conn, payload, author_id)
-    return get(conn, qid)
-```
-
-这里service返回DTO便于JSON/HTML复用；Pydantic依赖是课程取舍，不是纯领域层必需条件。预查不代替 `questions_title_key` 唯一约束，竞争失败仍由第三单元get_conn翻译。业务抛异常让事务边界回滚，表现层再决定HTTP输出。
-
-```python
-from fastapi import Response
-
-@router.post("/questions", response_model=QuestionOut, status_code=201,
-             responses={409: {"model": ErrorOut}, 422: {"model": ErrorOut},
-                        500: {"model": ErrorOut}})
-def create_question(payload: QuestionCreate, conn: ConnDep, response: Response):
-    question = svc.create(conn, payload, author_id=1)
-    response.headers["Location"] = f"/questions/{question.id}"
-    return question
-```
-
-此时构造Location不等于已发送201；function scope成功退出后才发送。response_model缺字段、业务异常或数据库错误不得在端点中吞掉后回正常结果。普通成功DTO在资源有效期构造好，第五课HTML也复用 `svc.create(conn,payload,author_id)`。
-
-目录可以是 `routers/schemas/services/repositories/deps/config`，也可按小项目模块组织；验收看依赖方向和行为，不强制文件名完全一致。不要求为简单读取添加空转的一层。
-
-## 七、配置与横切逻辑：有据取舍，不制造假收益
-
-**课堂10分钟；完整配置、依赖工厂为课后阅读。**
-
-### 7.1 配置的真实收益
-
-`create_engine(os.getenv("DATABASE_URL"))` 若参数是None，会立即抛配置错误，不是一定等第一次请求才失败。另一方面create_engine通常延迟建立物理连接，有效形状的URL仍可能连接失败；配置类型校验不能证明数据库可达。
-
-```python
-from typing import Literal
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
-    database_url: str = Field(min_length=1)
-    debug: bool = False
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
-
-settings = Settings()
-```
-
-集中字段、类型转换、必填与范围校验、可见配置清单是收益。database_url只校验非空字符串，URL能否由SQLAlchemy解析、驱动是否存在和网络是否可达还要另检验。
-
-分页上限当前只在PAGE_SIZE_MAX定义，不再顺手加一个未接入Query的第二配置源。若以后改为配置，应确保唯一读取点、重启时更新OpenAPI，并声明是否是对外契约变更。
-
-本课尚未使用会话，不凭空要求未使用的SECRET_KEY。第五课B档启用签名Cookie时再增加必填、长度校验的密钥字段与生产配置检查。不能提供可用默认密钥。
-
-`.env`不进Git，`.env.example`列键名和占位值。若真实密钥泄漏，应吊销/轮换并核查使用记录，清理历史不能替代轮换；不在课堂投影真实历史凭据。忽略文件并不能移除已经跟踪的内容。
-
-当前M0环境缺pydantic-settings：独立第四课工程需显式声明并锁定依赖，不能说Week0已经保证安装。可先用Pydantic模型加显式os.environ演示同一原则，但不得标成已验证pydantic-settings集成。
-
-### 7.2 横切逻辑归属
-
-| 需求 | 本课推荐落点 | 边界 |
-|---|---|---|
-| 全应用request-id、常规响应头 | 中间件＋外层500兜底补头 | 未匹配路由也需覆盖；注册/包装位置重要 |
-| 参数、资源对象、按端点的认证前置 | 依赖 | 不在未匹配路由执行；签名显式可见 |
-| 发帖规则、状态检查、跨数据编排 | service | 可被HTTP之外调用 |
-| IP/入口限流 | 入口设施或中间件 | 不依赖尚未执行的用户依赖 |
-| 按用户限流 | 依赖用户识别的限流依赖 | **端点执行前**检查并拒绝 |
-
-依赖可以通过Response或HTTPException.headers设置响应头；不是“只要需要Retry-After就必须中间件”。中间件也能按路径条件选择、读取部分请求信息，不是绝对做不到，只是上游执行时路由参数和已解析对象尚未可靠可用，绕开框架解析增加复杂度。
-
-按用户限流的必要顺序：
+先预测：端点抛未捕获 RuntimeError，call_next 会正常交回一个 500 Response 吗？固定 `debug=False`，本实现的层次是：
 
 ```text
-验证凭据 → 获取用户 → 检查/消耗调用额度 → 允许端点执行
-                             └→ 超额则429，可携带Retry-After
+ServerErrorMiddleware（未知异常兜底／Exception 处理器）
+  → 用户 trace 中间件
+    → ExceptionMiddleware（业务异常、HTTP 异常、请求校验异常处理器）
+      → 路由、依赖、端点
 ```
 
-不能让用户依赖先在call_next内部识别，再等call_next返回后由外层中间件决定拒绝：写操作此时可能已发生。完整限流和认证不在本课实现。认证中间件也有合理方案，不能因AI用了它就直接判错。
+普通业务异常在内层转为响应，call_next 正常返回；未捕获异常穿过用户中间件后，外层才生成 500。因此：**finally 负责异常时也有 end 日志，error_response 负责给外层 500 补响应头与正文中的 id**。仅在 try 正常返回后补头、记日志，覆盖不了这一分支。
 
-### 7.3 RFC9457的真实取舍
+outcome="error" 表示 call_next 抛出，不伪装成已经观察到 HTTP 500；计时到 call_next 返回／抛出，不是流式正文完全传输的耗时。异常发生在响应已启动之后时只能记录，不能再承诺客户端得到统一正文。debug 模式可能改用调试响应，正式验收固定关闭。
 
-课程保留现有 `code/message/detail/request_id`，原因是保持教学客户端与后续课一致、降低本轮迁移范围，不是假称标准不支持需求。
+### 6.2 `/healthz`：只升级能力，不换正文结构
 
-| 标准字段 | 含义 |
+```python
+from contextlib import closing
+from typing import Literal
+
+
+class HealthOut(BaseModel):
+    status: Literal["ok", "degraded"]
+
+
+def healthz():
+    try:
+        with closing(open_connection()) as conn:
+            conn.execute("SELECT 1").fetchone()
+    except sqlite3.Error:
+        body = HealthOut(status="degraded")
+        return JSONResponse(status_code=503, content=body.model_dump())
+    return HealthOut(status="ok")
+```
+
+新增的是数据库连接与最小语句检查：正常仍为 200、`{"status":"ok"}`；预期数据库失败为 503、`{"status":"degraded"}`，**不增加 db 字段，不套普通四字段错误体**。两种响应均有中间件补的 X-Request-ID。
+
+探针必须把获取连接和执行语句放在同一个捕获范围。若先由 ConnDep 获取连接，获取失败发生在端点前，端点里的 except 接不到，会变成通用 500。可以封装专用探针函数，不强求全项目零处 `open_connection()`。
+
+SELECT 1 只验证当前连接和简单语句可用，不证明 questions 表、迁移、所有查询或写权限正确。SQLite 可能自动创建不存在的文件，教师连接工厂须固定预期教学库路径；不能将一次探针成功说成库文件和数据一定正确。程序错误不是预期数据库故障，不应无差别吞成 503。
+
+### 6.3 最终应用装配（教师参考）
+
+在模型、数据函数、依赖、最终端点、处理器与中间件均已定义后，组装 E 应用。**创建新实例替换 R 应用**，不向已经服务中的实例动态添加处理器或重复路由。同源页面与 `/static` 的挂载沿用教师包，以下只列本课 API 部分：
+
+```python
+API_ERROR_RESPONSES = {
+    422: {"model": ErrorOut, "description": "请求校验失败"},
+    500: {"model": ErrorOut, "description": "服务端处理失败"},
+}
+REQUEST_ID_HEADER = {
+    "description": "本次请求的关联标识",
+    "schema": {"type": "string"},
+}
+
+
+def make_application():
+    application = FastAPI(debug=False)
+    register_handlers(application)
+    register_trace(application)
+    application.add_api_route(
+        "/questions", list_questions, methods=["GET"], response_model=QuestionListOut,
+        responses={200: {"headers": {"X-Request-ID": REQUEST_ID_HEADER}},
+                   **API_ERROR_RESPONSES})
+    application.add_api_route(
+        "/questions/{qid}", get_question, methods=["GET"], response_model=QuestionOut,
+        responses={404: {"model": ErrorOut, "description": "问题不存在"},
+                   **API_ERROR_RESPONSES})
+    application.add_api_route(
+        "/questions", create_question, methods=["POST"], status_code=201,
+        response_model=QuestionOut,
+        responses={201: {"headers": {
+            "Location": {"description": "新问题详情路径", "schema": {"type": "string"}},
+            "X-Request-ID": REQUEST_ID_HEADER,
+        }}, 409: {"model": ErrorOut, "description": "标题已存在"},
+            **API_ERROR_RESPONSES})
+    application.add_api_route(
+        "/healthz", healthz, methods=["GET"], response_model=HealthOut,
+        responses={503: {"model": HealthOut, "description": "数据库检查失败"},
+                   500: {"model": ErrorOut, "description": "非预期程序错误"}})
+    return application
+```
+
+教师入口取得 `app = make_application()` 后补原有静态页挂载。responses 覆盖默认 422 模型，并登记详情 404、创建 409、探针 503 和创建 Location；框架未知路径无法作为一个不存在的 operation 枚举，404／405 及全部响应的 request-id 规则另在契约说明中列出。本节没有逐状态穷举所有响应头 Schema，不把该节选说成已经生成完整课程快照。
+
+responses 主要是文档声明，不自动校验直接 Response 的正文，所以处理器和探针显式先构造模型；行为与 `/openapi.json` 都要核对。`/docs` 外部资源不可达时改用本地 JSON 和请求工具，不宣称文档 UI 已离线验收。
+
+## 七、回收、验收与第 5 课交接
+
+**课堂 7 分钟。用一条创建路径收束，再说明一次作业包。**
+
+> 依赖负责连接何时可用和何时关闭；服务负责本次事务提交；处理器决定错误怎样对外表达。成功响应晚于提交完成，但失败响应不意味着没有写入。
+
+### 常用写法卡 #4
+
+| 写法 | 替我们完成什么 | 必须知道的边界 |
+|---|---|---|
+| `Depends(get_conn)` | 框架准备并注入资源 | 请求内复用不等于全局共享；非法参数时依赖也可能已运行 |
+| yield + finally | 使用期间交出连接，最后清理 | 默认 request 退出在响应发送后，不在这里 commit |
+| 服务层显式 commit／rollback | 控制一次业务操作的事务边界 | 提交确认后的错误不能用 rollback 撤销已提交事务 |
+| AppError + exception_handler | 把业务原因集中翻译为 HTTP | 不是所有数据库错误都是冲突；不是所有校验错误都是请求 422 |
+| ErrorOut | 约定 code/message/detail/request_id | 探针、HTML、已启动的流式响应有不同表现边界 |
+| request-id 中间件 + 500 兜底 | 关联进入／离开／错误与响应 | id 不是身份；finally 日志不等于已经看到了最终状态 |
+
+### 7.1 验收矩阵
+
+| 范围 | 达标结果 |
 |---|---|
-| type | 问题类型URI引用；不要求每种错误都维护可访问文档站，缺省可用about:blank |
-| title | 类型的简短摘要 |
-| status | 对应HTTP状态 |
-| detail | 本次具体说明 |
-| instance | 本次问题标识URI引用 |
-| 扩展字段 | 可以合法增加request_id、errors等 |
+| R 阶段 | 三端点读取／创建／校验／旧错误体不变；探针仍纯存活；服务提交未移位 |
+| 成功契约 | 字面搜索、分页及五字段不变；201 + Location；独立连接回读标签和正文 |
+| 事务对照 | 提交前失败 500 且无本次写入；确认提交后失败 500 且写入仍在；标注实际注入点 |
+| E 业务错误 | 缺失整数 id 为 404/question_not_found；标题重复为 409/duplicate_title；均为四字段 |
+| E 框架与未知错误 | 请求／坏 JSON 为 422/validation_error；未知路径 404/http_404；方法 405/http_405 且保留 Allow；未知及输出失败为 500/internal_error |
+| 错误安全 | 不回显原始值、SQL 或异常文本；字段定位保留 loc/type；说明 loc 不等于彻底脱敏 |
+| 日志 | 正常及响应前未知异常有同 id 的 start/end；500 正文、头与 error 记录关联；非法 id 被替换 |
+| 资源 | 同请求相同依赖复用；各请求独立获取并关闭；获取失败不执行端点；其他失败仍清理 |
+| 探针 | 正常 200/status=ok，预期数据库获取或查询失败 503/status=degraded，恢复后 200；不新增 db 字段 |
+| 文档与页面 | OpenAPI 正确登记错误模型与 Location；第 2 课四态、正文显示、安全文本及恢复不退化 |
 
-媒体类型是application/problem+json；fetch的response.json()不会因此自动换一种JSON解析。特定库的媒体类型策略另行验证。公共API可考虑标准格式，不声称自定义格式普遍更好。
+### 7.2 一个作业包
 
-## 八、作业、验收与第五课交接
+1. R 阶段重构 diff 与教师回归结果，指出三个端点的资源入口、服务提交位置和合理保留的探针例外。
+2. E 阶段四字段错误迁移与契约快照；说明批准的变化，不重写全部历史快照来掩盖破坏性变更。
+3. 两组事务故障的“注入点 → HTTP → 独立连接数据”对照；可复用其中一次未知异常记录作为 request-id 日志与响应证据，不再追加一套独立报告。
+4. 一处“提交先于响应”的代码／事件说明；一次 AI 对依赖求值与清理的解释核对，正确时记录接受理由和证据。
 
-**课堂8分钟。**
+不要求学生实现故障工具、数据库设施、配置框架或完整测试系统；完整处理器由教师提供并要求能解释。学生未完成的独立端点接线须课后补齐，不能把基础验收称为选做。选做依赖工厂，仅在隔离实验说明复用收益与函数对象身份，不提前布置认证。
 
-A档必交：
-1. R阶段重构diff与回归：三个核心端点和探针不退化，未破坏分页名字/范围、输出、标签、标题唯一及清洗顺序。
-2. E阶段错误契约迁移：业务404/409、422、框架404/405、普通500；检查Allow等必要头与id；探针数据库503正文不变；OpenAPI同步。
-3. 资源失败证据：插入后异常不留半截；退出阶段模拟失败不得发201；连接资源能释放。测试模拟和真实数据库实验分开写。
-4. 指定规则的权威位置与依赖方向；配置字段、`.env.example`及敏感信息处理。
-5. 一张变更影响表，区分文件数与位置数；合理保留的重复要说明。
+### 7.3 第 5 课的明确起点
 
-| 变更问题 | 重构前文件/位置 | 重构后文件/位置 | 说明 |
-|---|---|---|---|
-| 普通业务连接生命周期策略 | 按实际填 | 按实际填 | 探针专用失败边界为何保留 |
-| JSON错误增加一个诊断字段 | 按实际填 | 按实际填 | 同时考虑schema、文档、客户端与测试，不只改一行 |
-| 隔离副本中分页上限50→30 | 按实际填 | 按实际填 | 主线交付仍50；只有一个列表也可以如实填 |
+- 继续 SQLite 同步读写、同一 QuestionCreate/QuestionOut、同一服务层显式提交；HTML 与 JSON 调用同一业务服务，不在 HTML 端点或依赖退出时另立提交点。
+- 保留三个 JSON 业务端点和探针；列表 items/total/page、page_size 默认 20 上限 50、原 id/title/body/tags/created_at 及标题唯一规则不变。
+- 第 5 课新增 SSR 列表／详情／创建页，表单输入先转换再复用模型；失败回填、成功 303。JSON 四字段错误不强行套给 HTML 页面，表现层分别翻译相同业务原因。
+- 本课首次建立 request-id 与结构化日志；下一课沿用异常路径覆盖，不撤回正确实现制造反例。第 5 课重点是 SSR 与同步／异步执行方式，不把本课遗漏的中间件讲解全部后移。
+- 标签仍为 JSON 文本、没有作者关联；第 6 课教师迁移到 PostgreSQL、建关联表时提供明确的数据迁移和去重规则。第 7 课换 Session 仍遵循服务层事务边界，不保证只改一个依赖文件。
 
-不要求路由零个with、零个except、全仓恰好一个commit或完全一致目录；更不把/healthz必要捕获判为分层失败。不按“文件越少越好”评分，分层后文件可能增加。
+## 八、制作与验证状态
 
-B档：打印依赖树；比较认证中间件与依赖；画Connection→Session影响范围。允许AI方案原本正确，不要求必须找到“误写中间件”的案例，也不要求提前实现认证。
+本稿给出 R/E 过程、最终 API 装配与隔离故障关键路径，仍依赖第 3 课的模型／数据函数、教师连接工厂、静态页、初始化与升级设施。不能指示学生切换不存在的 tag，也不从旧 ORM 工程推导本课要求。
 
-第五课交接清单：
-- 同步端点/持久层与ConnDep function scope；同一QuestionCreate，svc.create返回可用id的DTO。
-- 三JSON端点＋必保留探针；items/total/page、page_size默认20上限50；标题唯一与标签功能。
-- JSON错误契约已经登记；第五课新增HTML表现，不把错误吞在事务内部。
-- 本课已给出最小finally日志与500补头参考，第五课深化洋葱顺序、CORS、流式边界和调度；不为了课堂反例把正确实现撤回。
-- “课后完成基础验收”不等于可选，不把未完成的第三课成果推给第五课补救。
-
-## 九、课后依赖阅读与素材状态
-
-依赖树可遍历APIRoute.dependant打印；这是框架内部观察接口，不作为稳定公共API依赖。名称应兼容可调用对象，不一律访问 `.__name__`。资源清理通常按建立的上下文逆序，不把图的打印顺序当作所有求值与副作用时序保证。
-
-依赖工厂需要避免为同一语义反复创建不同函数导致缓存差异；认证安全方案第十四课再选。使用一次的资源依赖也有清理和替换价值，不能简单用复用次数否决。
-
-本仓库尚无独立第四课工程、v4各阶段tag、分层检查脚本或配置截图。本文提供职责、代码和验收条件；制作阶段须提供可运行副本、第三课数据升级、完整导入与注册顺序、真实回归入口。不能指示学生checkout不存在的tag或将未完成素材标“已验证”。
-
-本轮从本文代码提取依赖、分页、处理器、中间件与探针，使用FastAPI 0.141.1、Starlette 1.6.0、Pydantic 2.13.5、SQLAlchemy 2.0.54完成临时机制验证：
-- 同请求直接/间接依赖只获取一次连接；page_size公开名、默认约束及422文档保持正确。
-- SQLite插入后业务异常、模拟退出失败均回滚；模拟退出失败时request作用域返回201，function作用域返回500。后者不是实际PostgreSQL commit故障测试。
-- R阶段保持三字段409；E阶段业务/校验/框架/未知错误为四字段，Allow、WWW-Authenticate、Retry-After与合法点号id保留；未知异常有配对日志和响应头。
-- 模拟探针获取失败保持503 degraded/down，恢复200；详情404与探针503的OpenAPI模型分别正确。
-- 同步核对第五课的配对日志、点号id和JSON/HTML500分流。结合前述各课检查，Python临时验证共95项断言通过，四课预算均95＋5；不等于已有完整课程回归包。
-
-完整验收还需：PostgreSQL语句与真实提交错误、标签竞争、异常诊断、真实数据库断连与恢复、页面错误显示、完整OpenAPI快照及配置集成。最小FastAPI/SQLite机制验证不等于上述全部验收；每项记录版本、输入和实际结果。
+- **本轮机制验证已完成**：复用 Python 3.12.12、FastAPI 0.141.1、Starlette 1.6.0、Pydantic 2.13.5、httpx 0.28.1，提取本稿代码并组合第 3 课模型／数据函数。389 项行为／Schema 断言通过：R 阶段回归、E 阶段错误及安全投影、必要 HTTP 头、request-id 配对日志、依赖复用与关闭、探针故障与恢复、输出校验回滚、NOT NULL 分类、两种事务故障及 OpenAPI；另 1 项课时断言核对大纲逐项为 5/15/18/25/15/10/7，共 95 分钟，加 5 分钟缓冲。
+- **时序与限制**：隔离 SQLite 共享内存库使用独立连接回读；TestClient 外层 ASGI 观察器确认服务提交先于响应启动、默认依赖关闭晚于普通响应完成。连接获取／查询／提交方法的设施故障为模拟，提交前／确认后实验实际执行 SQLite 写入及 commit，但不证明文件落盘、进程重启、真实断连或提交结果未知。当前 httpx 适配有弃用提示，未安装或升级依赖；临时核验脚本不是已交付的教学工程。
+- **跨课扫描**：已核对第 1–4 课的阶段性参数、字段、错误体、探针与事务交接，并通过 `git diff --check`。后续第 5 课已按第四版及本稿 7.3 重写，继续 SQLite、同一模型和服务层提交，新增 HTML 表现适配；其验证结果与独立工程待办见[第 5 课制作状态](lesson-05.md#九制作与验证状态)，不把底稿完成视为配套工程已完成。
+- **试讲前必须补齐**：第 4 课独立阶段副本、显式连接选项、R/E 对照回归器、日志启动配置、两种固定故障开关、依赖和 ASGI 事件观察器、完整 OpenAPI 快照及页面回归。
+- **仍需真实验收**：本地 HTTP、IDE 断点、文件库重启与数据保留、真实连接故障与恢复、页面显示及投影；进程内机制测试不等于这些条件已完成。
+- **首轮试讲记录**：25 分钟内两端点接线与两组数据回读的完成情况、把 finally 当作 commit 的比例、把 500 当作无写入的比例。超时压缩参考代码阅读，不增加隐含学生设施任务。

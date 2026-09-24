@@ -1,656 +1,666 @@
-# 第 5 次课教学底稿（修订版）
-## 请求执行方式与 SSR 表单闭环 ｜ 交付 M1
+# 第 5 次课教学底稿（第四版）
+## SSR 表单闭环 ｜ 交付 M1
 
-## 〇、备课定位与内容取舍
+> **备课基线**：[第四版大纲](../syllabus-v4.md)第 5 课与[新版第 4 课交接](lesson-04.md)。本稿彻底重写课堂路线、参考实现、验收与后续交接，尚未移交归档。独立工程、模板任务包、并发脚本和课件需随后制作，不从旧工程反推本课要求。
 
-本课承接第四课的可控重构：同一套业务规则开始服务 JSON 与 HTML 两种客户端，同时检查请求究竟在哪里执行。主线是：**能返回正确结果，还要说明等待发生在哪里、失败如何结束、浏览器下一次会发什么请求。**
+## 〇、这次课要建立什么
 
-原稿把中间件、四组并发实验、模板、表单、flash 都列为不可压缩的现场任务；加上缓冲实际超过 100 分钟。本版保留完整的机制、分支与课后参考，取消“必须出现固定倍数”“刷新必须插入三条”“常规检查绝不可能发现”的叙事。
+**讲给学生的目标句**：你能让同一套业务规则同时服务 HTML 表单和 JSON 接口，并说出这个请求占用了服务器的什么。
 
-学生不需要先会 React/Vue。课堂使用给定样式和模板骨架，不考 CSS 布局。下面的代码按职责分段，是教学参考，不代表本仓库已经存在独立的第五课演示工程。
+核心解释目标是：**表单提交的完整闭环——校验失败怎样带着原输入回到页面，成功后为什么要跳转。** 同步／异步执行方式是支撑机制，由教师引导固定对照，不作为学生现场开发压测工具的任务。
 
-### 课堂路线：95 分钟教学 + 5 分钟缓冲
+课堂路线：**正常模板 → 教师做通创建与回填 → 学生完成列表／详情及三字段非法输入 → 预测 PRG → 教师并发对照 → M1 验收**。沿用第 4 课已正确的中间件和事务边界，不重新开一堂中间件调度课，不从混合故障工程开始。
 
-| 单元 | 分钟 | 课堂处理 |
-|---|---:|---|
-| 一、交付起点与两个现象 | 5 | 教师展示同一业务的两种入口 |
-| 二、解剖台与实验控制 | 8 | 只定位阻塞、POST 结果页两个问题 |
-| 三、中间件与异常路径 | 10 | 教师演示顺序和失败证据；完整代码课后读 |
-| 四、并发模型与调度 | 10 | 主讲框架调度与普通调用的区别 |
-| 五、受控并发实验 | 18 | 学生现场必做；中间停下来核对单请求基线 |
-| 六、端点选择判据 | 8 | 沿一条调用链判断，不盘点全项目 |
-| 七、模板与自动转义 | 10 | 主讲继承、插值、回填和转义 |
-| 八、表单完整闭环 | 20 | 前 10 分钟校验与错误，后 10 分钟提交与 PRG |
-| 九、M1 验收与收尾 | 6 | 展示基础清单，定位课后阅读 |
-| 合计 | 95 | 另留 5 分钟缓冲 |
+### 95 分钟教学 + 5 分钟缓冲
 
-**A 档**是所有学生应完成的基础能力，可在课堂、教师演示或课后阅读中获得；**B 档**是选做拓展。flash、CPU、多 worker、纯 ASGI 中间件不占上述主线时间。超时先将中间件完整实现和并发模型跨栈讨论转为课后读，保留并发结果解释与表单两条路径。
+| 分钟 | 教学单元 | 当场产出 |
+|---|---|---|
+| 5 | 回顾与目标 | 看到相同业务的 JSON 与 HTML 两种入口 |
+| 15 | 模板渲染与自动转义正例 | 能修改模板变量，解释继承与文本输出 |
+| 18 | 教师构建创建表单 | 校验失败回填，提交完成后 303 |
+| 25 | 学生完成列表／详情页 | 模板、三字段同时非法证据与失败回填函数 |
+| 20 | 教师引导三种执行方式对照 | 单 worker、并发 1／10 的六组记录 |
+| 12 | 执行判据、M1 与收尾 | 一条调用链的选择理由和作业范围 |
+| **95** | **合计** | **另留 5 分钟缓冲，无课内小测** |
 
-### 跨课交接基线
+前置是第 3 课的 QuestionCreate、基本异常处理，以及第 2 课的 form/label/提交事件概念。不要求先会 React、CSS 布局或压力测试。课内未完成的模板在同一个 M1 作业包中补齐；超时先压缩参考处理器逐行讲解，不削减正常正例、学生独立实践和失败回填。
 
-- 保留 `GET /questions`、`GET /questions/{qid}`、`POST /questions` 三个核心 JSON 端点，不要求补回旧稿中的六端点清单。
-- 第三课集合契约为 `QuestionListOut`：`items/total/page`；查询参数统一为 `keyword/page/page_size`，`page_size` 默认 20、上限 50。第四课依赖中的内部 `Page.size` 可以保留，但对外必须接 `page_size`，不能悄悄换成 `size`。
-- 第三课详情/创建响应沿用 `id/title/body/created_at/author`，创建成功为 201。第一课的 `success/data` 是更早阶段，若项目尚未迁移，先记录契约变更并同步客户端，不在实验中混用两种格式。
-- `/healthz` 继续保留：200 为 `{"status":"ok","db":"ok"}`；依赖不可用为 503 和 `{"status":"degraded","db":"down"}`。它不是可选功能，也不强行套业务错误体。
-- JSON 业务错误沿用 `code/message/detail/request_id`；HTML 错误渲染页面，两种表现共用业务异常。未知错误不得暴露 SQL、栈、凭据或用户原始正文。
-- 标题唯一是本课程已有业务约定。不得撤掉它，只为演示刷新造成重复数据。
-- M1 仍使用给定同步持久层；需要查库的端点使用 `def`。复用第三课先 `strip`、后约束的校验器；第八单元展示同一模型如何接入表单，两种入口一起回归。
+### 教师提供与学生负责
 
-## 一、开场：增加界面，不复制业务
+| 提供物 | 标注 | 学生要求 |
+|---|---|---|
+| Jinja2Templates、base.html 与给定样式 | 要求会用 | 会传 context、继承和插值，不解释模板编译或设计 CSS |
+| HTML 路由接线、现有 SQLite 数据层和连接依赖 | 要求会用，保留前课已经建立的解释要求 | 不重写数据库，按签名调用；知道服务显式提交、依赖只清理 |
+| Form 文本适配、创建路径和 HTML 错误适配骨架 | 要求解释 | 区分解析、校验、业务与表现；理解保留原值和状态码 |
+| 列表／详情模板、失败回填函数 | 学生完成并要求解释 | 自主组织继承与错误位置，按固定字段和文案实现 |
+| 三种等待端点、并发脚本、故障开关 | 工具内部黑盒；三种端点的执行差异要求解释 | 先预测、运行既有设施、记录并解释，不开发测量工具 |
 
-**课堂 5 分钟。**
+## 一、起点：换表现形式，不复制业务规则
 
-让学生对照一次 JSON 创建和一次 HTML 表单提交：传输格式不同，但“标题长度”“正文长度”“标题冲突”等规则不应复制两份。
+**课堂 5 分钟。先展示已有 JSON 创建，再展示教师完成版的“填表 → 发布 → 详情”，不分析故障开场。**
 
-```text
-JSON 请求 → JSON 入口 ─┐
-                      ├→ 同一个 schema → service → repository → 数据库
-HTML 表单 → 表单入口 ─┘
-```
+### 1.1 继续沿用的契约
 
-讲：第四课分层的收益不是保证以后“业务层一行不用改”，而是让变化有边界。新增 HTML 主要改变输入适配和输出表现；合格第四课的 service 已返回DTO，不含HTTP输出或隐藏提交，本课直接复用。若学生实现偏离该基线，先按交接检查修正，不把旧缺陷当作全班共同起点。
+- 数据仍为 sqlite3 单表，标签存 tags_json；没有 ORM、作者关联或用户表。第 6 课才由教师迁往 PostgreSQL 并建立关联表。
+- JSON 保留 `GET /questions`、`GET /questions/{qid}`、`POST /questions`。列表外壳 items/total/page，查询 keyword/page/page_size 默认空字符串／1／20；page≥1，page_size 为 1–50。
+- 搜索先去关键词首尾空白，标题或正文做字面子串匹配；样本英文字母不区分大小写，`%`／`_` 不作通配符；按 id 降序后分页，total 为分页前总数。
+- 记录保留 id/title/body/tags/created_at。详情整数 id 不加正数限制，缺失（包括 0、负数）404，非整数 422。
+- QuestionCreate 保持 title 清洗后 5–200 字符、body 清洗后 10–20000 字符；tags 最多 5 个字符串、默认空列表，不额外排序／去重；JSON 拒绝 id、created_at 等额外字段。
+- JSON 创建仍为 201 + Location。服务显式 commit 后返回 DTO，已知精确标题重复为 409；依赖仍只提供连接并关闭。
+- JSON 错误沿用 code/message/detail/request_id。`/healthz` 正常 200、`{"status":"ok"}`，预期数据库故障 503、`{"status":"degraded"}`，不增加 db 字段。
+- 第 4 课 request-id、配对结构化日志和普通未知异常补头继续有效；本课只增加 HTML 表现，不再安装第二份中间件。
 
-本课结束时应能回答：
+### 1.2 本课新增的 HTML 路由
 
-1. 同步函数何时在线程池，何时仍在事件循环中？
-2. 一次正常请求和一次未知异常，日志与响应头各在哪一层生成？
-3. 表单校验失败怎样保留用户输入？
-4. 成功创建何时才可以发送 303？
-5. PRG 解决什么，不解决什么？
+| 方法与路径 | 正常结果 | 主要异常 |
+|---|---|---|
+| `GET /ui/questions` | 200 列表页，支持相同搜索／分页参数 | 非法参数 422 HTML；空结果仍为 200 |
+| `GET /ui/questions/new` | 200 创建表单，三项输入为空 | 非预期错误 500 HTML |
+| `GET /ui/questions/{qid}` | 200 详情页，显示五个公开字段 | 不存在整数 404 HTML，非整数 422 HTML |
+| `POST /ui/questions` | 提交成功后 303，Location 指向 HTML 详情 | 输入 422 回填，标题冲突 409 回填，未知失败 500 HTML |
 
-## 二、解剖台：一次只保留一个预期缺陷
+HTML 三页指列表、详情、创建表单，不是要求再做一个错误页任务。教师提供安全错误页。JSON 路径不因浏览器的 Accept 请求头变成 HTML；本课按 `/ui` 和 `/ui/…` 的路径边界区分表现，不做完整内容协商。
 
-**课堂 8 分钟。** 故障代码是人为控制的教学样例，不宣称来自某次真实 AI 输出。真实 AI 产物需另外保存来源和上下文。
-
-### 2.1 阻塞反例
-
-```python
-import time
-from fastapi import APIRouter
-
-router = APIRouter()
-
-@router.get("/lab/a")
-async def blocking_wait():
-    time.sleep(0.5)
-    return {"ok": True}
-```
-
-单请求看似正常；多请求共享一个 worker 时，等待期间事件循环不能处理其他任务。延迟可能影响同 worker 的健康检查，但多 worker 或独立探针会改变现象，不能推广成“整个部署必然挂掉”。
-
-本例不查询数据库、不抓真实网址，不需要不存在的 `link_url` 字段。`time.sleep` 只模拟同步等待；真实调用还要考虑超时、连接池、失败与限流。
-
-### 2.2 POST 直接返回详情页
-
-```python
-# 预期缺陷片段：其余校验、事务和错误处理沿用修复版。
-# 创建成功后仍返回 POST 的结果页，而不是重定向。
-return templates.TemplateResponse(
-    request=request,
-    name="question_detail.html",
-    context={"q": question},
-)
-```
-
-在 Network 中保留日志，提交后刷新，观察浏览器是否确认重发 POST。浏览器行为可能不同，备用证据使用预录记录；手工重发请求只能证明重放后果，不能冒充浏览器 F5 证据。
-
-**本项目的预期**：第一次创建成功，再次同标题 POST 应被业务规则或数据库唯一约束挡住，返回 409。问题仍是浏览器停留在 POST 结果页，重复发送写请求；不是要求数据库一定新增重复行。
-
-讲：单次成功断言没有覆盖并发或重放场景，但代码审查、针对性的静态规则、并发测试和失败路径测试都可能发现这些问题。不把“现有检查未覆盖”说成“检查不可能发现”。
-
-## 三、中间件：顺序与异常不是同一个问题
-
-**课堂 10 分钟，完整实现为 A 档课后阅读。**
-
-### 3.1 先打印顺序
-
-```python
-@app.middleware("http")
-async def mw_a(request, call_next):
-    print("A enter")
-    response = await call_next(request)
-    print("A exit")
-    return response
-
-@app.middleware("http")
-async def mw_b(request, call_next):
-    print("B enter")
-    response = await call_next(request)
-    print("B exit")
-    return response
-```
-
-正常响应的顺序为 `B enter → A enter → A exit → B exit`。最后注册的是最外面的**用户中间件**，不是整个应用的最外层。
+第 2 课最小页面作为对照保留在教师副本；本课课堂主入口为 `/ui/questions`，旧 `/` 和静态挂载不因新增 SSR 被误删。不把 `.mount("/", …)` 放在所有 API 之前截走请求。此时同源，不引入 CORS。
 
 ```text
-ServerErrorMiddleware（未知异常的兜底响应）
-  → 用户中间件 B
-    → 用户中间件 A
-      → ExceptionMiddleware（已注册业务异常、HTTP 错误）
-        → 路由 / 依赖 / 端点
+JSON 正文 → JSON 端点 ─────────┐
+                              ├→ 同一 QuestionCreate → 同一创建服务 → SQLite
+表单文本 → 表单适配 → HTML 端点 ┘                         显式 commit
+       JSON 入口 ← 201 + JSON           HTML 入口 ← 303 → GET 详情 HTML
 ```
 
-对于未知异常，`call_next` 可能抛出而不是返回响应。先定位边界，再决定改什么。认证授权依赖适合本课程的按端点需求，但并非所有系统都禁止认证中间件。
+SSR 是服务器先把模板和数据生成 HTML，浏览器再解析显示；不需要在此页面再用 fetch 拼列表。页面实现换了，第 2 课建立的 HTTP、失败阶段和安全显示判断仍然适用。
 
-### 3.2 日志与响应头分别处理
+## 二、必要铺垫：一个能正常显示的模板
 
-以下适用于普通非流式响应，且 `debug=False`。第四课已给出最小finally日志和500补头，本课深化顺序并新增HTML错误表现；不要同时安装两份关联中间件或撤回学生已有正确实现。沿用第一课 request-id（含合法点号）：接受符合约束的标识，否则重新生成；不把不可信长字符串直接写日志。
+**课堂 15 分钟。约 5 分钟模板调用，5 分钟继承与表单元素，5 分钟同一文本的自动转义。**
+
+### 2.1 运行条件与模板入口
+
+教师包须预装 Jinja2 与 python-multipart，锁定与 FastAPI/Starlette 匹配的版本。缺少前者无法使用模板集成；缺少后者使用 Form 时可能在注册路由阶段报错，不把安装排错交给学生。
+
+以下代码按职责分段构成最终参考，需先定义所有函数再装配应用。QuestionCreate、QuestionOut、QuestionListOut、ConnDep、查询／服务函数与第 4 课应用工厂来自教师基线；不在本文复制模型或改写事务服务。
 
 ```python
-import logging
-import re
-import time
-import uuid
-from fastapi import Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from pathlib import Path
 
-logger = logging.getLogger("app.requests")
-RID = re.compile(r"[A-Za-z0-9._-]{1,64}\Z")
+from fastapi import APIRouter, Depends, Form, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+from pydantic import ValidationError
+from typing import Annotated
 
-@app.middleware("http")
-async def timing(request: Request, call_next):
-    incoming = request.headers.get("X-Request-ID", "")
-    rid = incoming if RID.fullmatch(incoming) else uuid.uuid4().hex
-    request.state.request_id = rid
-    started = time.perf_counter()
-    outcome = "error"
-    logger.info("[%s] --> %s %s", rid, request.method, request.url.path)
-    try:
-        response = await call_next(request)
-        outcome = str(response.status_code)
-        response.headers["X-Request-ID"] = rid
-        return response
-    finally:
-        logger.info("[%s] <-- %s %.1fms", rid, outcome,
-                    (time.perf_counter() - started) * 1000)
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
+templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
+ui = APIRouter(prefix="/ui", include_in_schema=False)
 
-@app.exception_handler(Exception)
-async def handle_unexpected(request: Request, exc: Exception):
-    rid = getattr(request.state, "request_id", uuid.uuid4().hex)
-    logger.error("unhandled rid=%s", rid,
-                 exc_info=(type(exc), exc, exc.__traceback__))
-    headers = {"X-Request-ID": rid}
-    if request.url.path.startswith("/ui/"):
-        return HTMLResponse("服务器内部错误，请稍后重试。", 500, headers=headers)
-    return JSONResponse(
-        status_code=500,
-        content={"code": "internal_error", "message": "服务器内部错误",
-                 "detail": None, "request_id": rid},
-        headers=headers,
+
+def render_form(request, values, errors, status_code=200):
+    return templates.TemplateResponse(
+        request=request, name="question_form.html",
+        context={"values": values, "errors": errors}, status_code=status_code,
     )
+
+
+@ui.get("/questions/new", response_class=HTMLResponse)
+def new_question_page(request: Request):
+    return render_form(request, {"title": "", "body": "", "tags": ""}, {})
 ```
 
-教师在隔离副本分两步复演：只加 `finally` 时日志恢复，外层生成的 500 不一定带头；再由兜底处理器添加头。业务 409 则由内层处理器转响应，正常经过用户中间件。主线保留第四课已正确的配对日志与补头；日志中的error表示未拿到响应，不是假定实际HTTP状态。
+`templates` 目录相对于教师入口模块定位，不依赖学生从哪个工作目录启动。request、模板名与 context 是不同参数；使用当前集成的关键字调用，不混用旧的位置参数顺序。
 
-边界必须留在学生可读正文中：
+### 2.2 base.html 与创建表单（教师提供）
 
-- 这里计时截至拿到响应或异常，不等于流式响应体完整发送时间。
-- `finally` 覆盖正常 Python 控制流中的退出；进程强制终止等不能据此保证日志落盘。
-- 响应已经开始发送后再发生错误，不能重新发送一份 JSON 500；后台任务失败也不能改写已发响应。
-- 自定义纯 ASGI 外包装也可统一处理响应头，兜底处理器不是唯一方案。
-- 日志中记录内部栈仍需权限、脱敏和保留策略，不因“不发给客户端”就可任意记录敏感信息。
-
-### 3.3 CORS 与上下文：导读，不在本课搭跨域项目
-
-`app.add_middleware(CORSMiddleware, ...)` 仍在 `ServerErrorMiddleware` 内部。若跨域客户端也必须读取外层产生的 500，可在全部路由注册后包装整个应用：
-
-```python
-from starlette.middleware.cors import CORSMiddleware
-
-# api 是已经注册路由与异常处理器的 FastAPI 实例。
-app = CORSMiddleware(
-    app=api,
-    allow_origins=["https://ui.example.com"],
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
-    expose_headers=["X-Request-ID"],
-)
-```
-
-只允许指定源，不为课堂方便开放带凭据的任意跨域。第十二课再做浏览器读取错误响应的完整实验。
-
-`BaseHTTPMiddleware` 有任务与上下文传播边界，具体行为需按版本验证，不沿用“读一次 body 端点就必然读不到”的笼统结论。`contextvars` 也不是跨任务、跨进程、后台任务的万能传值机制。纯 ASGI 改写为 B 档阅读。
-
-## 四、并发模型：先区分调度者
-
-**课堂 10 分钟。**
-
-| 模型 | 核心机制 | 主要限制 |
-|---|---|---|
-| 进程 | 独立内存与执行环境；每进程仍可有事件循环和线程池 | CPU 配额、内存、各进程数据库连接池总量 |
-| 线程池 | 同步等待占住线程，但事件循环可以继续处理其他任务 | 容量令牌、线程资源、下游连接与并发限制 |
-| 事件循环 | 协程在可挂起的等待点让出执行权 | 循环上的 CPU 工作、阻塞调用、连接数和下游能力 |
-
-它们可以组合，不能把“一个进程”画成“只能处理一个请求”。WSGI 是同步调用接口，ASGI 是异步消息接口；协议本身不替应用决定 worker 数和数据库调用方式。
-
-### 4.1 FastAPI 的规则及适用范围
-
-- **由框架调用的**同步端点与同步依赖，通常在线程池中执行。
-- 异步端点/异步依赖在事件循环中执行；可挂起的异步 I/O 才能让其他任务前进。不是每个 `await` 都一定发生切换。
-- **你直接调用的普通函数**仍在当前执行位置运行。`async def` 里调用 `svc.get()`，不会因为 `get` 是 `def` 就自动进入线程池。
-
-```python
-# 错误示意：同步查询发生在事件循环线程。
-async def bad_endpoint():
-    return sync_repository_query()
-
-# 同步栈的简洁选择：框架将端点放入线程池。
-def sync_endpoint():
-    return sync_repository_query()
-```
-
-### 4.2 CPU 与等待不能混为一谈
-
-通常启用 GIL 的 CPython 中，多个线程不能同时执行大量 Python 字节码；线程池可隔离阻塞等待，却不保证纯 Python 计算吞吐增加。原生扩展可能释放 GIL，其他运行时也可能不同。
-
-CPU 工作应先优化算法或用合适的原生实现，再考虑进程池、后台任务和资源预算。即使放到线程池，长计算仍可能通过 CPU 争抢影响服务；不能把它说成万能修复。
-
-## 五、现场必做：三种等待，同一份测量
-
-**课堂 18 分钟。** 先单请求，再提高并发；先保证响应正确，再解释数字。
-
-### 5.1 对照代码
-
-在第二单元 `/lab/a` 之外加两条，三条返回完全相同的响应：
-
-```python
-import asyncio
-
-@router.get("/lab/b")
-async def async_wait():
-    await asyncio.sleep(0.5)
-    return {"ok": True}
-
-@router.get("/lab/c")
-def thread_wait():
-    time.sleep(0.5)
-    return {"ok": True}
-```
-
-实验工程只在本地开启 `/lab/*`，不注册到最终交付或公开服务。参考启动命令供独立演示工程使用：
-
-```bash
-uvicorn app.main:app --workers 1 --log-level warning
-```
-
-不启用 reload；使用同一机器、相同 Python/依赖锁定版本、相同客户端连接池。脚本必须复用客户端，不把建连接时间差异混成服务端性能。
-
-### 5.2 测量协议
-
-课程制作阶段需提供并验证 `bench.py`，不能把下列文件名当成本仓库已有命令。参数协议：URL、并发、请求总数；输出总时长、成功/失败/超时数、吞吐、成功请求延迟 p50/p95。
-
-```bash
-python scripts/bench.py --url http://127.0.0.1:8000/lab/a --concurrency 1 --total 20
-python scripts/bench.py --url http://127.0.0.1:8000/lab/a --concurrency 10 --total 20
-```
-
-对 b、c 重复，得到六组。每个请求从实际开始发送到响应体读完计时；并发控制器的等待不混入单请求延迟，总时长则包括整批排队。超时单独计数，不能删掉失败后声称 p95 很低。基础实验客户端超时建议 30 秒。
-
-| 端点 | worker | 并发 | 总请求 | 成功/失败/超时 | 总时长 | 成功吞吐 | p50/p95 |
-|---|---:|---:|---:|---|---|---|---|
-| a / b / c | 1 | 1 / 10 | 20 | 实测 | 实测 | 实测 | 实测 |
-
-这是一张**待填表**，不是已测数据。课堂单轮用于观察；要下性能结论，预热后多轮重复并记录波动。少量样本的 p95 只作说明，不当作生产容量报告。
-
-### 5.3 如何解释，而不是背倍数
-
-- 单并发时主要在等 0.5 秒，因此三个版本可能接近。
-- 忽略开销的理想模型中，a 的吞吐约受 `1 / 0.5s` 限制；真实结果还受网络、队列和计时方式影响。
-- b 可以同时等待；c 由线程池容纳多个同步等待。二者都受客户端和服务端容量约束，不能直接宣称异步总更快。
-- AnyIO 默认通常有 40 个线程容量令牌，它不是本实验永久固定的线程数，且可能被其他同步工作共享。读取实际配置再解释瓶颈。
-- 如果数据不符合预期，先核对进程数、实验代码、请求总数、超时和测量方法；不以偏离某个百分比直接判定实验错误。
-
-讲：有说服力的是“受控变量 + 可重复证据 + 机制解释”，不是在对照图上预先写好 47 倍。
-
-## 六、把实验结论带回项目
-
-**课堂 8 分钟；CPU 与 worker 计算课后自学。**
-
-### 6.1 选择判据
-
-| 调用链 | 本课程选择 | 需要复查的条件 |
-|---|---|---|
-| 同步 SQLAlchemy、同步 SDK、阻塞文件 I/O | `def` 端点/依赖 | 线程与连接池是否饱和；是否有线程亲和要求 |
-| 原生异步 I/O，正确使用异步驱动 | `async def` + `await` | 是否还藏着同步查询或长计算 |
-| 很短的纯内存处理 | 均可，保持项目一致性 | 不为“更现代”改写 |
-| 长时间 CPU 工作 | 单独评估算法、进程或任务系统 | 不靠改成 `async def` 解决 |
-
-只把 `requests` 换为 `httpx.AsyncClient`，但保留同步 `conn.execute()`，不是“全程异步”。已有同步项目不必因此整栈迁移。
-
-混合场景可显式卸载完整同步工作单元：
-
-```python
-from fastapi.concurrency import run_in_threadpool
-
-# 连接在同一个同步工作单元内获取、使用并释放。
-def load_summary(qid):
-    with engine.connect() as conn:
-        row = repo.find_detail(conn, qid)
-        return {"id": row.id, "body": row.body}
-
-async def mixed_endpoint(qid):
-    data = await run_in_threadpool(load_summary, qid)
-    return data
-```
-
-此片段只是卸载机制参考；本课没有必要为它新增业务端点。不把已经创建的 Session/Connection 放进多个并行任务共享；若驱动要求同线程，资源生命周期也要在同一个工作单元内。
-
-### 6.2 B 档：固定工作量 CPU 实验
-
-```python
-def cpu_work(n: int) -> int:
-    result = 0
-    for i in range(n):
-        result = (result + i * i) % 1_000_000_007
-    return result
-```
-
-先校准 n，使单任务耗时便于观察，然后在各并发组**保持 n 不变**，核对返回值。不要用“忙等直到墙钟过了 0.5 秒”当固定计算量：并发争抢时每任务执行的循环次数不同，会产生虚假的吞吐提升。
-
-### 6.3 B 档：worker 与连接池
-
-没有通用于 FastAPI 的 `2 × 核数 + 1` 答案。从单 worker 基线开始，按 CPU 配额、内存、延迟目标增加并测量。
-
-```text
-部署实例数 × 每实例 worker 数 × (pool_size + max_overflow)
-    + 迁移、后台任务、管理连接的预算
-    ≤ 数据库可用连接额度
-```
-
-这是容量预算，不是活跃连接数的实时等式。多 worker 也会复制内存与连接池。第十六课再结合部署限制计算。
-
-### 6.4 AI 协作的可执行约束
-
-给 AI 的上下文应包括实际数据库驱动、同步/异步调用链、超时预算与验收方法。例如：“本项目使用同步 SQLAlchemy；请复用 service，说明端点为何用 `def`，并列出需要压测的等待点。”
-
-审查调用链、针对性静态规则与并发测试互补。简单 grep 会漏掉包装函数，也会误判异步 `.execute()`，不宣称能覆盖某个固定比例。AI 输出正确时保留方案并给验证证据，不为了凑错而改坏代码。
-
-## 七、Jinja2：最小模板足以完成 M1
-
-**课堂 10 分钟。** 模板负责表现，业务规则仍由 schema/service 决定。
-
-### 7.1 基础模板
+以下注释标明将来模板文件名，不表示本轮已经生成独立工程文件。
 
 ```html
-<!-- app/templates/base.html：独立演示工程中的建议位置 -->
+<!-- base.html -->
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><title>{% block title %}问答{% endblock %}</title></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}问答墙{% endblock %}</title>
+  <style>.body { white-space: pre-wrap; }</style>
+</head>
 <body>
-  <nav><a href="/ui/questions">问题列表</a> <a href="/ui/questions/new">提问</a></nav>
-  {% block content %}{% endblock %}
+  <nav aria-label="主导航">
+    <a href="/ui/questions">问题列表</a>
+    <a href="/ui/questions/new">发布问题</a>
+  </nav>
+  <main>{% block content %}{% endblock %}</main>
 </body>
 </html>
 ```
 
 ```html
-<!-- app/templates/question_list.html -->
+<!-- question_form.html -->
 {% extends "base.html" %}
+{% block title %}发布问题{% endblock %}
 {% block content %}
-<ul>
-  {% for q in questions %}
-  <li><a href="/ui/questions/{{ q.id }}">{{ q.title }}</a></li>
-  {% else %}<li>还没有问题</li>{% endfor %}
-</ul>
-{% endblock %}
-```
-
-```html
-<!-- app/templates/question_detail.html -->
-{% extends "base.html" %}
-{% block title %}{{ q.title }}{% endblock %}
-{% block content %}
-<h1>{{ q.title }}</h1>
-<p class="body">{{ q.body }}</p>
-{% endblock %}
-```
-
-CSS 可用 `white-space: pre-wrap` 保留正文换行，不必为此插入 `|safe`。课堂主讲插值、循环空态、继承；include、宏、自定义过滤器留自读。
-
-模板可以有简单展示条件，也可以测试。复杂授权/业务判断应在服务端集中执行；隐藏按钮从来不等于实施权限检查。
-
-### 7.2 自动转义的边界
-
-使用 `Jinja2Templates` 配置的 HTML 环境会自动转义；裸 `jinja2.Environment()` 或 `Template()` 不一定开启。不能把集成默认值当成所有 Jinja2 用法的保证。
-
-只在本地隔离样例中，将以下内容放入 **body 字段**，并观察同一个 `q.body` 渲染位置：
-
-```text
-<script>alert('xss')</script>
-```
-
-先用 `{{ q.body }}`，查看响应源码里的实体；再在隔离反例改为 `{{ q.body | safe }}` 对照，最后恢复转义。若浏览器 CSP 阻止执行，也应记录条件，不把“没弹窗”当无漏洞证明。
-
-自动 HTML 转义不等于任何上下文都安全：脚本、CSS、URL 协议等需要各自的处理。M1 不渲染用户富文本，不使用 `|safe`；第十五课再讲白名单清洗。
-
-跨栈阅读只保留准确结论：EJS 的 `<%=` 会转义、`<%-` 不会；换模板引擎应检查实际语法与配置，不能据此推断某生态的事故率。
-
-## 八、表单：同一套校验，两种响应
-
-**课堂 20 分钟。** 先完成失败分支，再验证提交成功与 PRG。
-
-### 8.1 共享 schema，不退回手写长度判断
-
-下例复列第三课已经采用的共享模型，JSON 与表单使用同一份定义，不另复制一套规则。标题与正文上限沿用第三课；标签最多五个，标签格式和规范化若另有规则，也必须集中维护。
-
-```python
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-class QuestionCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    title: str = Field(min_length=5, max_length=200)
-    body: str = Field(min_length=10, max_length=20000)
-    tags: list[str] = Field(default_factory=list, max_length=5)
-
-    @field_validator("title", "body", mode="before")
-    @classmethod
-    def strip_text(cls, value):
-        return value.strip() if isinstance(value, str) else value
-```
-
-`"    字    "` 清洗后不满足长度，应失败。原始输入保留在表单 values 中，清洗后的 payload 才传给业务层。M1 表单只提供标题与正文，tags 使用默认空列表；已有 JSON 标签行为不得被新表单实现破坏。
-
-### 8.2 表单和模板适配
-
-环境必须包含 `python-multipart`，否则使用 `Form` 可能在注册路由时就报错。以下模板调用采用当前 Starlette 的 request-first/关键字形式，不使用旧的位置参数写法。
-
-```python
-from fastapi import Form, Request
-from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
-from pydantic import ValidationError
-
-templates = Jinja2Templates(directory="app/templates")
-
-def render_form(request, values, errors, status_code=200):
-    return templates.TemplateResponse(
-        request=request, name="question_form.html",
-        context={"values": values, "errors": errors},
-        status_code=status_code,
-    )
-
-# 静态 /new 在动态 /{qid} 之前注册。
-@router.get("/ui/questions/new")
-def new_question_page(request: Request):
-    return render_form(request, {"title": "", "body": ""}, {})
-
-@router.post("/ui/questions")
-def submit_question(
-    request: Request, conn: ConnDep,
-    title: str = Form(""), body: str = Form(""),
-):
-    values = {"title": title, "body": body}
-    request.state.form_values = values
-    try:
-        payload = QuestionCreate.model_validate(values)
-    except ValidationError as exc:
-        errors = {}
-        for error in exc.errors():
-            field = str(error["loc"][0]) if error["loc"] else "form"
-            errors.setdefault(field, error["msg"])
-        return render_form(request, values, errors, 422)
-
-    # 业务/数据库错误向外抛，先让事务边界回滚，再转成 HTML。
-    question = svc.create(conn, payload, author_id=1)
-    return RedirectResponse(f"/ui/questions/{question.id}", status_code=303)
-```
-
-`ConnDep` 见下一节；`svc.create(conn, payload, author_id)` 是参考适配接口，内部可调用已有 repository，但不得自己提交。返回能在当前事务内取到 id 的对象或 DTO。若现有函数接收多个参数，集中适配，不要求为了照抄签名重写全部业务。
-
-手工 `model_validate` 抛 `ValidationError`；FastAPI 对请求自动校验产生的是 `RequestValidationError`。两者不可混写。上述页面只映射已知字段的错误消息，不把完整异常输入回传；国际化错误文案可以后续集中处理。
-
-```html
-<!-- app/templates/question_form.html -->
-{% extends "base.html" %}
-{% block content %}
-<form method="post" action="/ui/questions">
-  <label>标题 <input name="title" value="{{ values.title }}"></label>
-  {% if errors.title %}<p role="alert">{{ errors.title }}</p>{% endif %}
-  <label>正文 <textarea name="body">{{ values.body }}</textarea></label>
-  {% if errors.body %}<p role="alert">{{ errors.body }}</p>{% endif %}
-  {% if errors.form %}<p role="alert">{{ errors.form }}</p>{% endif %}
+<h1>发布问题</h1>
+{% if errors %}<p role="alert">发布未完成，请检查下方提示。</p>{% endif %}
+{% if errors.form %}<p role="alert">{{ errors.form }}</p>{% endif %}
+<form method="post" action="/ui/questions" novalidate>
+  <label for="title">标题</label>
+  <input id="title" name="title" value="{{ values.title }}" aria-describedby="title-error">
+  <p id="title-error">{{ errors.get('title', '') }}</p>
+  <label for="body">正文</label>
+  <textarea id="body" name="body" aria-describedby="body-error">
+{{ values.body }}</textarea>
+  <p id="body-error">{{ errors.get('body', '') }}</p>
+  <label for="tags">标签（用英文逗号分隔）</label>
+  <input id="tags" name="tags" value="{{ values.tags }}" aria-describedby="tags-error">
+  <p id="tags-error">{{ errors.get('tags', '') }}</p>
   <button type="submit">发布</button>
 </form>
 {% endblock %}
 ```
 
-浏览器字段校验可改善体验，不能替代服务端校验。空值、过长输入、纯空白、清洗后过短均需服务端测试。
+让学生指出：base 提供共同导航，子模板替换 title/content；input 的 value 与 textarea 的内容位置不同；name 是提交字段，id 用于 label 和页面定位。这里是原生表单导航，**没有第 2 课的 preventDefault 或 fetch 监听器**，不得把旧监听器再挂上去。
 
-### 8.3 提交先于成功响应
+textarea 开始标签后固定多放一个换行，再紧接插值且不缩进：HTML 解析会忽略这里的第一个换行，因此不会吞掉正文自身的首个换行。不要把插值挪回标签同一行；回填保留文本内容与换行，但浏览器会把 CRLF／CR 规范化为 LF，不承诺请求字节原样重现。
 
-复用第四课的函数作用域ConnDep及完整错误翻译，不为HTML再定义一份默认作用域依赖。当前 FastAPI 默认 request scope 在响应发送后退出；仅仅在 `yield` 后写提交并不足够。下例复列已有实现，engine与DuplicateTitle沿用第四课模块。
+教学页固定 `novalidate`，不设阻止边界输入的 maxlength，便于观察服务器同时拒绝三个字段；实际产品可增加浏览器约束改善体验，但服务端规则仍须保留。样式由教师提供，不以照抄 DOM 或页面美观作为本课唯一达标标准。
+
+### 2.3 正常的安全输出
+
+教师在隔离模板预览的 values.title 中放入无害文本 `<strong>用户标题</strong>`。使用当前 Jinja2Templates 的 HTML 环境，`{{ values.title }}` 会将它转义；浏览器显示文本，响应源码可见实体，不生成 strong 节点。创建任务先用普通合法数据，不为了这个预览写入共享库。
+
+- 本课从正例开始，正式模板不使用 `|safe`、Markup 或拼接用户 HTML。换行可用 CSS `white-space: pre-wrap`，无需关闭转义。
+- 这里是 Jinja2Templates 的 HTML 集成；裸 Jinja2 Environment 不必然开启同样配置。
+- 自动 HTML 转义不等于任意脚本、样式或 URL 协议上下文安全。本课的用户数据放进文本或带引号的普通表单属性；链接 id 来自整数记录，查询串另做 URL 编码。
+- 不展示弹窗脚本或以“没弹窗”证明安全。第 15 课再进入专用 XSS 靶场。
+
+## 三、教师构建：保留原值，校验成功后才调用服务
+
+**课堂 18 分钟。约 5 分钟表单编码与模型，7 分钟回填，6 分钟正常创建与 PRG。先用普通输入做通提交，再逐段回看失败路径。**
+
+### 3.1 三个字段怎样进入同一个模型
+
+原生表单默认发送 `application/x-www-form-urlencoded`，不是 JSON。Form 负责取得文本，QuestionCreate 负责业务输入校验；不再手写一套标题／正文长度判断。
+
+本课固定的表单编码规则：
+
+| 控件 | 原始回填值 | 传给 QuestionCreate 的值 |
+|---|---|---|
+| title | 解析后的原始文本，保留首尾空白 | 原文本交模型；模型先 strip 再限制长度 |
+| body | 解析后的原始文本，保留正文与换行 | 原文本交模型；模型先 strip 再限制长度 |
+| tags | 一个逗号分隔的文本串 | 整栏为空为 `[]`；否则按英文逗号 split，不额外 trim／去重 |
+
+例如 `python,FastAPI` 变为两个字符串，`a,a` 保留重复，空栏不变成一个空标签。逗号是**本表单的编码分隔符**；JSON 入口仍可传包含逗号的单个标签，本页不宣称能无损表达所有可能的字符串列表。标签数量仍由同一个模型检查，不在适配器偷偷截成前五个。
+
+下面是教师提供的文本适配器。命名 Form 参数本身可能忽略额外表单键，所以另外检查未知键和同名控件重复提交，不能仅把已挑选的三项交给 extra="forbid" 就声称拒绝了全部原请求字段。
 
 ```python
-from typing import Annotated, Iterator
-from fastapi import Depends
-from sqlalchemy import Connection
-from sqlalchemy.exc import IntegrityError
+async def read_question_form(
+    request: Request,
+    title: str = Form(""),
+    body: str = Form(""),
+    tags: str = Form(""),
+):
+    raw = await request.form()
+    values = {"title": title, "body": body, "tags": tags}
+    errors = {}
+    if any(name not in values for name in raw):
+        errors["form"] = "表单只接受标题、正文和标签字段。"
+    elif any(len(raw.getlist(name)) > 1 for name in values):
+        errors["form"] = "同一字段不能重复提交。"
+    request.state.form_values = values
+    return values, errors
 
-def get_conn() -> Iterator[Connection]:
-    try:
-        with engine.begin() as conn:
-            yield conn
-    except IntegrityError as exc:
-        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
-        if constraint == "questions_title_key":
-            raise DuplicateTitle() from exc
-        raise
 
-ConnDep = Annotated[Connection, Depends(get_conn, scope="function")]
+FormDep = Annotated[tuple, Depends(read_question_form)]
 ```
 
-所有依赖这条事务边界的 JSON/HTML 端点应使用同一别名；嵌套 yield 依赖也需核对作用域兼容。上述 `engine.begin()` 正常退出提交、异常退出回滚，提交失败时不应发送已经准备好的 201/303。标题约束冲突仍在事务退出后翻译为DuplicateTitle；第六课解释约束依据，第七课替换为Session，不能因新增HTML丢失JSON原有409行为。
+这个异步依赖只等待框架解析／取得表单，不执行 sqlite3 操作；同步创建端点随后由框架在线程池执行。当前 Form 解析可复用同一 Request 已缓存的表单结果，不是再次消费网络正文。文件上传或无法按声明解析的正文不在普通文本回填承诺内：它们由教师 HTML 请求错误处理器返回安全错误页，不把任意原始请求体塞回页面。
 
-业务冲突不要在写入后由 HTML 路由吞掉异常返回正常响应。让它穿过事务边界，再在全局表现层处理：
+### 3.2 创建端点只做输入适配和 HTTP 翻译
 
 ```python
-@app.exception_handler(DuplicateTitle)
-async def duplicate_title_handler(request: Request, exc: DuplicateTitle):
-    values = getattr(request.state, "form_values", None)
-    if request.url.path == "/ui/questions" and values is not None:
-        return render_form(request, values, {"title": "标题已存在"}, 409)
-    return JSONResponse(
-        status_code=409,
-        content={"code": "duplicate_title", "message": "标题已存在",
-                 "detail": None,
-                 "request_id": getattr(request.state, "request_id", "-")},
+@ui.post("/questions", response_class=HTMLResponse)
+def submit_question_page(request: Request, form: FormDep, conn: ConnDep):
+    values, errors = form
+    if errors:
+        return render_form(request, values, errors, 422)
+    incoming = {
+        "title": values["title"], "body": values["body"],
+        "tags": values["tags"].split(",") if values["tags"] else [],
+    }
+    try:
+        payload = QuestionCreate.model_validate(incoming)
+    except ValidationError as exc:
+        return render_validation_failure(request, values, exc)
+    question = create_question_service(conn, payload)
+    return RedirectResponse(f"/ui/questions/{question.id}", status_code=303)
+```
+
+`render_validation_failure` 是下一单元的学生局部任务；教师演示副本提供行为正确的版本，先展示失败时原值与各字段提示，函数实现留到学生练习后对照。
+
+必须能解释：
+
+1. values 留给回填，payload 才传入服务。不能拿清洗后的模型倒填原始输入，也不能在 except 中统一换成空字符串。
+2. 这里只捕获紧贴输入模型调用的 ValidationError。服务内部输出模型校验失败仍是 500，不被这个 except 改成客户端 422。
+3. DuplicateTitle 向表现层传播；服务已先 rollback。不能在依赖里提交，也不在 HTML 端点另加 commit；JSON 与 HTML 使用同一服务入口。
+4. 默认 request 作用域依赖仍负责最后关闭。服务返回成功已确认提交，303 的发送不依赖清理阶段完成写入。
+5. 资源依赖可能先于输入校验执行；数据库获取失败与非法输入同时出现时可能先返回 500。422 回填的课堂对照固定在数据库正常的条件下，不承诺多故障优先级。
+
+### 3.3 业务失败与未知失败各放哪里
+
+教师提供并讲解 §七 的 HTML 适配：标题冲突返回 409 的表单，回填三项；详情缺失返回 404 错误页；请求解析／路径参数错误返回 422 错误页；响应启动前未知错误返回 500 错误页。JSON 仍由第 4 课原处理器生成四字段，不复制业务冲突规则。
+
+普通 500 只显示“服务器内部错误”及 request-id，不回传异常文本、SQL 或原始正文。不能把所有 500 说成没有保存，也不自动重试提交。第 4 课两组故障回归继续使用：commit 前失败无本次记录，确认提交后失败记录仍在；同样不能发送 303，但数据结论不同。
+
+### 3.4 PRG：先预测，再观察刷新
+
+固定正常数据和已成功的服务调用：
+
+```text
+POST 表单 → 模型校验 → 服务写入并提交 → 303 Location: /ui/questions/新id
+          → 浏览器 GET 详情 → 200 HTML → F5 再 GET 详情
+```
+
+先问：成功跳转后 F5 会发哪个方法、哪个 URL？若成功后直接返回 200 HTML 呢？
+
+- PRG 完成后的当前页面来自 GET 详情，刷新再次 GET，不重发创建 POST。JSON 客户端的 201 行为没有因此变成 303。
+- 教师隔离副本只把成功返回改成 POST 200 HTML，再刷新，浏览器可能提示确认重发；记录实际行为。若重发相同标题，当前唯一约束应拒绝并返回 409，不要求产生重复记录才能证明重放。
+- RedirectResponse 默认是 307，必须显式写 303。307／308 保留方法和正文，不是本课需要的“改为读取详情”。
+- **PRG 只处理成功结果页刷新重放的问题，不等于幂等，不防双击、并发重发或 CSRF。** 422／409 的失败页面仍是 POST 响应，刷新可能再次提交，不能笼统说任何页面 F5 都是 GET。
+
+教师请求工具关闭自动跟随，先核对 303 与 Location，再发 GET；浏览器在 Network 保留日志查看真实导航与刷新。手工重发 POST 不是 F5 的替代证据，不把进程内重定向测试称为已验收浏览器行为。
+
+## 四、学生任务：两页模板与一次完整回填
+
+**课堂 25 分钟。建议 4 分钟独立写失败回填函数，7 分钟列表模板，6 分钟详情模板，5 分钟三字段非法输入，3 分钟互查和保存结果。AI 对照可在课后补齐，不要求再独立写整个创建端点。**
+
+### 4.1 自己先写这一个函数，再和 AI 比较
+
+教师给 `render_validation_failure(request, values, exc)` 签名和已有 render_form；学生按以下规则完成：返回 422、原 values 不变、按 loc 第一项把提示放到 title/body/tags、只展示固定安全文案，不回显完整错误对象。可以选提示组织方式，但三项错误不能互相覆盖。
+
+完成后才给出核对参考：
+
+```python
+FIELD_MESSAGES = {
+    "title": "标题去除首尾空白后须为 5–200 个字符。",
+    "body": "正文去除首尾空白后须为 10–20000 个字符。",
+    "tags": "标签须为字符串列表，最多 5 项。",
+}
+
+
+def render_validation_failure(request, values, exc):
+    errors = {}
+    for error in exc.errors():
+        field = error["loc"][0] if error["loc"] else "form"
+        if field in FIELD_MESSAGES:
+            errors.setdefault(field, FIELD_MESSAGES[field])
+        else:
+            errors.setdefault("form", "表单内容不符合接口约束。")
+    return render_form(request, values, errors, 422)
+```
+
+固定文案是表现层提示，不重新实施长度校验；模型规则变化时同步提示文本。JSON 的安全 loc/type 与 HTML 的字段文案可以不同，但使用同一输入模型作裁决。
+
+AI 协作限定在**这一个失败回填函数**：保存自己的版本，再让 AI 写一版，用三字段失败样本比较错误位置、输入保留、状态码和安全性。记录采纳／未采纳的理由，正确建议可保留，不要求找出错误。模板和回归结果可复用同一作业材料。
+
+### 4.2 读取路由由教师提供，学生完成表现
+
+```python
+@ui.get("/questions", response_class=HTMLResponse)
+def question_list_page(
+    request: Request, conn: ConnDep,
+    keyword: str = Query(""), page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=50),
+):
+    result = QuestionListOut.model_validate(
+        search_questions(conn, keyword, page, page_size)
+    )
+    return templates.TemplateResponse(
+        request=request, name="question_list.html",
+        context={"result": result, "keyword": keyword, "page_size": page_size},
+    )
+
+
+@ui.get("/questions/{qid}", response_class=HTMLResponse)
+def question_detail_page(request: Request, qid: int, conn: ConnDep):
+    question = get_question_service(conn, qid)
+    return templates.TemplateResponse(
+        request=request, name="question_detail.html", context={"q": question},
     )
 ```
 
-此函数登记在前述 `app` 上；不在 service 中判断 `/ui/`。若使用统一 `AppError` 处理器，将这个分支并入原处理器，不重复维护冲突规则。
+先注册静态 `/questions/new`，再注册动态 `/questions/{qid}`，防止把 new 当作整数编号解析；这是教师接线核对，不以分析路由内部对象作为学生任务。
 
-### 8.4 PRG 与验收证据
+HTMLResponse 不受 JSON 的 response_model 自动处理，所以这里显式使用既有读模型检查数据，不把数据库行随意交给模板。错误与业务缺失继续通过同一服务／处理器分流，输出模型不替代业务核对。
 
-```text
-校验失败：POST → 422 HTML（错误 + 原值）；没有业务写入
-业务冲突：POST → 异常 → 回滚 → 409 HTML（错误 + 原值）
-创建成功：POST → 写入 → 提交成功 → 303 Location → GET 详情 → 200 HTML
-刷新详情：GET → 200 HTML；不重发创建请求
+### 4.3 列表页的固定规格与参考
+
+应显示：查询关键词、当前页及总数、问题标题链接与正文、空结果说明；列表 id 顺序和查询行为与 JSON 对齐。分页链接由教师提供可用写法，学生不开发分页库或另设计参数规范。无匹配是 200 和“没有找到相关问题”，不是异常。
+
+```html
+<!-- question_list.html -->
+{% extends "base.html" %}
+{% block title %}问题列表{% endblock %}
+{% block content %}
+<h1>问题列表</h1>
+<form method="get" action="/ui/questions">
+  <label for="keyword">关键词</label>
+  <input id="keyword" name="keyword" value="{{ keyword }}">
+  <input type="hidden" name="page" value="1">
+  <input type="hidden" name="page_size" value="{{ page_size }}">
+  <button type="submit">搜索</button>
+</form>
+<p>共 {{ result.total }} 条，第 {{ result.page }} 页</p>
+<ul>
+{% for q in result.items %}
+  <li><a href="/ui/questions/{{ q.id }}">{{ q.title }}</a><p class="body">{{ q.body }}</p></li>
+{% else %}
+  <li>没有找到相关问题</li>
+{% endfor %}
+</ul>
+<nav aria-label="分页">
+{% if result.page > 1 %}
+  <a href="/ui/questions?{{ {'keyword': keyword, 'page': result.page - 1, 'page_size': page_size} | urlencode }}">上一页</a>
+{% endif %}
+{% if result.page * page_size < result.total %}
+  <a href="/ui/questions?{{ {'keyword': keyword, 'page': result.page + 1, 'page_size': page_size} | urlencode }}">下一页</a>
+{% endif %}
+</nav>
+{% endblock %}
 ```
 
-- 本课程选择校验失败直接回填 422；其他产品可用服务器端状态配合重定向保留输入，但不是本课必要复杂度。
-- POST 成功后用 303 明确转向读取；301/302 在现代 HTTP 语义中允许 POST 改为 GET，307/308 则保留方法和请求体。`RedirectResponse` 默认 307，必须显式设 303。
-- PRG 减少成功结果页刷新重放 POST；双击、网络重试、并发请求仍可能重复写入，需要业务唯一约束或幂等机制。第八课继续讨论写操作正确性。
-- `author_id=1` 只用于本地虚构用户；PRG 不提供登录、授权或 CSRF 防护。本阶段不得作为安全完备的公开站点上线。
+result 是 QuestionListOut 模型对象，此处 result.items 是声明的列表字段；若改成字典，应使用 `result['items']`，避免 Jinja 属性查找取得字典的 items 方法。查询串用 urlencode，再由 HTML 自动转义处理属性，不把关键词手拼进 href。
 
-教师验证时关闭自动跟随重定向，先看 303/Location，再看 GET；浏览器保留 Network 记录。不能只展示最后 200 就宣称 PRG 正确。提交失败用模拟故障验证没有 303，数据库没有新增记录。
+### 4.4 详情页的固定规格与参考
 
-### 8.5 B 档：flash 跨过两次请求
+显示同一记录的 id、标题、完整正文、标签与带时区创建时间；标签为空给“暂无标签”。模板自主选择继承结构和布局，但不能漏掉正文或重新引入作者字段。
 
-flash 不是 M1 必交。最小实现使用 `SessionMiddleware` 的**客户端签名 Cookie 会话**，并非服务器存储内容。签名防篡改、不加密，不能存凭据、敏感正文等。
+```html
+<!-- question_detail.html -->
+{% extends "base.html" %}
+{% block title %}{{ q.title }}{% endblock %}
+{% block content %}
+<article>
+  <h1>{{ q.title }}</h1>
+  <p>问题编号：{{ q.id }}</p>
+  <p class="body">{{ q.body }}</p>
+  <ul aria-label="标签">
+  {% for tag in q.tags %}<li>{{ tag }}</li>
+  {% else %}<li>暂无标签</li>{% endfor %}
+  </ul>
+  <time datetime="{{ q.created_at.isoformat() }}">{{ q.created_at.isoformat() }}</time>
+</article>
+{% endblock %}
+```
+
+继承和链接可使用等价组织方式；不能用固定一条问题冒充详情查询。时间验收比较实际含义，不因 `Z` 和 `+00:00` 的等价表示判错。
+
+### 4.5 必做的一次“三个字段同时非法”
+
+固定数据库可用，表单不被浏览器校验拦截。学生自选值，同时满足：title 清洗后少于 5、body 清洗后少于 10、tags 按逗号切分后超过 5。示例：title=`"  x  "`，body=`"  short  "`，tags=`"a,b,c,d,e,f"`。
+
+核对一份响应即可：422 HTML，三个字段各有错误提示；title/body 的原始空白及 tags 全串仍在对应控件中；没有重定向，独立连接确认无新增。不能只回填第一个错误，也不能为了消除报错静默截断标签。
+
+然后把输入修正为合法值，正常提交得到 303，详情显示清洗后的标题正文及全部标签。再提交相同清洗标题，409 回填，行数不增加。缺失／空白、长度上下界、特殊文本和 JSON 同规则回归由教师脚本帮助课后核对，不追加多份截图。
+
+## 五、教师引导：一个请求占用了什么
+
+**课堂 20 分钟。建议 4 分钟说明调度与固定条件，3 分钟预测，8 分钟运行六组并记录，5 分钟解释结果。压测脚本为黑盒，学生记录即可。**
+
+### 5.1 先给最小执行规则
+
+- 由 FastAPI 调用的普通 `def` 端点／同步依赖在线程池执行；等待会占用线程容量。
+- `async def` 在事件循环上运行，可挂起的异步等待让其他任务前进；写了 async 不会把内部阻塞调用变成异步。
+- 在异步端点中直接调用普通同步函数，仍在当前执行位置运行，不会因辅助函数写成 def 自动卸载到线程池。
+
+先把这些位置画在已有服务器框里，不要求新交一张完整架构图。一个进程仍可以处理多个并发请求，不能把 worker、线程池和协程都说成“一个请求开一个进程”。
+
+### 5.2 固定的三种对照
+
+下列端点只注册在教师本地隔离实验应用，不挂到 M1 公开工程。它们都没有数据库、没有模板、没有真实外部服务，仅等待 1 秒并返回相同数据。
 
 ```python
-from starlette.middleware.sessions import SessionMiddleware
+import asyncio
+import time
+from fastapi import FastAPI
 
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=settings.secret_key,
-    same_site="lax",
-    https_only=settings.cookie_secure,
-)
+
+def make_wait_lab():
+    lab = FastAPI(debug=False)
+
+    @lab.get("/lab/blocking")
+    async def blocking_wait():
+        time.sleep(1)
+        return {"ok": True}
+
+    @lab.get("/lab/awaiting")
+    async def awaiting_wait():
+        await asyncio.sleep(1)
+        return {"ok": True}
+
+    @lab.get("/lab/threaded")
+    def threaded_wait():
+        time.sleep(1)
+        return {"ok": True}
+
+    return lab
 ```
 
-另需 `itsdangerous`。密钥来自外部配置；本地 HTTP 可设 `cookie_secure=False`，生产 HTTPS 必须开启。Cookie 的传输、容量与并发覆盖问题留第十四课。
+第一条是隔离反例，不是要求学生把合格 M1 改坏。`time.sleep` 模拟阻塞等待，不证明真实数据库、CPU 或网络调用具有相同成本；第三条释放事件循环但仍占用线程。
 
-在创建路由成功分支给 `request.state.flash_on_commit` 设为 True；由事务依赖在 `with engine.begin()` **成功退出之后**写入 `request.session["flash"] = "发布成功"`。不要在尚未提交时写成功消息，否则提交失败也可能发送带成功提示的 Cookie。此扩展会让依赖需要 `Request`，仅在选做实现中加入。
+教师包的实验模块约定为 wait_lab.py，`app = make_wait_lab()`；发包后实际验收的启动形式：
 
-详情 GET 在查到资源后用 `request.session.pop("flash", None)` 取消息，并通过模板 context 的 `flash` 字段传入；模板增加 `{% if flash %}<p>{{ flash }}</p>{% endif %}`。下一次刷新不再出现消息。
+```bash
+python -m uvicorn wait_lab:app --host 127.0.0.1 --port 8001 --workers 1
+```
 
-## 九、M1 验收与作业
+它不是本仓库已经存在的命令入口。不启用 reload；与 M1 的端口区分，先核对当前请求确实发给实验服务。线程池可用容量至少为 10，无其他同步任务争抢；实际配置及版本随记录附上，不把常见默认值说成固定线程数量。
 
-**课堂 6 分钟。** 预估基础任务 3 小时左右，拓展自选，不要求全部完成。
+### 5.3 预测条件与测量口径
 
-### 9.1 A 档基础交付
+固定每组**总请求数为 10**，并发上限分别为 1 与 10，共三种端点 × 两种并发。单 worker、每次等待 1 秒、客户端允许至少 10 个连接，所有请求完整读完 JSON 才结束计时。并发 10 时客户端在同一批次发起十个任务；并发 1 是顺序处理相同的十个请求，不是仅发一次。
 
-| 项目 | 验收证据 |
+先问：并发 10 时总时长大致是多少，哪个更长？忽略开销、资源足够时的解释模型：
+
+| 端点 | 并发 1、总数 10 | 并发 10、总数 10 | 原因 |
+|---|---|---|---|
+| blocking | 约 10 秒 | 约 10 秒 | 阻塞事件循环，等待无法在该循环上重叠 |
+| awaiting | 约 10 秒 | 约 1 秒 | 可挂起等待重叠 |
+| threaded | 约 10 秒 | 约 1 秒 | 多个线程中的等待重叠，须有足够容量 |
+
+上表是条件明确的预测，不是实测数据、硬性通过阈值或“异步永远更快”的承诺。不能把每组请求数从 10 改成 20，却继续照抄这张总时长答案。
+
+教师脚本统一复用异步客户端和连接池，先预热、后测量；客户端超时至少 30 秒。每组报告总数／并发、成功／HTTP失败／超时／其他失败、总时长及单请求延迟；等待并发名额的时间不计入单请求服务延迟，但整批总时长包含它。
+
+| 模式 | 并发 | 请求总数 | 成功／失败／超时 | 总时长 | 解释 |
+|---|---|---|---|---|---|
+| blocking／awaiting／threaded | 1／10 | 10 | 实测 | 实测 | 按条件填写 |
+
+课堂六组记录可以直接复用教师数据，注明来源。不得删除超时请求后宣称延迟很低；少量样本不作为生产吞吐或容量报告。若结果不符，先核对单 worker、客户端并发、等待代码、线程容量与目标端口，不以偏离固定倍数直接扣分。
+
+## 六、执行判据、M1 验收与后续交接
+
+**课堂 12 分钟。约 4 分钟回到调用链，5 分钟 M1 验收，3 分钟收束与后续任务。**
+
+### 6.1 回到本课为什么用 def
+
+HTML 的读写路径使用同步 sqlite3，所以路由采用 def，直接调用相同的同步服务。不能只给端点加 async 就宣称提速，也不把同步连接传进多个并行任务共享。继续使用第 4 课教师工厂的 `check_same_thread=False`、每请求独立连接、非自动提交写事务；取消线程亲和检查并不保证共享连接并发安全。
+
+| 调用链 | 本课判据 | 边界 |
+|---|---|---|
+| 同步 sqlite3 或阻塞 SDK | def 端点，框架放入线程池 | 线程容量、连接与数据库仍可能成为限制 |
+| 真正的异步 I/O | async def + await | 排查内部隐藏的同步调用或长计算 |
+| 异步入口必须调用同步工作 | 教师参考：显式卸载完整同步工作单元 | 资源在有效生命周期内使用，不并发共享连接 |
+| 长时间 CPU 工作 | 另行评估算法、进程或任务系统 | 不是加 async 或线程池就必然提高吞吐 |
+
+本课不增加多 worker、CPU 压测或连接池调优的必交任务。表单依赖中的 await 仅服务异步解析；真正阻塞的数据操作仍在同步端点调用链内。
+
+### 常用写法卡 #5
+
+| 写法 | 替我们做什么 | 必须知道的边界 |
+|---|---|---|
+| Jinja2Templates + extends/block | 把 context 渲染进共享页面骨架 | 不是再次执行前端 fetch；模板不承担数据库业务规则 |
+| HTML 模板自动转义 | 将用户内容安全地用于本课文本／普通属性位置 | 不是任意上下文都安全，不用 safe 绕过 |
+| Form 文本 → QuestionCreate | 解析传输格式，再复用输入规则 | CSV 标签是表单编码，不改变 JSON 列表规则 |
+| 原 values + errors 回填 | 告诉用户哪里错，同时保留输入 | 清洗后的 payload 不等于原输入；不能只保留首个字段 |
+| 服务返回后 303 → GET | 成功结果停留在读取页面 | PRG 不是幂等或 CSRF 防护，失败 POST 页仍可能被重发 |
+| def／async def | 框架选择线程池或事件循环 | 直接调用普通函数不会自动卸载 |
+
+### 6.2 M1 固定验收
+
+| 范围 | 达标结果 |
 |---|---|
-| 三个核心 JSON 端点、健康检查保持有效 | 契约快照与正常/异常响应；不改旧验收规则掩盖回归 |
-| HTML 列表、详情、发帖页 | 列表空态、详情不存在与正常导航均可用 |
-| JSON/表单复用 schema 与 service | 同一组长度、空白边界输入；两入口规则一致 |
-| 失败回填 | 422 和标题冲突 409；正文保留且转义；失败没有业务新增 |
-| 成功 PRG | POST 的 303/Location 与后续 GET；刷新不重发 POST |
-| 提交与异常边界 | 提交失败没有 201/303；日志和普通 500 响应头可关联 |
-| 同步/异步选择 | 一个代表性端点，沿 service/repository 指到实际阻塞调用 |
-| 六组基础并发记录 | a/b/c × 并发 1/10；可使用课堂数据，注明来源和环境 |
+| HTML 三页 | 列表／详情／创建表单可导航；new 不误匹配动态路由；列表空结果 200，详情缺失 404 |
+| 搜索与输出 | 查询规则、分页参数不改名；标题正文对应真实记录；详情显示标签与时间，用户文本转义 |
+| 三字段失败 | title/body/tags 同时非法时 422，三个提示和原值都在，无新增记录 |
+| 其他输入边界 | 缺失／空白／长度上下界、5／6 标签；未知表单键和重复标量键拒绝；JSON 原有严格输入规则保留 |
+| 标题冲突 | 409 HTML 回填三项，独立连接确认没有第二条；JSON 仍为 409 四字段 |
+| 成功 PRG | 303 + HTML Location，独立连接可读到已提交数据；后续 GET 成功，实际浏览器刷新 GET |
+| 错误与事务 | HTML 404／422／500 不误发 JSON，API 不因 Accept 变 HTML；未知错误安全，request-id 保留；提交前／确认后故障分别核对数据，不将所有 500 当无写入 |
+| JSON 与探针 | 三端点成功与错误契约保留；healthz 200／503 仍仅 status 字段；没有提前加入作者或 ORM |
+| 执行方式 | 六组教师并发记录及解释；能沿一个实际路由指到 sqlite3 等阻塞点并说明 def 的理由 |
 
-原有配置外置、`.env` 不入仓、分层依赖方向继续保持；不设路由行数上限，不要求所有 HTML/健康响应套 JSON 业务模型。同步数据库测试应使用故障替身或隔离依赖，勿为演示停掉其他人的数据库。
+这是本地虚构数据教学站点，尚无登录、授权和 CSRF 防护，不作为安全完备的公开应用部署。只在原页面中保留安全文本输出，不要求回到第 2 课再开发一套新四态页面。
 
-### 9.2 AI 协作与判据说明
+### 6.3 只交一个作业包
 
-在本次实际工作中选一段模板、表单适配或调用链建议，保存提示词与输出，说明：符合哪些规则、怎样验证、是否修改以及原因。若建议正确，提交保留理由即可。
+1. M1 工程：HTML 三页、三 JSON 端点和探针；包含自己完成的两个模板及失败回填函数。
+2. 表单异常证据：三字段 422、冲突 409；成功 303／GET／刷新与独立连接回读。相同观察可支撑多个验收项，不按截图数量评分。
+3. 教师六组并发记录及自己的机制解释；一个实际端点的执行方式判据。允许复用课堂数据，不要求课后重写压测器。
+4. 自己与 AI 的失败回填函数 diff、采纳理由及回归结果。契约补充记录 HTML 路径／状态／表单编码即可，不再交多份独立报告。
 
-更新已有技术方案手册的一小节，不重复交多份相同截图。推荐记录一个决定：“本项目数据访问保持同步，因此端点使用 def；当等待量、资源预算与测量支持时再评估异步改造。”不要求每课凑满若干条 ADR。
+不按路由行数、目录数量或模板结构完全一致评分；基础验收可课后补齐，不能当选做。没有现成教师设施就先补设施，不删掉三字段任务来制造“已完成”。
 
-### 9.3 B 档选做
+### 6.4 第 6 课交接
 
-任选一项，建议不超过一小时：flash；固定工作量 CPU 对照；并发 50 或多 worker 对照；纯 ASGI 中间件阅读与改写。交真实结果和局限，不以预测必须失败或吞吐必须提升评分。
+M1 交付仍是 SQLite 和同一服务层事务边界。第 6 课教师在课前准备 SQLite → PostgreSQL 16 的迁移与核对清单，不让学生课堂临时调驱动。迁移必须明确：
 
-## 十、素材、运行条件与验收状态
+- 保留已有 id/title/body/created_at，迁移后重置序列，核对记录数量、编码与带时区时间。
+- tags_json 可能含重复、空字符串或带空白标签；转关联表时明确去重／保留／拒绝规则、冲突报告和回归预期，不能悄悄丢数据。
+- 现有 M1 没有作者关联。引入用户表／关系时教师提供虚构用户及既有数据映射，不声称旧记录原本已有 author 字段；实际认证与归属接口迁移按后续课次契约执行。
+- 如果后续查询排序、回复数或公开字段变化，应登记差异并更新 JSON／HTML／测试；不能以换库为由悄悄改本课 id 降序或输入契约。
+- 第 6 课按 v4 安排 80 分钟教学 + 15 分钟小测 + 5 分钟缓冲；现有第 6 课旧稿尚需另行重写，本轮不把其旧要求提前压给 M1。
 
-本底稿修订不等于独立演示工程、截图和压测脚本已经交付。制作前需要补齐：
+## 七、教师参考：HTML 错误适配与应用装配
 
-- 独立的第五课工程及依赖锁：Python 3.12、支持函数作用域依赖的 FastAPI、匹配的 Starlette、Pydantic v2、同步 SQLAlchemy、Jinja2、python-multipart、httpx；flash 另需 itsdangerous。
-- 正常 M1 起点与三个互不混杂的反例阶段：阻塞、POST 结果页、局部模板 `safe`；用明确版本或副本标识，不冒称已有 Git tag。
-- `bench.py` 六组基础测量、预录备用证据、普通 500 的头与日志、422/409 回填截图和 PRG 的 Network 记录。
-- 教师需验证依赖注册、模板调用、数据库提交故障与浏览器刷新行为。只构建课件不能替代这些验收。
+本节用于随包提供和课后核对，不作为额外课堂单元。沿用第 4 课完整处理器；在应用开始服务前，用下面的分流适配替换相同异常类型的处理器，非 HTML 请求交回原处理器。不要同时保留优先级更高的旧 DuplicateTitle 专用处理器，也不同时装两份 trace 中间件。
 
-本轮在 FastAPI 0.141.1 / Starlette 1.6.0 的进程内最小应用中验证：依赖退出抛异常时，默认 request scope 已返回 200，而 function scope 返回 500；另用 Pydantic 2.13.5 核对先 strip 再做标题长度约束。前者是提交失败时机的模拟，不是完整数据库提交测试。当前第一课 Python 环境未安装 Jinja2、python-multipart，本轮未安装新依赖；完整表单/模板、浏览器 PRG 和真实 HTTP 并发压测仍待验收。
+### 7.1 安全错误页与四类适配
 
-所有实验用虚构数据和可丢弃副本；先确认库名、连接串与当前工作目录。复位只重建该演示副本，不覆盖学生未提交代码，不对真实项目批量灌脏数据。现场故障超过约半分钟，可切预录材料，注明机器、版本、日期和模拟条件。
+```python
+from html import escape
 
-## 十一、与后续课衔接
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-| 内容 | 后续位置 |
-|---|---|
-| 数据库约束与并发唯一性 | 第六课；不把已有合格 M1 改坏 |
-| Session、提交失败、持久化实现替换 | 第七课 |
-| PRG 之外的写入正确性与幂等 | 第八课 |
-| 回归与故障验证固化 | 第九课 |
-| 跨域读取、CORS 与客户端错误 | 第十二课 |
-| 登录、身份与 Cookie | 第十四课 |
-| XSS、CSRF 和公开站点安全 | 第十五课 |
-| 外部服务等待、部署资源预算 | 第十六课；不承诺在本课实现任务队列 |
 
-第六课先用小型可手算数据说明约束与 NULL，再在隔离性能库观察索引。完整模板参考、错误路径、容量判据保留在课件中，课堂不必逐条展开。
+def is_html_request(request):
+    path = request.url.path
+    return path == "/ui" or path.startswith("/ui/")
 
-参考：FastAPI 的 Request Forms、Templates、Advanced Dependencies；Starlette Middleware；RFC 9110 的 303 See Other。制作演示工程时以锁定版本对应的官方文档和实测为准。
+
+def html_error(request, status, message, headers=None):
+    rid = getattr(request.state, "request_id", "-")
+    response = HTMLResponse(
+        "<!doctype html><html lang=\"zh-CN\"><meta charset=\"utf-8\">"
+        f"<title>请求未完成</title><h1>{escape(message)}</h1>"
+        f"<p>请求编号：{escape(rid)}</p>"
+        '<a href="/ui/questions">返回问题列表</a></html>',
+        status_code=status, headers=headers,
+    )
+    response.headers["X-Request-ID"] = rid
+    return response
+
+
+def register_html_handlers(application):
+    json_business = application.exception_handlers[AppError]
+    json_validation = application.exception_handlers[RequestValidationError]
+    json_http = application.exception_handlers[StarletteHTTPException]
+    json_unexpected = application.exception_handlers[Exception]
+
+    @application.exception_handler(AppError)
+    async def business(request: Request, exc: AppError):
+        if not is_html_request(request):
+            return await json_business(request, exc)
+        mapping = BUSINESS_HTTP.get(type(exc))
+        if mapping is None:
+            return await unexpected(request, exc)
+        status, code, message = mapping
+        values = getattr(request.state, "form_values", None)
+        if type(exc) is DuplicateTitle and request.method == "POST" and values is not None:
+            return render_form(request, values, {"title": message}, 409)
+        return html_error(request, status, message)
+
+    @application.exception_handler(RequestValidationError)
+    async def validation(request: Request, exc: RequestValidationError):
+        if not is_html_request(request):
+            return await json_validation(request, exc)
+        return html_error(request, 422, "请求参数不合法")
+
+    @application.exception_handler(StarletteHTTPException)
+    async def http_error(request: Request, exc: StarletteHTTPException):
+        if not is_html_request(request):
+            return await json_http(request, exc)
+        messages = {404: "路径不存在", 405: "该路径不支持此方法"}
+        return html_error(request, exc.status_code,
+                          messages.get(exc.status_code, "HTTP 请求失败"), headers=exc.headers)
+
+    @application.exception_handler(Exception)
+    async def unexpected(request: Request, exc: Exception):
+        response = await json_unexpected(request, exc)
+        if not is_html_request(request):
+            return response
+        return html_error(request, 500, "服务器内部错误")
+```
+
+html_error 用固定结构与 escape，不依赖可能正出错的模板文件。未知异常先调用原兜底以复用安全错误日志，再为 HTML 请求生成固定页面；不把 JSONResponse 的 Content-Type／Content-Length 拷给 HTML 响应。预期错误经原中间件补 request-id，外层未知错误由 html_error 显式补头。
+
+普通回填仅针对已解析的三项文本；框架解析失败或未知错误不承诺完整回填。request.state 只在本次请求保存输入，不写日志、Cookie 或全局变量。调试固定 `debug=False`；响应已经开始或后台任务失败时，不能再承诺替换整份页面。
+
+### 7.2 只组装一次
+
+```python
+def make_ssr_application():
+    application = make_application()
+    register_html_handlers(application)
+    application.include_router(ui)
+    return application
+```
+
+make_application 是第 4 课 E 阶段工厂。所有模型、函数、ui 路由及异常适配定义好后，教师入口取得 `app = make_ssr_application()` 并保留原静态页挂载，再启动服务。JSON OpenAPI 快照不变；本例明确用 include_in_schema=False 排除 HTML 路由，其契约由 §1.2 与行为验收记录，不假称 OpenAPI 自动描述了模板和 PRG。
+
+## 八、选做：签名 Cookie 的 flash
+
+这是 v4 的选做方向，不加进 95 分钟主线，也不作为 M1 达标条件。教师另提供 SessionMiddleware 与依赖安装配置，密钥来自外部且无可用默认值，生产使用 HTTPS 与安全 Cookie 配置。
+
+最小顺序：**调用创建服务成功返回 → 端点写 flash → 返回 303 → GET 详情读出并移除 flash**。写成功消息晚于服务提交；不在依赖退出阶段写入事务或 flash。若服务确认提交后抛异常，没有成功返回，也不应展示“发布成功”。
+
+Starlette 的这类会话内容在客户端签名 Cookie 中，签名防篡改、不加密；不放正文、凭据等敏感内容。flash 是“一次读出后移除”的消息约定，session 是保存会话状态的机制，两者不是同一概念。响应丢失、并发标签页与 Cookie 更新仍有边界，不能承诺消息绝对只显示一次；不借此声称已经实现登录或 CSRF 防护。
+
+## 九、制作与验证状态
+
+本稿只提供教学底稿与可核对参考，不表示已有第五课独立工程。教师需要把模板文件、同步 SQLite 工厂、R/E 后续起点与异常分流按锁定环境真正装配。
+
+- **本轮机制验证已完成**：从本稿提取 Python 代码与四个模板，组合第 3／4 课模型、SQLite 数据函数、事务服务和错误处理器。SSR 共 557 项断言通过，其中 555 项行为／模板／契约检查，2 项课时检查；另通过 7 项并发检查，累计 564 项。课时逐项为 5/15/18/25/20/12，共 95 分钟，加 5 分钟缓冲；学生单元细分为 4/7/6/5/3，共 25 分钟。
+- **覆盖范围**：三页与静态路由顺序、搜索分页与空态、五字段详情、三字段同时非法及原值回填、正文首个／连续换行与 CRLF、长度与标签边界、额外／重复表单键、文本转义及查询串编码、409 回填、提交先于 303、独立连接回读、再次 GET 不写入、JSON 契约和 OpenAPI 不变、request-id／资源释放、探针故障恢复、提交前／确认后故障、服务输出校验仍为 500、模板损坏时的安全兜底。
+- **验证环境**：Python 3.12.12、FastAPI 0.141.1、Starlette 1.6.0、Pydantic 2.13.5、httpx 0.28.1；Jinja2 3.1.6、python-multipart 0.0.32、MarkupSafe 3.0.3 仅安装到工作区隔离验证目录，未修改已有工程依赖或锁文件。TestClient 的 httpx 适配仍有弃用提示，未为消除提示升级框架。
+- **证据边界**：SQLite 为共享内存隔离库，以独立连接检查提交可见性，不证明文件落盘或重启恢复；模板使用真实 Jinja2Templates 环境与 DictLoader，HTMLParser 检查生成文本和回填，另以 Chromium DOMParser 隔离核对 textarea 首换行规则，不等于已验收站点真实 DOM、点击或 F5。并发使用同进程单事件循环与 ASGITransport，没有网络服务器；客户端也受该循环阻塞，单请求计时不能覆盖获得调度之前的等待，网络连接池与超时行为未验收。
+- **跨课核对**：第 5 课继续第 4 课的 SQLite、五字段、四字段 JSON 错误、单 status 探针及服务层提交，HTML 仅增加表现适配。第 6 课迁移清单与小测课时按 v4 交接，其旧稿待另行重写。临时核验脚本不是已交付的学生自检器或教师并发工具。
+
+本轮进程内六组数据如下，每组总数 10、完整成功 10；线程容量已核对至少为 10。数据只验证等待能否重叠，不作为课堂真实 HTTP 实测数据或固定性能阈值：
+
+| 模式 | 并发 1 总时长 | 并发 10 总时长 |
+|---|---|---|
+| blocking | 10.159 秒 | 10.057 秒 |
+| awaiting | 10.022 秒 | 1.012 秒 |
+| threaded | 10.066 秒 | 1.014 秒 |
+
+工作区临时复核命令（依赖上述隔离安装及第 3／4 课核验脚本，不是学生工程启动命令）：
+
+```bash
+uv run --offline --project snippets/ch01/m0-tracer --no-sync python .build-check/validate_lesson05.py --wait
+```
+
+- **试讲前必须补齐**：M1 独立起点／完成版、两个学生模板骨架、失败回填函数任务壳、Form 适配与 HTML 处理器、真实文件库、锁定依赖、压测脚本与六组记录、PRG 和失败回填备用录屏。
+- **必须实测的行为**：真实浏览器表单提交／回填、自动转义后的 DOM、303 与 F5、单 worker 真实 HTTP 并发、连接故障与恢复、文件库重启及数据保留；模拟响应或进程内测试不能替代这些证据。
+- **教学负荷验证**：记录学生在 25 分钟内完成两个模板、失败回填函数和三字段输入所需提示；记录把失败 POST 页刷新误认为 GET、把 async 理解为自动非阻塞的错因。不能仅凭代码运行就宣称课堂负荷已验证。

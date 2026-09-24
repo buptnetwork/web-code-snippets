@@ -1,124 +1,239 @@
-# 第 3 次课教学底稿（完整整改版）
-## 路由选择与输入 / 输出契约
+# 第 3 次课教学底稿（第四版）
+## FastAPI 正式入门：参数、模型与返回值
 
-## 〇、备课定位与交接起点
+> **备课基线**：[第四版大纲](../syllabus-v4.md)第 3 课与[新版第 2 课交接](lesson-02.md)。本稿重新组织正文、接口规格、验收与第 4 课交接，尚未移交归档；配套工程和课件需随后重构，不从旧工程反推本课要求。
 
-主线：**输入按声明收窄，输出按承诺组织；知道这两道边界能保证什么。** 入口校验不等于授权，出口模型不等于业务正确，也不是不可绕过的安全屏障。
+## 〇、这次课要建立什么
 
-起点是第二课修好的 M0 页面与接口，不是旧稿里凭空出现的六端点项目。M0 已有部分路径类型约束、404 和探针；不能称学生“两道闸门一道都没有”。本课新增 JSON 创建，完善列表与详情契约，并**显式进行一次前后端同步迁移**。
+**讲给学生的目标句**：你能用 Pydantic 正常实现列表查询和创建接口，并说出非法输入被挡在了哪里。
+
+第 1 课写过路径参数，第 2 课调用了教师提供的搜索接口。本课不再把后端看成黑盒：先声明从哪里接收参数、允许哪些值，再将已校验的数据接入教师提供的查询／插入骨架。
+
+核心解释是：**走 FastAPI 的自动请求校验路径时，不满足声明的输入会在调用端点函数前被拒绝。** 与它配对的出口约束是：普通返回值按输出模型处理；多余字段与缺失必填字段的结果不同。
+
+课堂路线：**正常列表 → 参数与模型 → 学生创建一条问题 → 三组边界输入 → 入口断点与出口对照 → OpenAPI 核对**。不以路由冲突、多表联查或一组混杂故障作为开场。
 
 ### 95 分钟教学 + 5 分钟缓冲
 
-| 单元 | 分钟 | 课堂处理 |
-|---|---:|---|
-| 一、起点与迁移范围 | 5 | 主讲 |
-| 二、隔离反例与两道边界 | 8 | 教师对照，不修改合格库制造错误 |
-| 三、路由表与选择 | 12 | 教师打印与方法 / 路径实验 |
-| 四、参数来源与 schema | 12 | 主讲输入来源、清洗顺序 |
-| 五、同一端点的入口 / 出口验证 | 22 | 唯一学生现场必做 |
-| 六、业务端点与输出映射 | 14 | 教师演示迁移，完整 SQL 课后读 |
-| 七、OpenAPI 与契约循环 | 12 | 主讲声明与运行的区别 |
-| 八、作业与交接 | 10 | 5 分钟核对基线，5 分钟布置 |
-| 合计 | 95 | 另留 5 分钟缓冲 |
-
-A 档基础材料可课后读，不要求学生现场完成所有 SQL、三个端点与文档。B 档才是更多边界组合、路径转换器、跨栈和 ASGI 阅读。超时将路由对象属性、完整字段表转课后，保留第五单元的证据与解释。PATCH 不在本课实现或评分。
-
-## 一、本课允许的契约迁移
-
-**课堂 5 分钟。** 先展示旧 / 新响应及页面受影响位置，再修改代码。
-
-| 内容 | 第二课交付 | 本课交付 |
+| 分钟 | 教学单元 | 当场产出 |
 |---|---|---|
-| 列表路径 | GET /questions | 不变 |
-| 查询参数 | keyword/page，固定页长 | keyword/page/page_size；page≥1；page_size 默认20、1—50 |
-| 列表正文 | success/data，含正文 | items/total/page；每项 id/title/created_at/author，不含正文 |
-| 详情正文 | id/title/body/created_at | 保留这些字段，新增 author={id,display_name} |
-| 创建 | 尚非必做端点 | POST /questions，QuestionCreate → QuestionOut，201 + Location |
-| /healthz | 200 ok/ok；503 degraded/down | 完全保留，必做而非拓展 |
-| 错误正文 | M0 详情404与框架422不同 | 404保持 code/message/request_id，创建409同形；422先保留框架格式 |
+| 5 | 回顾与目标 | 第 2 课页面及读取接口仍正常 |
+| 15 | 三类参数与 In/Out 模型 | 字段放在哪里、由谁填写 |
+| 20 | 教师构建列表与讲解参数化查询 | Query 声明、占位符绑定和输出映射 |
+| 25 | 学生实现创建接口 | 模型、插入字段映射、201 与三组边界输入 |
+| 12 | 入口与出口机制 | 非法输入未进端点；缺字段与多字段的区别 |
+| 10 | OpenAPI 对照实际请求 | 声明与运行结果逐项对应 |
+| 8 | 边界一句话、作业与交接 | 验收范围和第 4 课起点 |
+| **95** | **合计** | **另留 5 分钟缓冲，无课内小测** |
 
-第四课再迁移业务 JSON 错误为 `code/message/detail/request_id`，本课不暗中提前统一。列表不输出正文是明确的载荷选择，不能只改容器而忘记第二课 render 还读 q.body。
+前置只需类型注解、类属性、列表／字典和 JSON 结构。数据访问不从零搭建；首次试讲记录 25 分钟任务的完成情况，超时先压缩工具面板与参考层解释，不削减正常示例和学生实践。
 
-保留 request-id、日志与静态页。当前作者固定为教师夹具中的用户1，**不是已经完成登录或授权**。M0 数据中没有 users 和 question_tags：教师须提供隔离数据升级模板，保留既有问题 id/title/body/created_at，为旧问题回填存在的作者，并建立标签关联；不能运行原 seed 覆盖学生数据。
+### 教师提供与学生负责
 
-## 二、反例：一次只让一个问题起作用
-
-**课堂 8 分钟。**
-
-不再把手写 request.json、SQL 错误、作者外键不存在、路由冲突和出口泄漏混在一个所谓“已验证版本”中。
-
-| 对照 | 固定条件 | 预期区别 |
+| 提供物 | 标注 | 学生要求 |
 |---|---|---|
-| 路由选择 | 同 GET 方法，独立路由应用 | 参数路径先登记时 latest 进入参数校验而得422 |
-| 入口校验 | 同一 POST，使用内存夹具，无数据库 | 非法输入不进入端点，合法输入进入 |
-| 输出过滤 | 同一合法 POST、相同嵌套数据 | 无模型时多余字段暴露，有模型时过滤 |
-| 输出边界 | 同一模型，换直接 Response / 缺字段 | 前者绕过，后者服务端校验失败 |
+| 参数化查询／插入骨架、显式字段映射、`lastrowid` | 要求解释 | 说清占位符与值的对应关系，按模型字段改写并接入端点 |
+| 连接获取与关闭、SQLite 建库与数据升级 | 要求会用 | 按约定获取和关闭，不实现数据库设施；第 4 课才收进依赖 |
+| 服务层提交、回滚与已知标题冲突模板 | 本课要求会用，第 4 课升级为要求解释 | 知道调用成功意味着提交已返回，不移动提交位置，不从零设计事务模板 |
+| Query、输入／输出模型、端点接线 | 要求解释 | 能修改声明、构造边界输入并说明状态码与字段 |
+| 故障对照开关、回归脚本 | 黑盒 | 使用并核对结果，不编写实验工具 |
 
-所有敏感字段用明显虚构占位，例如 `password_hash="not-a-real-hash"`。不使用真实用户数据，也不宣称“功能测试永远发现不了泄漏”：有字段白名单断言的测试就可以发现。
+本课继续使用 SQLite，不引入 PostgreSQL、SQLAlchemy、ORM、用户表、作者关联、回答接口或 PATCH。标题、正文与标签是本课最小创建输入；标签暂由教师模板存为 JSON 文本，第 6 课再建立规范化关联表，不提前要求学生实现多表写入。
 
-## 三、路由选择：打印内部结构，再解释结果
+## 一、开场：读取页不变，新增一次正常创建
 
-**课堂 12 分钟，教师演示。**
+**课堂 5 分钟。先回归 `react` 得一条、无匹配词得空列表。**
 
-### 3.1 装饰器登记，不是收到请求才执行
+教师说明：
+> 上节课，你会判断接口返回了什么。这节课，我们声明接口允许收到什么，再让它保存一条新问题。
 
-课前的 route 装饰器把函数存入表；FastAPI 在执行路由声明时构造路由对象。不能说所有框架只能用 list 或全部按同一种算法匹配；这里只观察当前 FastAPI/Starlette 的实现。
+### 1.1 保持的公开契约
+
+- `GET /questions` 继续接收 keyword/page/page_size，默认值分别为空字符串、1、20；page 为整数且至少为 1，page_size 为整数且在 1–50 范围内。
+- 搜索先去掉关键词首尾空白，在标题或正文中做字面子串匹配；样本英文字母不区分大小写，`%`、`_` 不作通配符。按 id 降序后分页，total 是分页前的匹配总数。
+- 列表外壳继续是 `items/total/page`，不是本课才迁移到这个容器。
+- 详情仍为 `GET /questions/{qid}`。保留 `qid: int`，本课不新增正数限制：不存在的整数 id，包括 0 和负数，返回业务 404；不能解析成整数的路径参数返回框架 422。
+- `/healthz` 仍为 200、`{"status":"ok"}`，不访问数据库。统一错误体、request-id 与数据库可用性检查均在第 4 课引入。
+
+### 1.2 本课明确新增的字段与操作
+
+所有问题记录保留 id/title/body，**增加 tags 与 created_at**。列表、详情和创建成功都使用同一记录形状；本课不删除列表正文，不增加作者展示。第 2 课页面只消费既有字段，因此读取与渲染代码可以继续工作；若主动展示新字段，仍使用安全文本输出。
+
+教师在独立教学库中为原有三条记录补 `tags=[]` 与固定、带时区的 created_at，保留原 id/title/body。学生不重建或覆盖自己的数据来完成接口任务。
+
+新增 `POST /questions`：按输入模型创建，成功返回 201、记录正文以及指向详情的 Location。先用正常输入完成一次创建，再测非法输入。
+
+## 二、必要铺垫：参数从哪里来，模型约束谁
+
+**课堂 15 分钟。把输入声明画在“路由匹配之后、端点调用之前”，输出模型画在“端点返回之后、响应发送之前”。**
+
+### 2.1 三类参数位置
+
+| 来源 | 声明形状 | 例子与意义 |
+|---|---|---|
+| 路径 | `qid: int` 与 `/questions/{qid}` 对应 | 选择某一条问题；非法整数在函数调用前拒绝 |
+| 查询串 | `page: int = Query(1, ge=1)` | 读取方式及条件；默认值和范围写进声明 |
+| JSON 正文 | `payload: QuestionCreate` | 一组创建字段，由 Pydantic 模型描述 |
+
+本课使用上述明确写法，不讲完整参数推断算法。不要把所有外部输入都说成字符串：查询串经解析得到参数，而 JSON 本身就有字符串、数字、数组和 null 等类型。
+
+类型注解在普通 Python 调用中不自动拦截值；这里是 FastAPI 读取声明并执行校验。直接在 Python 里调用函数，不等同经过一次 HTTP 请求。
+
+### 2.2 给定字段契约：先判断，再写模型
+
+以下是本课固定验收规格，学生不自行改变范围。它也作为随后教师《契约与迁移交接表》的录入依据，不要求本轮另建一份文档。
+
+| 字段 | 创建输入 | 成功输出 | 规则 |
+|---|---|---|---|
+| title | 必填 | 必有 | 字符串，先去首尾空白，最终长度 5–200 |
+| body | 必填 | 必有 | 字符串，先去首尾空白，最终长度 10–20000 |
+| tags | 可省，默认空列表 | 必有 | 最多 5 个字符串；本课不额外约束单项长度、排序或去重，原样保存 |
+| id | 不允许客户端填写 | 必有 | 数据库生成的整数 |
+| created_at | 不允许客户端填写 | 必有 | 服务端生成的 UTC 时间，JSON 中为带时区的时间字符串 |
+
+- 长度按清洗后的字符串字符数计，不是 UTF-8 字节数。title/body 的 null、缺失及错误类型不会被强行转成字符串。
+- 创建拒绝其他字段，包括客户端提交的 id、created_at、author_id。拒绝额外字段是输入契约，不是认证或权限检查。
+- 教师库对清洗后的 title 有唯一约束；当前按 SQLite 的精确文本比较，大小写不同不自动视为同一标题。已知重复标题返回 409，不把所有数据库异常都叫重复。
+- 本课输出字段是 id/title/body/tags/created_at，没有 author、version 或内部维护字段。结构正确仍可能取错记录，需要核对业务结果。
+
+保留 tags 是为了后续表单有标题、正文、标签三类输入；当前只解释字符串列表与数量限制，不把标签关系建模塞进本课。
+
+### 2.3 输入与输出的职责
+
+`QuestionCreate` 回答“调用者可提交什么”，`QuestionOut` 回答“服务承诺返回什么”。它们不是把同一个模型换两个名字：客户端不生成 id 和时间，而服务端必须给出它们。
+
+教师先让学生按字段表分类，再看参考。第三单元的正常列表演示使用教师预置读模型；第四单元由学生完成创建模型和输出字段核对，最终列表／详情／创建共用同一个 `QuestionOut`，不要求维护多份相同输出模型。
+
+## 三、教师构建列表：声明、绑定、返回三件事
+
+**课堂 20 分钟。约 5 分钟看 Query 与输出模型，8 分钟逐行说明查询绑定，4 分钟接入端点，3 分钟核对返回数据。**
+
+### 3.1 输出模型与通用导入
+
+下列代码分段构成最终参考；app、同源静态页和 `open_connection()` 来自教师起点包。改造时替换旧列表／详情声明，不把相同方法和路径的第二个端点追加在旧路由后，也不重新创建 app 丢掉页面挂载。
 
 ```python
-from fastapi import FastAPI
-from fastapi.routing import APIRoute
+import json
+import sqlite3
+from contextlib import closing
+from datetime import datetime, timezone
 
-route_app = FastAPI()
-
-@route_app.get("/questions/{qid}")
-def detail_demo(qid: int):
-    return {"id": qid}
-
-@route_app.get("/questions/latest")
-def latest_demo():
-    return {"id": 7}
-
-for route in route_app.routes:
-    print(type(route).__name__, getattr(route, "methods", None), route.path)
-
-selected = next(route for route in route_app.routes
-                if isinstance(route, APIRoute)
-                and route.path == "/questions/{qid}" and "GET" in route.methods)
-print(selected.path_regex, selected.endpoint, selected.response_model)
-```
-
-不要用 `app.routes[4]`。默认文档路由含 `/docs/oauth2-redirect`，自定义配置还可能改变数量。源码位置、方法和路径比固定下标稳定。
-
-### 3.2 路径与方法共同决定匹配
-
-相同方法下，默认参数路径匹配到字符串 `latest`，随后尝试转为 int，得422；`latest_demo` 没被调用。不是详情函数返回了422，而是框架在调用它之前拒绝了参数。
-
-- 方法不匹配不等于立即使用这个路径候选；后面仍可能有完整匹配。
-- 找不到完整匹配但有路径候选时可能得405；完全无路径则404。
-- 重排为静态 `/questions/latest` 在参数路由前，即可避免本例遮蔽。
-- `/questions/{qid:int}` 收窄路径转换器也是一种选择，但改变哪些请求得到404还是422；不是无需验收的替换。
-
-演示重新构造应用并更换登记顺序，不把三个装饰器叠在同一个省略函数上冒充修复。`/questions/latest` 仅为实验或既有可选功能，不增加一个基础必交端点。
-
-## 四、参数与输入模型：先清洗，再检验最终值
-
-**课堂 12 分钟。**
-
-| 来源 | 声明 | 本课例子 |
-|---|---|---|
-| 路径 | 与模板同名，Path 明确约束 | qid 整数≥1 |
-| 查询串 | Query | keyword、page、page_size |
-| JSON 正文 | Pydantic 模型参数 | QuestionCreate |
-| 请求头 / Cookie | Header / Cookie 显式声明 | 后续认证与状态 |
-| 表单 | Form | 第五课；不等同 JSON 模型参数 |
-
-这是常用默认推断，不是完整算法；Body、Query 等显式元数据可以改变来源。查询串通常以文本到达，JSON 原本就有数字、布尔、数组与 null，不能把所有外部输入画成字符串。
-
-### 4.1 本课与第五课共享的创建模型
-
-```python
+from fastapi import HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+
+class QuestionOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: int
+    title: str
+    body: str
+    tags: list[str]
+    created_at: datetime
+
+
+class QuestionListOut(BaseModel):
+    items: list[QuestionOut]
+    total: int = Field(ge=0)
+    page: int = Field(ge=1)
+```
+
+输出明确忽略模型未声明的额外字段，声明的必填字段则必须存在。时间由框架序列化为字符串，验收比较时间含义，不把 `Z` 与 `+00:00` 的等价表示当作业务差异。
+
+### 3.2 数据模块展开成可读骨架
+
+第 2 课的模块自己处理连接；教师在本课提供显式接收 conn 的查询与插入骨架，便于学生看清绑定关系。这是内部调用接口的展开，不改变公开搜索行为。
+
+教师包约定：
+
+- 使用 Python 标准库 sqlite3；`open_connection()` 每次返回连接，设置 `row_factory=sqlite3.Row`，启用非自动提交的写入事务模式。
+- questions 表包含 `id INTEGER PRIMARY KEY`、唯一且非空的 title、非空 body、tags_json 和 created_at；tags_json 由 Python JSON 编解码，不依赖学生编写 SQLite JSON 扩展查询。
+- 保留旧记录，填入合法 JSON 数组和带时区时间。建库、升级和 seed 为教师提供项。
+- 端点用 `closing(...)` 关闭连接。sqlite3 连接自己的 `with` 管理事务，不等于自动关闭连接；这里由教师封装和演示，不展开底层实现。
+
+先看显式行映射：
+
+```python
+def row_to_question(row):
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "body": row["body"],
+        "tags": json.loads(row["tags_json"]),
+        "created_at": row["created_at"],
+    }
+```
+
+列名、输出字段名与转换关系写明，不把数据库行对象直接当作最终 JSON。tags_json 是存储字段，不出现在 API 输出中。
+
+```python
+def search_questions(conn, keyword, page, page_size):
+    params = {
+        "keyword": keyword.strip(),
+        "limit": page_size,
+        "offset": (page - 1) * page_size,
+    }
+    rows = conn.execute("""
+        SELECT id, title, body, tags_json, created_at
+        FROM questions
+        WHERE instr(lower(title), lower(:keyword)) > 0
+           OR instr(lower(body), lower(:keyword)) > 0
+        ORDER BY id DESC
+        LIMIT :limit OFFSET :offset
+    """, params).fetchall()
+    total = conn.execute("""
+        SELECT count(*) FROM questions
+        WHERE instr(lower(title), lower(:keyword)) > 0
+           OR instr(lower(body), lower(:keyword)) > 0
+    """, {"keyword": params["keyword"]}).fetchone()[0]
+    return {
+        "items": [row_to_question(row) for row in rows],
+        "total": total,
+        "page": page,
+    }
+```
+
+课堂逐行说清：
+
+1. `:keyword` 对应参数字典的 keyword；值没有拼进 SQL 结构。关键词里有引号，也仍然是一个待查询的值。
+2. limit 是当前页条数上限，offset 按给定页码计算；count 使用相同筛选条件，但不带分页。
+3. `instr` 做字面子串查找，`%`、`_` 没有通配符含义；SQLite 内置 lower 对本课英文字母样本适用，不承诺完成任意 Unicode 语言的大小写折叠。
+4. 当前按固定数据和 id 降序验收；不把两次查询说成自动共享并发一致快照。并发分页与其他搜索能力不在本课扩展。
+
+SQL 深层执行原理第 6 课讲，本课必须能解释占位符绑定和返回字段，不能仅说“这是老师给的黑盒”。
+
+### 3.3 把声明接到查询
+
+```python
+@app.get("/questions", response_model=QuestionListOut)
+def list_questions(
+    keyword: str = Query(""),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=50),
+):
+    print("进入列表端点", page, page_size)
+    with closing(open_connection()) as conn:
+        return search_questions(conn, keyword, page, page_size)
+```
+
+正常请求先验证：空关键词为三条；`react` 为 id 3；无匹配为 200 空列表；`page=2&page_size=2` 为 id 1，total=3。新增记录之后数量会变化，所以固定样本检查在创建前或独立复位库中运行。
+
+此时先问学生 `page=0` 会在哪里停，不立即改代码。第五单元再用断点验证预测。
+
+## 四、学生任务：正常创建，再构造边界输入
+
+**课堂 25 分钟。建议 7 分钟完成模型与字段分类，8 分钟接入插入骨架和端点，6 分钟构造三组边界，4 分钟互相核对。**
+
+### 4.1 学生真正决定什么
+
+学生依据固定字段表完成 `QuestionCreate`、核对 `QuestionOut`，将 title/body/tags 显式映射到插入参数，构造三组触及边界的输入。可以选择代码组织与测试值，但不能自改长度、让调用者传 id 或把标签静默丢弃。
+
+先创建一条普通问题，从返回的 Location 回读，确认 id、标题、正文与标签属于同一条记录。只有看到 201 而没有持久化证据，不算完成闭环。
+
+### 4.2 输入模型参考：先清洗，再限制长度
+
+以下完整实现用于教师核对和学生完成后的比较；起点包提供字段表、模型类壳及校验器提示，不把完整创建答案作为待填骨架。
+
+```python
 class QuestionCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: str = Field(min_length=5, max_length=200)
@@ -131,324 +246,256 @@ class QuestionCreate(BaseModel):
         return value.strip() if isinstance(value, str) else value
 ```
 
-为什么 before：`"    x"` 原长5，清洗后只有1。after 先按原值通过长度再返回 x，会破坏“最终对象满足长度约束”的承诺。before 先规范化，再进行内置类型与长度校验；非字符串交给类型校验，不用 str() 偷偷把任意对象变成合法输入。
+`"    x"` 清洗后只有一个字符，应该被拒绝。这里先运行 before 校验器，再按字符串类型和长度检查；不先按原长度放行再返回短字符串，也不用 `str(value)` 把错误类型悄悄变成输入。
 
-`extra="forbid"` 拒绝多余 author_id/is_admin；默认 ignore 虽不把字段加入模型，但不会报告调用者多传。forbid 不是认证：作者仍须由可信服务端上下文决定，第十四课实现。
+`default_factory=list` 给省略的 tags 创建空列表；tags 的 max_length 限制列表元素个数，不是每个标签的字符数。输入中额外的字段由 forbid 拒绝；这不代表使用者已经被授权。
 
-tags 是可省略列表，最多5个字符串；本课不新增标签字符集规则。教师持久化模板须保存所提交标签，不能接受后静默丢弃；重复标签按集合关联处理。更复杂的标签规范需另声明契约。
+### 4.3 插入骨架与回读
 
-### 4.2 入口保证范围
-
-“非法请求不进入端点”适用于框架自动校验这条路径。某些依赖和中间件可能已执行，所以不能说整个应用绝无动作。手工 `model_validate` 会抛 Pydantic `ValidationError`，不是 `RequestValidationError`；在其他入口直接调用业务函数也不会自动经过 HTTP 校验。
-
-基础结构、长度和局部跨字段约束可放 schema；唯一性、资源状态等需要数据库与业务判断。不能因此宣称所有 if 都错误，或内部对象已被授权、永远不会被修改为非法状态。
-
-## 五、唯一现场必做：在同一 POST 上证明两道边界
-
-**课堂 22 分钟。** 使用独立内存实验，避免数据库约束先拦住输入而混淆观察。下面与第四单元模型、下述输出模型一起构成参考实验；不把实验 POST 当作真实持久化接口。
-
-### 5.1 出口模型
+教师给出 SQL 结构、JSON 编码及时间生成方式，学生补齐字段映射。接线后的参考如下：
 
 ```python
-from datetime import datetime
+def insert_question(conn, payload):
+    cursor = conn.execute("""
+        INSERT INTO questions (title, body, tags_json, created_at)
+        VALUES (:title, :body, :tags_json, :created_at)
+    """, {
+        "title": payload.title,
+        "body": payload.body,
+        "tags_json": json.dumps(payload.tags, ensure_ascii=False),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return cursor.lastrowid
 
-class AuthorOut(BaseModel):
-    id: int
-    display_name: str
 
-class QuestionBriefOut(BaseModel):
-    id: int
-    title: str
-    created_at: datetime
-    author: AuthorOut
-
-class QuestionOut(QuestionBriefOut):
-    body: str
-
-class QuestionListOut(BaseModel):
-    items: list[QuestionBriefOut]
-    total: int = Field(ge=0)
-    page: int = Field(ge=1)
+def find_question(conn, qid):
+    row = conn.execute("""
+        SELECT id, title, body, tags_json, created_at
+        FROM questions WHERE id = :qid
+    """, {"qid": qid}).fetchone()
+    return None if row is None else row_to_question(row)
 ```
 
-输出默认忽略额外字段；若选择 extra=allow 或自定义序列化，行为会改变。入口用 forbid、出口白名单投影是本课明确选择，不泛化为 Pydantic 的所有用法。
+`lastrowid` 来自这次 INSERT 使用的游标，不用 `SELECT max(id)` 猜新记录编号。这里是 sqlite3 的写法，迁到 PostgreSQL 时教师会换成相应的 RETURNING，不让学生机械照搬驱动 API。
 
-### 5.2 可切换的实验应用
+### 4.4 教师服务模板：先完成提交，再返回成功
+
+本段是预置模板，本课会用，第 4 课再逐行解释事务与异常职责。学生不把 commit 移到数据访问函数、端点返回之后或未来依赖的退出代码里。
+
+```python
+class DuplicateTitle(Exception):
+    pass
+
+
+def create_question_service(conn, payload):
+    try:
+        qid = insert_question(conn, payload)
+        result = QuestionOut.model_validate(find_question(conn, qid))
+        conn.commit()
+    except sqlite3.IntegrityError as exc:
+        conn.rollback()
+        if exc.sqlite_errorcode == sqlite3.SQLITE_CONSTRAINT_UNIQUE:
+            raise DuplicateTitle() from exc
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    return result
+```
+
+限定条件：教师单表基线**唯一的 UNIQUE 约束是 questions.title**，并核验当前驱动的扩展错误码；只有该已知冲突映射为 DuplicateTitle。添加其他唯一约束后必须同步分类，不能继续把任意唯一冲突都解释为标题重复。其他数据库错误仍按服务器失败处理。
+
+服务层先验证可返回的记录，再显式提交。这个模板不等于“所有 500 都没有写入”；提交确认后仍可能在后续处理失败，第 4 课会用固定故障开关说明。当前不让学生设计重试或模拟提交期间断网。
+
+### 4.5 创建与详情的 HTTP 接线
+
+```python
+@app.post("/questions", status_code=201, response_model=QuestionOut,
+          responses={409: {"description": "标题已存在"}})
+def create_question(payload: QuestionCreate, response: Response):
+    print("进入创建端点")
+    try:
+        with closing(open_connection()) as conn:
+            result = create_question_service(conn, payload)
+    except DuplicateTitle as exc:
+        raise HTTPException(status_code=409, detail="标题已存在") from exc
+    response.headers["Location"] = f"/questions/{result.id}"
+    return result
+
+
+@app.get("/questions/{qid}", response_model=QuestionOut,
+         responses={404: {"description": "问题不存在"}})
+def get_question(qid: int):
+    with closing(open_connection()) as conn:
+        result = find_question(conn, qid)
+    if result is None:
+        raise HTTPException(status_code=404, detail="问题不存在")
+    return result
+```
+
+端点做 HTTP 翻译，服务层提交，数据访问函数只读写。详情接线作为教师参考与课后回归，不增加第二个独立现场大任务。
+
+`response.headers` 是在注入的 Response 上补头，最终仍返回模型／普通数据；这不同于直接返回一个 JSONResponse，后者会绕过常规输出模型处理。
+
+### 4.6 三组边界：输入、预期、依据一起写
+
+下面是教师验收口径。学生可以换成相同边界的自选值；涉及合法创建时用不同标题或独立复位库，避免把重复标题 409 当成长度校验失败。
+
+| 组 | 输入构造 | 预期与解释 |
+|---|---|---|
+| 刚好合法 | title 长 5、body 长 10、tags 恰 5 项；另核对 title=200、body=20000 的上界 | 201，输出与清洗后输入一致；省略 tags 则输出空列表 |
+| 刚好越界 | 分别只改一个字段：title 为 4／201，body 为 9／20001，tags 为 6 项 | 422，loc 指向相应 body 字段，端点未进入，不新增记录 |
+| 空白与首尾空格 | 合法 title/body 外包空白；纯空白 title 或 body；`"    x"` | 外包空白后仍合法则 201 并保存清洗后的值；清洗后不足下限则 422 |
+
+25 分钟内每组先完成一个代表请求，余下组合由教师回归器帮助课后核对。仍需理解三组为何不同，不以堆截图数量计分。
+
+## 五、机制回收：拒绝输入与校验输出不是同一件事
+
+**课堂 12 分钟。先回收 `page=0` 的预测，再做固定输出模型的两组对照。**
+
+### 5.1 输入为什么没进入端点
+
+IDE 在列表或创建函数第一行停点，关闭 reload，按一次请求观察。先发合法请求证明断点有效，再发 `page=0`：响应为 422，列表第一行不执行。
+
+在响应 detail 中找：
+
+- `loc`：位置与字段路径，例如 `["query", "page"]` 或 `["body", "title"]`。
+- `type`：错误分类；`msg`：说明文案，不用整句英文相等来写测试。
+- 可能存在 `input` 等信息：教学只用虚构数据，不在请求里放真实秘密。第 4 课再做安全的错误正文投影。
+
+创建的非法输入同理。坏 JSON 语法在当前 FastAPI 自动请求解析路径下也是 422，不先承诺必然为 400。手工调用模型的 `model_validate` 抛的是 Pydantic ValidationError，不会脱离 HTTP 上下文自动变成 422。
+
+“端点未进入”不等于整个应用没有执行代码：中间件与部分依赖可能已运行。当前端点内才获取连接，因此这些输入校验失败不会执行本端点的插入路径；这不是对所有应用副作用的通用保证。
+
+### 5.2 输出模型保持不变，只改变返回数据
+
+教师提供隔离只读实验，沿用本课 `QuestionOut`。不删除共享数据库字段，不对创建接口注入故障来混淆提交结果；实验路径不是新的必交业务接口。
 
 ```python
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 
-def make_boundary_app(use_model=True, direct=False, missing=False):
+def make_output_probe(mode):
     lab = FastAPI(debug=False)
-    lab.state.entered = 0
 
-    @lab.post("/lab/questions", status_code=201,
-              response_model=QuestionOut if use_model else None)
-    def boundary_demo(payload: QuestionCreate):
-        lab.state.entered += 1
+    @lab.get("/probe", response_model=QuestionOut)
+    def probe():
         result = {
-            "id": 7, "title": payload.title, "body": payload.body,
-            "created_at": "2026-09-01T08:00:00Z",
-            "author": {"id": 1, "display_name": "课程用户",
-                       "email": "demo@example.invalid",
-                       "password_hash": "not-a-real-hash"},
-            "internal_note": "仅用于隔离对照",
+            "id": 3, "title": "React 的 props 是什么？",
+            "body": "想知道组件怎样接收数据。", "tags": [],
+            "created_at": "2026-09-01T08:00:00+00:00",
         }
-        if missing:
-            result.pop("body")
-        if direct:
-            return JSONResponse(status_code=201, content=result)
+        if mode == "missing":
+            result.pop("created_at")
+        if mode in ("extra", "direct"):
+            result["internal_note"] = "仅供教师隔离对照"
+        if mode == "direct":
+            return JSONResponse(content=result)
         return result
 
     return lab
 ```
 
-实验顺序：
-1. 先给 `/lab/questions` 发缺 body、空白短标题或多余 author_id，核对422、loc/type、entered 不增或端点断点未命中。
-2. 发合法正文，核对清洗后的 title；无输出模型时观察多余字段。
-3. 同数据启用模型，核对嵌套作者的敏感字段和 internal_note 消失。
-4. 教师展示 direct=True：直接 JSONResponse 绕过模型过滤，额外字段又出现；这条路径不能当作合格业务输出。
-5. 教师展示 missing=True：缺必填 body，输出校验失败得服务端500，而不是客户端422。用 TestClient 时设置 `raise_server_exceptions=False` 才看错误响应；默认模式可能把服务端异常抛给测试程序。
+先预测，再观察：
 
-学生提交前3步的同一任务记录，并说明后2步的边界。不要求四次大型现场重写，也不强迫预测必须有一次错误。计数只用于单请求实验，不是并发安全统计。
+| 模式 | 固定模型下的结果 | 为什么 |
+|---|---|---|
+| normal | 200，包含五个公开字段 | 正常数据满足输出模型 |
+| missing | 输出校验失败，HTTP 500 | 服务端缺少承诺的必填 created_at，不是客户端输入错误 |
+| extra | 200，不出现 internal_note | 普通返回值按显式 extra=ignore 的输出模型处理 |
+| direct | 200，internal_note 出现 | 直接 Response 绕过常规输出模型处理；仅作为边界对照 |
 
-### 5.3 读422
+学生重点解释 missing 与 extra；direct 为教师短演示，不要求实现另一套业务返回路径。TestClient 默认可能把服务端异常抛给测试程序；要观察 500 响应使用 `raise_server_exceptions=False`，不是通过改业务代码吞掉异常来让测试继续。
 
-- loc 指明 body/query/path 等位置及嵌套字段路径。
-- type 是机器分类，msg 是人读文案；依版本锁定核对，不以英文句子比较分支。
-- detail 可以报告多项错误，但不保证对任意校验器一次穷尽所有错误。
-- 默认响应可能包含 input，不能用真实秘密做教学输入；第四课会给安全的错误投影。
-- 当前 FastAPI 对坏 JSON 也返回422；本课保留。422 已纳入现代 HTTP 语义规范，不说它只是非标准借用。
+## 六、OpenAPI：声明怎样变成可查的接口
 
-## 六、三个业务端点：迁移形状，不遗漏数据含义
+**课堂 10 分钟。打开 `/openapi.json` 与 `/docs`，把声明、文档、实际请求逐项对照。**
 
-**课堂 14 分钟；完整代码 A 档课后参考。** 本节使用同步 SQLAlchemy Core Connection 与 PostgreSQL 参数化 SQL，不是 ORM。教师提供持久化模板，学生重点修改和验证边界；本仓库尚未落地独立第三课工程。
+### 6.1 本课核对清单
 
-### 6.1 联表显式投影，消除同名列
+- 搜索参数名、默认值与 page/page_size 的范围。
+- POST 的 Request Body 是否引用 QuestionCreate；title/body 必填、tags 可省且最多 5 项、额外字段策略是否与模型一致。`default_factory=list` 在当前版本不生成静态 `default: []` Schema；省略 tags 得空列表须另用真实请求核对，不把 UI 未显示默认值判为接口错误。
+- 成功响应是否引用 QuestionOut／QuestionListOut，created_at 是否作为必填时间字段出现。
+- 创建成功状态是否为 201；实际响应含 Location，沿它 GET 能回读同一记录。
+- 默认输入校验的 422，以及我们显式登记的详情 404、标题重复 409。
 
-```python
-from sqlalchemy import text
+文档 UI 根据 OpenAPI 渲染，不是另一套接口实现。函数里 raise 的所有错误、动态写入的响应头和业务副作用不会自动被完整推导；这里的 responses 只补充状态描述，**不等于已经登记了完整错误 Schema 或 Location 响应头 Schema**。实际行为仍须用请求核验，后续统一错误体时同步完整文档。
 
-DETAIL_SQL = text("""
-SELECT q.id AS question_id, q.title, q.body,
-       q.created_at AS question_created_at,
-       u.id AS author_id, u.display_name AS author_name
-FROM questions q JOIN users u ON u.id = q.author_id
-WHERE q.id = :qid
-""")
+`/docs` 的外部资源如果在教室不可用，用本地 `/openapi.json` 与现有请求工具继续核对；不把 JSON 可读取说成文档 UI 已离线可用。教师包若提供离线 UI，须另行实际验收。
 
+### 6.2 AI 解释核对
 
-def find_detail(conn, qid):
-    row = conn.execute(DETAIL_SQL, {"qid": qid}).mappings().one_or_none()
-    if row is None:
-        return None
-    return {
-        "id": row["question_id"], "title": row["title"], "body": row["body"],
-        "created_at": row["question_created_at"],
-        "author": {"id": row["author_id"], "display_name": row["author_name"]},
-    }
-```
+让 AI 解释一份真实 422 的 detail 层次，再用三组边界中的输入核对其说法。AI 正确时记录接受理由与验证证据，不要求一定找出错误；不增加“重新让 AI 生成全部工程”的任务。
 
-不再 `SELECT q.*, u.*`；同名 id、created_at 可能造成歧义或映射错误，类型正确的作者id也可能被误当问题id。出口模型验证形状，不验证字段属于正确实体。过滤实验用第五单元夹具，不在真实查询里多取敏感数据。
+OpenAPI 快照用于记录本次公开契约，不是代码一改就自动保护所有调用方。自动类型消费者与 CI 是后续课次，本课只运行教师提供的行为回归。
 
-### 6.2 列表与稳定分页
+## 七、回收、验收与一个作业包
 
-```python
-LIST_SQL = text("""
-SELECT q.id AS question_id, q.title,
-       q.created_at AS question_created_at,
-       u.id AS author_id, u.display_name AS author_name
-FROM questions q JOIN users u ON u.id = q.author_id
-WHERE q.title ILIKE :pattern ESCAPE '!'
-ORDER BY q.created_at DESC, q.id DESC
-LIMIT :limit OFFSET :offset
-""")
-COUNT_SQL = text("""
-SELECT count(*) FROM questions q
-JOIN users u ON u.id = q.author_id
-WHERE q.title ILIKE :pattern ESCAPE '!'
-""")
+**课堂 8 分钟。先用一句话收束，再说明课后范围。**
 
+> 输入模型约束调用者能交什么，输出模型约束普通返回值该长什么样；它们不替你选对记录、实现业务规则或完成授权。
 
-def literal_pattern(keyword):
-    value = keyword.replace("!", "!!").replace("%", "!%").replace("_", "!_")
-    return f"%{value}%"
+### 常用写法卡 #3
 
+| 写法 | 当前作用 | 边界 |
+|---|---|---|
+| `Query` 的默认值与范围 | 把读取参数约束交给框架 | 非法输入未进入该端点，不等于应用从未运行 |
+| `QuestionCreate` + before 校验器 | 先清洗 title/body，再校验类型与长度 | 不能把错误类型强转为字符串来放行 |
+| `response_model=QuestionOut` | 处理普通返回数据，过滤额外字段 | 缺必填字段会失败；直接 Response 可绕过 |
+| SQL 占位符 + 参数字典 | 将输入作为值绑定 | 不用用户值拼 SQL，结构正确也可能映射错字段 |
+| `lastrowid` | 取回本次插入编号 | 不用 max(id) 猜，不跨驱动照搬 |
+| 调用创建服务后返回 201 + Location | 保存完成后给出结果与回读位置 | commit 由服务层显式执行，不放进清理阶段 |
 
-def read_page(conn, keyword, page, page_size):
-    pattern = literal_pattern(keyword)
-    rows = conn.execute(LIST_SQL, {
-        "pattern": pattern, "limit": page_size, "offset": (page - 1) * page_size,
-    }).mappings().all()
-    total = conn.execute(COUNT_SQL, {"pattern": pattern}).scalar_one()
-    items = [{"id": row["question_id"], "title": row["title"],
-              "created_at": row["question_created_at"],
-              "author": {"id": row["author_id"], "display_name": row["author_name"]}}
-             for row in rows]
-    return QuestionListOut(items=items, total=total, page=page)
-```
+### 7.1 功能与回归规格
 
-本课迁移同时声明字面关键词匹配，`%/_` 不再被无声当成通配符；参数化防止值改变 SQL 结构，LIKE 转义处理的是另一件事。若原项目已经采用其他搜索口径，迁移记录必须标出，不能把语义变化伪装成纯重构。SQL 原理第六课展开，第三课模板提供。
+| 验收项 | 预期 |
+|---|---|
+| 列表／搜索／分页 | 保持参数、筛选与排序规则；固定三条样本及第二页正确，空结果仍为 200 |
+| 详情 | 五个公开字段；不存在整数 id 为 404、非整数路径为 422；未知路径仍为框架 404 |
+| 创建 | title/body/tags 按契约接收；201 + Location；独立连接可回读同一 id、正文和标签 |
+| 三组边界 | 刚好合法、刚好越界、空白与首尾空格；非法输入不新增记录 |
+| 其他输入拒绝 | 缺必填字段、错误类型、tags 超量、客户端填写 id／created_at／author_id 均为 422 |
+| 已知标题冲突 | 精确重复标题为 409、`{"detail":"标题已存在"}`，不增加第二条记录 |
+| 输出机制 | 缺 created_at 为 500，多 internal_note 被过滤，理解直接 Response 的例外 |
+| 探针与页面 | `/healthz` 仍为纯存活响应；第 2 课四态、正文显示、安全文本与恢复不退化 |
 
-排序用唯一id决胜；并发插删下 OFFSET 仍可能漂移，列表和 total 在默认隔离下也不保证同一快照。当前实验用固定数据，不提前承诺强一致分页。
+### 7.2 一次提交，不重复写报告
 
-### 6.3 端点边界与错误
+交一个作业包：
 
-下面的 app、engine、logger 和 request-id 中间件来自 M0；不是重新创建 app 后忘记原路由。迁移时替换旧列表与详情的路由声明，不把同方法同路径的新函数追加在旧路由后，否则请求仍可能命中旧实现。保留其余页面、探针和观察路由。辅助模型是本课暂存的错误契约：
+1. 列表／详情／创建三端点、模型与字段映射代码，保留 `/healthz` 和同源页面。
+2. 三组边界输入、实际状态／字段定位、输入输出机制说明。正常创建的 Location 回读、标签与持久化核对可以复用同一组证据。
+3. 本阶段 OpenAPI 契约快照与简短迁移说明：增加 tags/created_at 和 POST，读取参数、列表容器及原字段不变。
+4. 一次 AI 解释核对记录及教师回归器结果；将模型、绑定与断点的理解写在上述材料旁，不另交多份独立报告。
 
-```python
-from fastapi import Path, Query, Request, Response
-from fastapi.responses import JSONResponse
-from sqlalchemy.exc import IntegrityError
+不要求学生实现数据库升级器、故障工具或自动测试框架。更多边界组合可由教师脚本执行；模型声明、字段映射和结果解释仍需学生自己理解。
 
-class ExistingErrorOut(BaseModel):
-    code: str
-    message: str
-    request_id: str
+选做只在隔离副本中改变一项契约，例如标题上限或错误格式，比较取舍；主线仍按给定规则验收。不提前布置 PATCH、作者权限、路由内部属性或跨框架移植。
 
+## 八、第 4 课交接：抽取资源与统一错误，提交位置不变
 
-def existing_error(request, status, code, message):
-    error = ExistingErrorOut(code=code, message=message,
-                            request_id=request.state.request_id)
-    return JSONResponse(status_code=status, content=error.model_dump())
+第 4 课起点是有真实持久化的 SQLite 三端点，不是只有内存实验，也不是已经迁到 ORM 的项目。
 
+| 已有基础 | 第 4 课要做什么 | 不能悄悄改变什么 |
+|---|---|---|
+| 三处 `closing(open_connection())` | 收进 `yield` 依赖并传递同一连接 | 连接使用期间有效，最终正确关闭 |
+| `create_question_service` 显式 commit | 讲清事务边界、失败回滚与调用顺序 | commit 仍在服务层，依赖只提供资源与清理 |
+| HTTPException 404／409 与框架 422 | 业务异常经统一处理器翻译，迁移四字段错误体 | 已批准状态码与成功数据契约继续保留 |
+| 端点内最小观察日志 | 引入 request-id 与结构化日志模板 | 不能声称第 3 课已完成中间件或全链路取证 |
+| 纯存活 `/healthz` | 增加数据库可用性检查，故障返回 503 | 沿用 status 字段的正文结构，不回退到旧多字段探针 |
+| 第 2 课四态页面 | 回归 HTTP 失败与恢复，按需适配新的错误提示 | 保留文本渲染、列表容器及既有字段 |
 
-@app.get("/questions", response_model=QuestionListOut, status_code=200,
-         tags=["questions"], summary="问题列表")
-def list_questions(
-    keyword: str = Query(""), page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=50),
-):
-    with engine.connect() as conn:
-        return read_page(conn, keyword, page, page_size)
+教师提供两种事务故障开关：SQL 已执行但 commit 调用前失败，以及 commit 已确认返回后失败；都在 HTTP 响应启动前触发。两者都可能返回 500，但持久化结果不同，必须用独立连接回读。该设施在第 4 课引入，不要求本课学生先实现，也不把它当作提交期间断网的模拟。
 
+第 5 课继续复用 title/body/tags 的输入规则，完成 SSR 表单解析与失败回填。第 6 课迁往 PostgreSQL 并建立标签关联时，由教师提供从 tags_json 到关联表的明确迁移与去重规则，不能把存储变化伪装成“数据自动就有了”。
 
-@app.get("/questions/{qid}", response_model=QuestionOut, status_code=200,
-         responses={404: {"model": ExistingErrorOut}},
-         tags=["questions"], summary="问题详情")
-def get_question(request: Request, qid: int = Path(ge=1)):
-    with engine.connect() as conn:
-        result = find_detail(conn, qid)
-    if result is None:
-        return existing_error(request, 404, "question_not_found", "问题不存在")
-    return QuestionOut.model_validate(result)
-```
+## 九、制作与验证状态
 
-这里错误 JSONResponse 是有意的表现层例外，用 ExistingErrorOut 先验证再输出，并显式声明 OpenAPI；不能以这个例外为理由把业务成功输出也无约束地直接返回。
+本稿参考代码依赖教师提供的 app、同源静态挂载、SQLite 建库／升级与 `open_connection()`；这些并未因重写底稿而自动成为仓库里的新工程。
 
-### 6.4 创建参考与事务前置条件
-
-同步创建用 engine.begin 管理连接与事务，先构造合法输出再退出提交，成功后才返回201。完整事务课程在第七课，但当前模板不能先发成功再提交。
-
-教师提供的持久化模板接口：
-
-```python
-def insert_question_with_tags(conn, payload, author_id):
-    qid = conn.execute(text("""
-        INSERT INTO questions (title, body, author_id)
-        VALUES (:title, :body, :author_id) RETURNING id
-    """), {"title": payload.title, "body": payload.body,
-           "author_id": author_id}).scalar_one()
-    for name in dict.fromkeys(payload.tags):
-        tag_id = conn.execute(text("""
-            INSERT INTO tags (name) VALUES (:name)
-            ON CONFLICT ON CONSTRAINT tags_name_key DO NOTHING RETURNING id
-        """), {"name": name}).scalar_one_or_none()
-        if tag_id is None:
-            tag_id = conn.execute(text("SELECT id FROM tags WHERE name = :name"),
-                                  {"name": name}).scalar_one()
-        conn.execute(text("""
-            INSERT INTO question_tags (question_id, tag_id) VALUES (:qid, :tid)
-        """), {"qid": qid, "tid": tag_id})
-    return qid
-
-
-@app.post("/questions", response_model=QuestionOut, status_code=201,
-          responses={409: {"model": ExistingErrorOut}},
-          tags=["questions"], summary="创建问题")
-def create_question(payload: QuestionCreate, request: Request, response: Response):
-    try:
-        with engine.begin() as conn:
-            qid = insert_question_with_tags(conn, payload, author_id=1)
-            result = QuestionOut.model_validate(find_detail(conn, qid))
-    except IntegrityError as exc:
-        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
-        if constraint == "questions_title_key":
-            return existing_error(request, 409, "duplicate_title", "标题已存在")
-        raise
-    response.headers["Location"] = f"/questions/{qid}"
-    return result
-```
-
-前提：PostgreSQL + psycopg，命名唯一约束 `questions_title_key`、`tags_name_key`，question_tags 联合主键，已有用户1；标签回读使用 READ COMMITTED 且本课不并发删除标签。其他数据库不能照抄错误诊断或 ON CONFLICT 语法后声称兼容。第六、七课会系统解释；本课只用已准备模板。
-
-标题唯一是课程业务约定，不是所有问答系统通则。先查后写不能保证并发唯一性；数据库约束才兜住竞争。不要撤掉已有正确约束制造故障。异常只在事务上下文退出后转换，不能吞掉失败再继续提交。没有匹配约束名的数据库异常仍按未知错误处理，不能全部误报409。
-
-### 6.5 保留健康检查与页面同步
-
-`/healthz` 继续独立捕获数据库连接获取与 SELECT 1 的失败，200 ok/ok、503 degraded/down。不使用 QuestionOut，不降级为选做，不变成业务500。
-
-第二课前端迁移清单：
-- URL 参数增加 page_size，名称不改为 size。
-- `readSearch` 校验 `items/total/page`；每项改验 id/title/created_at/author.id/author.display_name。
-- 返回前端适配器的 items=payload.items；删除旧 success/data 条件。
-- render 不再读 q.body，改显示标题与作者（正文去详情获取）。文本仍用 textContent。
-- loading、empty、HTTP/解析/结构错误、request-id 和 finally 恢复不退化。
-- 固定数据下回归搜索与排序；同步验收脚本的**已批准变更项**，M0旧快照保留，不为了忽略失败删断言。
-
-## 七、OpenAPI：声明不是全行为推断
-
-**课堂 12 分钟。**
-
-打开 `/openapi.json` 和 `/docs` 对照：文档 UI 渲染机器契约；路径参数、模型、成功状态与一些默认校验响应可自动生成，但函数里 raise404、直接 JSONResponse 或全局处理器**不会自动推导全部错误**。
-
-上节用 responses={404/409: ...} 显式登记。本课默认422可用 FastAPI 生成模型，第四课改正文后必须覆盖文档中的422模型。给响应写文档也不自动验证 handler 实际返回，仍要跑请求。
-
-契约先行小循环，不新增第四个现场任务：
-1. 人确认 QuestionCreate / QuestionOut 和业务判据。
-2. 让 AI 在现有模板中补创建实现，禁止擅改公开字段、忽略 tags、接受客户端作者或自行部署。
-3. 检查输入拒绝、输出字段、201/404/409、健康检查和数据实际持久化。
-4. 合理实现可以保留；发现问题附最小 diff，不要求凑错误数量。
-
-schema 是需求的结构部分、实现约束和验收依据，但不能管住错误关联、授权、唯一性或所有副作用。schema 也能被改错、绕过；审查与测试共同保护它，不能说“AI 也绕不过去”“一次投入永久有效”。
-
-类型生成必须重新生成并运行类型检查才可能发现客户端不兼容，不是后端一变前端自动即时失败。第九课系统学习测试设计与 CI；**现在就运行教师提供的回归检查**，不等第九课才有保障。
-
-## 八、作业、验收与第四课交接
-
-**课堂 10 分钟。**
-
-A 档基础必交：
-1. 三核心业务端点：列表、详情、创建；保留 `/healthz`。模型、公开参数与成功状态按第一单元。
-2. 一组输入 / 输出对照证据，包含“普通返回会过滤、直接 Response 可绕过、缺字段可能500”的解释。
-3. 基础边界表：合法带外侧空白、清洗后不足5、缺 body、正文超上限、多余 author_id、page_size=0/51、qid=abc/0、未知资源；写预测、实测、依据。可课后运行，不降为B档。
-4. 新旧契约快照与迁移说明：列表容器、页长参数、作者输出、字面搜索口径、前端对应修改；未批准部分不改变。
-5. 固定数据中创建后 GET 到同一 id 与正文，重复标题409；标签关联被保留；探针断连503和恢复200。
-
-没有出现与预测不一致的情况也可满分；不能要求只有错了才记录。B 档是更多类型/边界组合、回答端点的模板迁移、路径转换器和跨框架阅读。**PATCH 延至第八课，不列可选作业诱导提前实现。**
-
-第四课起点：正确的 Query/Path/Field 约束；items/total/page；page_size默认20上限50；QuestionOut；数据库标题唯一；普通同步连接上下文；统一错误体尚未完成。只有一个列表端点很正常，不能声称人人已有四处分页重复。
-
-## 九、课后原理卡
-
-- In 与 Out 回答不同问题：客户端可提交什么、系统承诺输出什么。Create 中 title/body必填但tags可省；不能说全部字段必填。Update 缺失与null单独在第八课建模，不用“全Optional”提前代替语义设计。
-- 返回字典本身不是错误；**业务 JSON 成功响应必须经过明确出口契约约束**。查询也应最小化字段，不能只靠出口过滤补救不必要的数据读取。
-- ASGI 传递 scope/receive/send；FastAPI在其上组织路由、依赖、校验与响应。同步端点线程栈并不含所有 ASGI 经过，沿用第一课边界。
-- 路由和校验机制跨框架有对应物，但实现算法、默认强制校验和输出过滤不同，不泛化某生态“更容易泄漏”。
-- Engine 已负责连接池策略；每次 with 获取 Connection 不等于每次新建物理连接。第四课集中生命周期，第七课改数据访问实现，不是从“完全没池”升级。
-
-## 十、素材与验证边界
-
-现有 M0 源码不包含本课用户关联、创建 SQL 和完整契约页面。独立第三课工程、升级 / seed 脚本、回归入口、契约快照和阶段录屏仍待制作，不能把本文代码块当作已经发布的 tags。
-
-制作前按下列门槛验收：
-- 路由实验与内存边界实验独立可运行，包含预期失败。
-- PostgreSQL 表、完整命名约束与创建模板吻合；旧问题保持原数据，作者确实存在，手工seed id之后同步序列。
-- API与页面一起切换；非法输入、额外输出、未知资源、标签、唯一性、探针都有结果证据。
-- 断点无reload；Swagger CDN不可用时用curl，不宣称已有离线UI。
-
-本轮从本文代码提取模型、内存实验、路由示例与详情映射进行临时验证。FastAPI 0.141.1、Starlette 1.6.0、Pydantic 2.13.5、SQLAlchemy 2.0.54下，先清洗后约束、非法输入未进端点、嵌套输出过滤、直接Response绕过、缺字段500、坏JSON422及路由顺序/方法对照均通过；SQLite两表夹具验证了问题id与作者id的别名映射。
-
-这不等于完整PostgreSQL创建/标签/唯一约束诊断、数据升级、浏览器或教室验收。临时机制检查也不是已经发布的课堂回归包；只有验证了具体版本和行为才能给对应素材标“已验证”。
+- **本轮机制验证已完成**：复用 Python 3.12.12、FastAPI 0.141.1、Starlette 1.6.0、Pydantic 2.13.5、httpx 0.28.1，通过临时脚本提取本稿代码，组合隔离 SQLite 与 TestClient。239 项行为／Schema 断言通过：列表搜索与分页、路径及输入拒绝、6 组合法创建、清洗和标签、201 与 Location 独立连接回读、重复标题 409、特殊字符字面匹配及 SQL 注入样本、4 种输出模式、OpenAPI、连接失败 500、输出校验失败回滚与直接服务调用的 NOT NULL 分类；另 1 项课时断言确认 95 分钟教学、25 分钟学生任务及另留 5 分钟缓冲。
+- **核验限制**：本轮 SQLite 使用隔离共享内存库和独立连接，证明事务提交可见性，不证明文件落盘、进程重启或数据升级。未启动真实服务器；TestClient 的 httpx 适配仍提示弃用，本轮未安装或升级依赖。临时核验脚本不是独立练习包或已交付的课程自检器。
+- **试讲前必须补齐**：第 3 课独立起点包、固定种子与升级脚本、模型／插入任务骨架、服务模板、输出对照开关、锁定环境及回归器。
+- **需要实际验收**：真实 HTTP、课堂 IDE 的合法／非法请求停点、页面新增字段后的回归、OpenAPI UI 与投影可读性；进程内测试不等于这些条件已完成。
+- **首轮试讲重点**：字段划分与 before 校验是否理解、参数字典能否自己补齐、25 分钟创建任务是否需要额外提示。超时先减少参考层讲述，不把数据库设施开发转嫁给学生。
