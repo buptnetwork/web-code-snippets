@@ -1,168 +1,236 @@
-# 第 8 次课教学底稿（修订版）
-## API 契约设计与写操作正确性
+# 第 8 次课教学底稿（第四版）
+## 写操作的正确性：为什么票会丢
 
-## 〇、备课定位与内容取舍
+> **备课基线**：[第四版大纲](../syllabus-v4.md)第 8 课与[第 7 课交接](lesson-07.md#83-下一课接收什么)。本稿尚未移交归档，定义教学内容、固定契约与配套工程要求；不是已经交付的独立问答应用。文中教师脚本、模型模块与命令须在课程包中落地，不把示意路径或阶段名说成现有入口。
 
-本课承接合格 M2：已经能持久化、管理事务和迁移，但“事务内执行”不等于“多个请求不会互相覆盖”，“客户端没收到成功”也不等于“服务端没有提交”。主线是：**先说明一次写操作承诺什么，再用并发、重试和响应证据核对承诺。** 契约包含方法、参数、状态、数据结构和业务语义，不只是字段类型。
+## 〇、这次课解释一件什么事
 
-原稿把本课变成了 Vite、类型生成和三个前端页面的实现课，遗漏并发写入；还误把第七课数据库列改名当成公开 API 改名。修订后恢复大纲主线。类型生成保留为 B 档参考，第十课学习前端工程化，第十一至十三课再构建 React 页面，不在今天重复造一套 UI。
+**讲给学生的目标句**：你能复现并发投票导致的丢失更新，用条件更新修复，并解释 409 的含义。
 
-### 课堂路线：75 分钟教学 + 20 分钟诊断小测 + 5 分钟缓冲
+核心解释目标：**两个人同时投票，票为什么会丢。** 先跑正常操作，再把两个合法请求的读取、写入和提交排在同一条时间线上。事务保护一次操作内部的完整性，但不能单靠“使用了事务”就避免两个读—改—写互相覆盖。
 
-| 单元 | 分钟 | 课堂处理 |
-|---|---:|---|
-| 一、起点与写操作解剖 | 5 | GET 投票、先查再改与重试三个问题 |
-| 二、资源、方法和可观察契约 | 8 | 方法判据与成功含义 |
-| 三、丢失更新与条件写入 | 24 | 唯一学生现场必做；中途核对初始状态 |
-| 四、PUT/PATCH 与输入边界 | 10 | PATCH 教师演示，完整接入课后复做 |
-| 五、幂等与提交结果未知 | 9 | 时间线与方案选择，不现场造防重平台 |
-| 六、列表与 OpenAPI 交付 | 12 | 稳定排序、白名单、错误声明与快照 |
-| 七、交付与收尾 | 7 | 验收清单与 AI 约束 |
-| 教学合计 | 75 | 另有小测 20、缓冲 5 |
+### 95 分钟教学 + 5 分钟缓冲
 
-小测在教学单元后进行，不额外叠加到 100 分钟之外。超时压缩类型生成演示和方法变体，保留并发证据、409 含义和小测。A 档包含课后基础复做；B 档完全选做，不能标成“B 档必交”。
-
-### 输入基线与允许变更
-
-| 已有能力 | 本课处理 |
-|---|---|
-| `GET /questions` | 保留 `keyword/page/page_size`；page≥1、page_size 默认20、范围1—50；容器仍为 `items/total/page` |
-| 列表项 | 保留 `id/title/created_at/author={id,display_name}`，不默认已有 answer_count、tags 或 has_next |
-| 详情和创建 | `GET /questions/{qid}`、`POST /questions`；HTTP 字段仍叫 `body`；创建201＋Location |
-| 创建输入 | title 先 strip 后长度5—200；body 先 strip 后长度10—20000；tags 最多5项、可省略；拒绝额外字段 |
-| 错误 | 第四课 `code/message/detail/request_id`；422 的 detail 是 `loc/type/msg` 列表 |
-| HTML 与探针 | 保留第五课 SSR 页面与 `/healthz` 的200/503正文；不统一改成业务 JSON |
-| 持久层 | 第七课五表、函数作用域事务、001/002迁移；数据库 `content` 对应 Python/API 的 `body` |
-| 本课批准的增量 | 问题增加 `vote_count/version`；详情/创建输出增加这两项；新增投票与 PATCH；列表新增 sort/status 白名单 |
-
-列表摘要不必增加版本字段；写操作前从详情获取版本。客户端仍须接受原有字段，不把增加两个输出字段当成全面换约。课堂固定虚构作者身份，不声称已有认证或“一人一票”；写端点只在本地教学环境开放，第十四课补认证与对象授权。
-
-文中为教学参考与配套工程规格；尚不存在的迁移、runner、tag 和截图不能写成已交付资产。正式制作须锁定 Python/FastAPI/SQLAlchemy/PostgreSQL/Alembic 版本并完成文末验收。
-
-## 一、解剖台：200、事务和按钮禁用都不够
-
-**课堂 5 分钟。** 使用教师构造的缺陷样本，明确标注来源；真实 AI 输出另行记录，不要求它一定有错。
-
-```python
-# 预期缺陷示意，不接入最终工程。
-@router.get("/questions/{qid}/vote")
-def vote(qid: int, session: SessionDep):
-    question = session.get(Question, qid)
-    question.vote_count = question.vote_count + 1
-    return {"ok": True}
-```
-
-三个独立问题：
-
-1. GET 被设计为读取，不应用于投票等业务写入；预取、爬虫或重复访问都可能触发它。
-2. `SELECT → 在内存加一 → UPDATE 常量` 即使位于事务内，也可能覆盖另一个请求的结果。
-3. 禁用按钮、PRG 和事务都不自动识别“这是同一个意图的重试”。
-
-讲：今天不凭“看起来专业”判断代码。把两次请求的旧值、新值、状态和最终数据库值排在一起，才能知道系统兑现了什么。
-
-## 二、从资源与方法写出验收标准
-
-**课堂 8 分钟。** URI 主要描述资源；方法表达操作性质。但资源化命名本身不解决并发、权限或重试。
-
-### 2.1 本课端点表
-
-| 方法与路径 | 成功与输入 | 失败/边界 |
+| 分钟 | 教学单元 | 当场产出 |
 |---|---|---|
-| GET `/questions` | 200；筛选后稳定排序分页 | 非法参数422；读操作无投票副作用 |
-| GET `/questions/{qid}` | 200；原详情＋vote_count/version | qid非法422；缺失404 |
-| POST `/questions` | 原创建契约；201＋Location；版本初值1、票数0 | 校验422；标题唯一冲突409；不是通用防重接口 |
-| POST `/questions/{qid}/votes` | `{"version":1}`；200返回 `qid/vote_count/version` | 缺失404；版本过期409；输入422 |
-| PATCH `/questions/{qid}` | 必填version；至少一个title/body字段；200返回更新后详情 | 缺失404、版本/标题冲突409、输入422 |
+| 5 | 目标与已有 M2 | 说清一次投票的输入、输出与成功含义 |
+| 12 | 正常路径：一次投票成功 | 详情取得版本，投票 +1，独立回读 |
+| 20 | 教师复现丢失更新 | 两连接读到相同旧值，两个成功却只增加 1 |
+| 25 | 学生改成条件 UPDATE | 选择成功判据、区分 404／409、判断四个情境 |
+| 15 | 原子加一与乐观并发控制 | 比较接受意图与拒绝陈旧状态，不自动重试 |
+| 10 | 最简 PATCH | 只改提交字段，复用版本条件与标题唯一规则 |
+| 8 | 写法卡、契约说明与交接 | 一个作业包、一次 AI 对照判断 |
+| **95** | **教学合计** | **另有 5 分钟缓冲，共 100 分钟** |
 
-投票这里定义为**接受一次计数加一意图**，不是创建可查询的 Vote 资源，因此成功用200而非虚构一个资源 Location。系统允许同一演示身份多次主动投票；真实一人一票模型放在第五单元拓展。
+本课**不安排计分小测**。四个情境属于 25 分钟任务中的解释检查，不再增加 20 分钟诊断题。超时压缩附录逐行讲解与幂等键拓展，不挤占正常演示、学生实践或四情境核对。
 
-### 2.2 方法性质与幂等的严格含义
+### 教师提供什么，学生决定什么
 
-幂等：多次相同请求对服务端的**预期效果**与一次相同；不要求每次响应体、状态码、日志条数完全相同。安全：客户端请求的语义是读取，不要求服务器连访问日志都不能写。
-
-| 方法 | 通常语义 | 不能推出的结论 |
+| 内容 | 提供者／标注 | 边界 |
 |---|---|---|
-| GET | 安全、幂等读取 | GET 请求体能稳定承载业务参数；任何实现都不会写库 |
-| PUT | 替换目标资源的可写表示，按协议语义幂等 | 只要命名 PUT 就自动防重；一定把数据库每列覆盖 |
-| PATCH | 应用部分修改，幂等性由补丁语义决定 | PATCH 天生幂等或天生不幂等 |
-| POST | 由目标资源处理请求，通常不承诺幂等 | 永远无法做防重 |
-| DELETE | 删除的预期效果幂等 | 第二次必须与第一次返回相同状态 |
+| 正常投票完成版、已知缺陷副本 | 教师提供，要求解释 | 先看正确路径；缺陷只在隔离副本，不破坏合格 M2 |
+| 条件写入函数壳 | 学生课堂完成 | 自选 RETURNING 或可靠影响行数；自选无匹配时的存在性查询方式 |
+| 模型增量、迁移、详情／创建 DTO 接线 | 教师提供，要求会用 | 不把迁移和旧路由适配再加成学生编码任务 |
+| 服务事务、异常出口 | 沿用前课，要求解释 | 服务显式 commit；内部辅助函数不提交；依赖只提供与关闭 |
+| 双连接同步、复位、日志与故障脚本 | 教师设施，要求会用；内部黑盒 | 会读初值、连接标识、注入点与结果；不开发控制器、不进口试内部细节 |
+| PATCH 输入模板和端点壳 | 教师提供，要求会用；更新语义要求解释 | 课堂讲一个正常补丁，课后完成标题／正文与边界回归 |
+| 一页契约说明 | 教师给固定规格，学生补实例与解释 | 不自由改状态码、字段或公开排序 |
 
-`PATCH {"title":"固定标题"}` 与“把票数加一”不是同一种效果；使用版本条件后，同一旧版本的再次提交可以返回409，同时避免重复改变数据。409仍不是“原请求成功”的证明。
+本课不前置 React、Vite、TypeScript 类型生成或完整认证。幂等键、PUT 全量替换、ETag、复杂迁移只在参考层；不作为 M3 的隐藏前提。
 
-短写请求的成功含义继续沿用第七课：**事务提交成功后才发送200/201/303**。`Depends(get_session, scope="function")` 必须实际用于新端点，不能只在参考代码里定义别名。
+## 一、从 M2 出发：一次成功到底承诺什么
 
-## 三、现场必做：两个请求都成功，为什么只多一票
+**课堂 5 分钟。先看已有详情，再展示本课新增的两个字段。**
 
-**课堂 24 分钟。** 前8分钟复现，中间10分钟修复，后6分钟核对边界。准备两个独立连接/Session；不能跨线程共享 Session，也不能用单连接事务 fixture 冒充并发。
+第 7 课交付五表、列表／详情／创建 ORM、服务事务和 `001_baseline`。数据库列仍为 questions.body；没有状态、浏览量或作者摘要接口。列表原有五字段、`items/total/page`、id DESC 和字面搜索都继续保留。
 
-### 3.1 先明确数据与迁移
+### 本课契约与迁移交接表
 
-在第七课 `002_body_content` 后增加 `003_question_version`。模型新增：
+这张表是本课实现、教师回归与第 9 课接线的依据，不把旧稿的参数扩展当成既有规格。
 
-```python
-vote_count: Mapped[int] = mapped_column(Integer, server_default="0")
-version: Mapped[int] = mapped_column(Integer, server_default="1")
-# 加入 Question.__table_args__：
-CheckConstraint("vote_count >= 0", name="questions_votes_nonneg")
-CheckConstraint("version >= 1", name="questions_version_positive")
-```
-
-迁移主体参考，保留实际 revision/down_revision 元数据；不在历史迁移中 import 当前业务模型：
-
-```python
-from alembic import op
-import sqlalchemy as sa
-
-def upgrade():
-    op.add_column("questions", sa.Column(
-        "vote_count", sa.Integer(), nullable=False, server_default="0"))
-    op.add_column("questions", sa.Column(
-        "version", sa.Integer(), nullable=False, server_default="1"))
-    op.create_check_constraint("questions_votes_nonneg", "questions", "vote_count >= 0")
-    op.create_check_constraint("questions_version_positive", "questions", "version >= 1")
-
-def downgrade():
-    op.drop_constraint("questions_version_positive", "questions", type_="check")
-    op.drop_constraint("questions_votes_nonneg", "questions", type_="check")
-    op.drop_column("questions", "version")
-    op.drop_column("questions", "vote_count")
-```
-
-旧行得到票数0、版本1；两字段非空。回退会丢票数和版本，**不是保数据回退**，只能在副本演示并说明备份或前向修复方案。保留第七课已经验证的正文改名迁移，不把它重新做成公开接口改名。
-
-### 3.2 受控复现：先读到同一个旧值，再放行写入
-
-初始指定测试问题：`vote_count=10, version=1`。使用 PostgreSQL READ COMMITTED、两个独立事务；教师 runner 在两次 SELECT 后设置 `Barrier(2, timeout=5)`，双方都读取后才各自继续写。
-
-```python
-# 预期缺陷 service，仅注册在独立本地实验应用。
-def vote_broken(session, qid, after_read):
-    question = session.get(Question, qid)
-    if question is None:
-        raise QuestionNotFound()
-    before = question.vote_count
-    after_read()  # 测试同步点，不暴露成可被远程控制的生产参数。
-    question.vote_count = before + 1
-    session.flush()
-    return {"qid": qid, "vote_count": question.vote_count}
-```
-
-| 时刻 | 请求A | 请求B |
+| 项目 | 本课决定 | 变更与核对 |
 |---|---|---|
-| 读取 | 10 | 10 |
-| 同步点放行 | 准备写11 | 准备写11 |
-| 写入并提交 | UPDATE 为11 | 等待行锁后 UPDATE 为11 |
-| 最终 | 两个成功响应，数据库11 | 预期两个意图应为12 |
+| 列表 | GET /questions，keyword/page/page_size，默认空／1／20，page_size 为 1–50 | 不变；仍五字段、id DESC、字面 %／_，total 为筛选后分页前总数；不加 sort/status |
+| 创建输入 | title/body 先 strip，长度 5–200／10–20000；tags 最多五项、默认 []；拒绝额外字段 | 不允许客户端指定 vote_count/version/author_id；标签仍精确去重保首次顺序 |
+| 详情／创建输出 | 原五字段 + vote_count + version | 明确增量；票数初值 0，版本初值 1；创建仍 201 + Location |
+| 条件投票 | POST /questions/{qid}/votes，JSON `{"version":5}` | version 必填、严格正整数；200 返回 qid/vote_count/version |
+| PATCH | PATCH /questions/{qid}，version 必填，title/body 至少出现一个 | 省略保持；显式 null 拒绝；200 返回扩展详情 |
+| 资源标识 | qid 仍按整数解析，不新增 ge=1 | 不存在的 0／负整数是业务 404，非整数 422 |
+| 错误体 | code/message/detail/request_id 四字段 | 缺失 question_not_found→404；陈旧 version_conflict→409；标题 duplicate_title→409；输入 validation_error→422 |
+| 数据结构 | questions 加非空 vote_count/version 与 CHECK | 001_baseline → **002_question_version**；其他五表关系、标签 position 不变 |
+| HTML／探针 | 原三页、失败回填、303、自动转义、request-id、单 status 探针 | 不新增投票／PATCH 表单页；内部详情可带新增字段，原模板仍能使用；200 ok／预期数据库故障 503 degraded 不改 |
 
-这是指定调度下的预期结果，不是说每次随机并发都会丢失。Barrier只用于控制实验，不使用 `SELECT FOR UPDATE`，否则会在读取阶段阻塞而无法同时到达同步点。设置等待超时并输出失败位置；不靠反复 sleep 碰运气。
+version 是服务端管理的修订号，客户端提交的是**自己看到的旧版本**，不是希望写进去的新版本。详情、投票和 PATCH 必须连成闭环，否则客户端无从取得条件值。
 
-### 3.3 修复：把“仍是我读到的版本”放进写语句
+投票在本课表示“接受一次计数加一意图”，不是创建一个可独立查询的 Vote 资源，成功用 200，不伪造 Location。允许演示者再次确认新的加一意图；没有登录、投票记录或“一人一票”保证。新增写接口只用于本地虚构数据，第 14 课补认证与对象授权。
 
-前端先读取详情，两次意图都基于version=1提交。repository 核心：
+讲：今天既要问数据库最后是多少，也要问**两次意图到底接受了几次**。两个请求都成功和一个成功一个冲突，不是同一种结果。
+
+## 二、先跑通正常路径：取得版本，再投一票
+
+**课堂 12 分钟。4 分钟读详情与输入，5 分钟执行正确服务，3 分钟回读并指认 SQL／COMMIT。教师先提供完成版，学生之后在任务副本补同一个核心函数。**
+
+### 2.1 给定初始数据
+
+教师已经在独立副本完成 002 迁移，保留第 6 课 seed；为本轮观察把问题 101 设置为 **vote_count=10、version=5**，提交后再开始请求。这是教师复位，不是公开接口允许客户端改计数；正常新建问题仍从 0／1 开始。
+
+```http
+GET /questions/101
+
+POST /questions/101/votes
+Content-Type: application/json
+
+{"version":5}
+```
+
+详情中看见 10／5；成功投票响应为 `{"qid":101,"vote_count":11,"version":6}`。等成功响应返回后，用独立连接查询 101，仍为 11／6。响应中的数字是这次成功操作的结果，不保证此后永不被其他请求更新。
+
+### 2.2 输入／输出与业务异常
 
 ```python
+# lesson08: vote_contract
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class VoteIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version: int = Field(ge=1, strict=True)
+
+
+class VoteOut(BaseModel):
+    qid: int
+    vote_count: int = Field(ge=0)
+    version: int = Field(ge=1)
+
+
+class QuestionDetailOut(QuestionOut):
+    vote_count: int = Field(ge=0)
+    version: int = Field(ge=1)
+
+
+class VersionConflict(AppError):
+    pass
+
+
+BUSINESS_HTTP[VersionConflict] = (409, "version_conflict", "资源已变化，请刷新后确认")
+```
+
+这里复用第 3／4 课 QuestionOut、AppError、BUSINESS_HTTP；新增映射，不另建一套 HTTP 错误格式。`strict=True` 拒绝 true、"5"、5.0；合法值是 JSON 正整数。输入不合法优先返回 422，不能拿非法 version 测资源是否存在。
+
+**正常数据访问函数的完整参考在 §4.2**。第一次演示只指出：把 id 与旧 version 同时放入 WHERE，在数据库里完成票数和版本加一，返回实际更新值；不先在 Python 中算一个固定新票数。
+
+### 2.3 服务确认提交，端点才返回成功
+
+教师在引入 SQL 函数时配好下列服务。`no_fault` 是第 7 课默认空回调；两个回调只供教师本地脚本，不通过请求参数开放。
+
+```python
+# lesson08: vote_service
+
+def vote_question_service(
+    session, qid, payload, *, after_flush=no_fault, after_commit=no_fault,
+):
+    try:
+        result = vote_once(session, qid, payload.version)
+        session.flush()
+        after_flush()
+        session.commit()
+        after_commit()
+        return result
+    except Exception:
+        session.rollback()
+        raise
+```
+
+UPDATE 已经执行，flush 不是第二次加票；它让事务中待写工作完成。结果模型在 commit 前构造并校验。服务返回之后，HTTP 边界才生成成功响应；`get_session()` 仍是 yield／close，不在依赖退出阶段提交。
+
+正常例先通过再讨论故障：SQL／flush 成功、commit 调用前抛错，500 且计数／版本保持原值；commit 确认返回后、响应启动前抛错，500 但计数／版本已更新。沿用 M2 教师脚本，记录位置、响应与独立回读；**500 不等于没投上**。真实提交期间断连属于结果未知，这两个注入点不模拟它。
+
+## 三、教师复现：两个事务都成功，为什么只多一票
+
+**课堂 20 分钟。5 分钟读缺陷与预测，7 分钟同步运行，5 分钟排列 SQL／结果，3 分钟核对独立连接证据。**
+
+### 3.1 已知缺陷样本，只用于隔离实验
+
+先明确缺陷来源：下面是教师构造的读—改—写反例，不是真实 AI 一定会给出的代码，也不是主项目的正确服务。端点方法依旧 POST，输入合法，事务会提交；只改变“怎样写入”，不同时叠加 GET 写操作、缺失字段或依赖未提交等问题。
+
+```python
+# lesson08: broken_demo
+
+def vote_broken_service(session, qid, *, after_read):
+    try:
+        question = session.get(Question, qid)
+        if question is None:
+            raise QuestionNotFound()
+        old_votes, old_version = question.vote_count, question.version
+        after_read()
+        question.vote_count = old_votes + 1
+        question.version = old_version + 1
+        session.flush()
+        result = VoteOut(qid=qid, vote_count=question.vote_count, version=question.version)
+        session.commit()
+        return result
+    except Exception:
+        session.rollback()
+        raise
+```
+
+隔离适配器仍接合法 VoteIn，但缺陷函数没有把 payload.version 加到 UPDATE 条件；这是待修复点。不要把它接回正确 `/questions/{qid}/votes`。公开端点固定版本条件，不能让用户选择 broken 策略。
+
+### 3.2 观察点一：先完整写出条件
+
+初始 101=10／5；PostgreSQL READ COMMITTED；两条**独立**连接／Session、非自动提交；A/B 都成功读取 10／5 后再放行。没有第三个写者、删除、超时、触发器或重试。A/B 都执行上述常量覆盖并提交。最终票数、版本与两个响应是什么？
+
+| 时刻 | A | B |
+|---|---|---|
+| 读取并到达同步点 | 10／5 | 10／5 |
+| 计算 | 准备写 11／6 | 准备写 11／6 |
+| UPDATE／提交 | 按主键写常量 11／6，然后提交 | 若撞上行锁则等待，之后仍写常量 11／6并提交 |
+| 结果 | 成功 200，返回 11／6 | 成功 200，返回 11／6 |
+| 独立回读 | **最终 11／6，不是 12／7** | 两个成功意图中一个增量被覆盖 |
+
+丢失的不是一条 HTTP 响应，而是一次加一效果。数据库把两条 UPDATE 按锁顺序执行了，但第二条指令本身就是“写 11”，不是“对当前值加一”。row lock 防止物理写入混乱，不自动修正应用根据旧数据算出的常量。
+
+### 3.3 教师同步设施与证据
+
+教师 runner 在两个 SELECT 完成后用带超时的 Barrier 放行，每个线程创建自己的 Session。记录 backend pid、request-id、读到的旧值、UPDATE 参数与提交结果。Barrier 不能放在 UPDATE 之后：第一条 UPDATE 持锁、第二条等锁时，双方可能无法抵达同一同步点。
+
+不要加 SELECT FOR UPDATE 再要求两者都读完才放行，这会让第二个读取先被阻塞。隔离数据每轮复位为 10／5，确认两连接不同；不能在同一个连接上排两段代码假装并发，也不能靠随机 sleep 或快速双击证明读到了同一旧值。
+
+同步超时不是复现成功；应报告失败阶段、释放等待和回滚。真实 HTTP 演示必须通过教师测试适配器连接到同一受控同步设施；只有服务函数调用时就标明服务级实验，不把它称为网络并发压测。
+
+## 四、学生任务：把旧版本条件放进同一条 UPDATE
+
+**课堂 25 分钟。4 分钟读固定规格，10 分钟补函数，6 分钟正反核对，5 分钟四情境判断与保存证据。**
+
+### 4.1 任务壳与可以自主选择的地方
+
+教师提供原有路由、VoteIn/VoteOut、服务事务、异常映射、迁移完成的数据和独立测试入口。学生只补数据函数：
+
+```text
+vote_once(session, qid, expected_version)
+  ① 在同一 UPDATE 中判断 id 与 version，并让两个值在数据库内 +1
+  ② 判断是否匹配成功：RETURNING 或驱动可靠支持的影响行数
+  ③ 无匹配时查询是否仍存在：不存在 → QuestionNotFound；存在 → VersionConflict
+  ④ 返回本次更新的 qid／票数／新版本；不在这里 commit
+```
+
+如果选影响行数，本例是一条不带 RETURNING 的 UPDATE，需确认当前驱动 rowcount 的语义／支持情况；成功后在本事务内读取新值构造响应。不是拿 SELECT 的 rowcount 或 executemany 的未知计数判断。若选 RETURNING，**有行是成功，None 是未匹配**，不同时依赖未验证的 rowcount。
+
+学生的独立决定是成功判据与查询组织方式，不是把所有无匹配都改成 409，也不是修改错误体或自动刷新版本重发。
+
+### 4.2 完成后对照的正确数据函数
+
+```python
+# lesson08: conditional_vote
 from sqlalchemy import select, update
+
+
+def raise_unmatched(session, qid):
+    exists = session.scalar(select(Question.id).where(Question.id == qid))
+    if exists is None:
+        raise QuestionNotFound()
+    raise VersionConflict()
+
 
 def vote_once(session, qid, expected_version):
     statement = (
@@ -173,15 +241,12 @@ def vote_once(session, qid, expected_version):
         .execution_options(synchronize_session=False)
     )
     row = session.execute(statement).mappings().one_or_none()
-    if row is not None:
-        return {"qid": row["id"], "vote_count": row["vote_count"],
-                "version": row["version"]}
-    if session.scalar(select(Question.id).where(Question.id == qid)) is None:
-        raise QuestionNotFound()
-    raise VersionConflict()
+    if row is None:
+        raise_unmatched(session, qid)
+    return VoteOut(qid=row["id"], vote_count=row["vote_count"], version=row["version"])
 ```
 
-对应 SQL 形态：
+SQL 形状如下，`:qid` 等是 SQLAlchemy 绑定参数示意，不是可直接粘贴到 psql 的变量：
 
 ```sql
 UPDATE questions
@@ -190,321 +255,444 @@ WHERE id = :qid AND version = :expected_version
 RETURNING id, vote_count, version;
 ```
 
-**版本判断与写入必须是同一条原子语句。** 在 Python 中先比较version再无条件UPDATE，仍有竞争窗口。PostgreSQL READ COMMITTED 下等待另一写者完成后，UPDATE会对更新后的行重新判断条件；旧version不再匹配。
+两个关键点：**校验旧版本与修改必须是同一语句**；修改使用列当前值加一，不是 Python 里提前算好的常量。在 READ COMMITTED 下，若等待另一写者提交，PostgreSQL 会针对更新后的行重新判断条件，旧 version 就不再匹配。
 
-这里用 RETURNING 有无结果判断是否匹配，也可在驱动可靠支持时检查影响行数。关闭ORM状态同步后，不从旧的已加载对象拼响应；投票使用返回行，PATCH重新查询时须刷新对象。业务异常继承第四课 `AppError`；HTTP边界新增映射：
+`synchronize_session=False` 不同步已加载 ORM 对象的内存值。本函数直接用 RETURNING 行构造输出；不从旧对象读票数。普通 `session.get()` 可能命中旧 identity map，不等于“重新查库”；PATCH 的刷新参考见 §6.3。
 
-```python
-BUSINESS_HTTP[VersionConflict] = (409, "version_conflict", "资源已变化，请刷新后确认")
-```
+存在性查询只说明**第二条语句当时**能否找到资源，不与前一条 UPDATE 自动共用快照。课堂排除并发删除／重建同 id；如发生删除，第二次查询可能返回 404，不能据此追溯 UPDATE 前的全部历史。不要用 `if not exists`，合法整数 id=0 在别的导入场景可能存在，应判断 `is None`。
 
-继续使用既有统一处理器，不在 service 写 HTTPException。没有匹配行后的二次查询只能报告当时的资源状态；并发删除会影响404/409分类，不承诺“存在性判断与前一语句同一快照”。课堂不安排并发删除。
+### 4.3 观察点二：两个请求都看到了 version=5
 
-输入、输出与路由接线参考：
+继续用初始 101=10／5；两客户端都在写前取得 version=5，分别提交同一版本。没有其他写入，第一条成功提交后第二条完成条件 UPDATE；假定无超时、无重试。
 
-```python
-from typing import Annotated
-from fastapi import Path
-from pydantic import BaseModel, ConfigDict, Field
+预测：第一条匹配 1 行，200→11／6；第二条匹配 0 行，资源存在→409 version_conflict；最终 11／6。这表示**只接受了一次意图**，不是“两票都成功但系统补救了计数”。若第一条回滚，第二条可以成功，这不在上述“第一条已提交”的前提里。
 
-class VoteIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    version: int = Field(ge=1, strict=True)
+冲突方读取最新详情，让用户确认新的意图后，携带 version=6 再投，成功后为 12／7。**不能由程序收到 409 就自动读版本、再发直到成功**；那会把用户未见的新状态当成他同意了。
 
-class VoteOut(BaseModel):
-    qid: int
-    vote_count: int = Field(ge=0)
-    version: int = Field(ge=1)
+### 4.4 观察点三与四个情境
 
-@router.post("/questions/{qid}/votes", response_model=VoteOut,
-             responses={404: {"model": ErrorOut}, 409: {"model": ErrorOut}})
-def vote_question(qid: Annotated[int, Path(ge=1)],
-                  payload: VoteIn, session: SessionDep):
-    return vote_once(session, qid, payload.version)
-```
+先问：合法请求访问不存在的 qid，UPDATE 同样匹配 0 行。若一律返回 version_conflict，客户端会误以为“刷新版本还能继续”，掩盖资源不存在。正确处理为 404 question_not_found。
 
-router继续继承第四课422/500声明，ErrorOut、SessionDep、异常与Question从配套工程的现有模块导入。必须实际更新详情/创建的响应模型和DTO；仅在ORM加字段、却从未返回version，客户端就无法完成条件写入。
+四个情境都规定：输入合法、没有并发删除／重建，且查询与写入期间只有题面所述变化。写判断后再运行教师用例。
 
-### 3.4 四组验收与结论
-
-| 请求安排 | 应观察到 | 能说明什么 |
+| 情境 | 当前事实 | 应答与解释 |
 |---|---|---|
-| 缺陷版，两次读完再写 | 200/200，最终11 | 一次增量被覆盖 |
-| 修复版，两次都携带version=1 | 200/409，最终11、version=2 | 拒绝陈旧写入；**不是两票都已接受** |
-| 冲突方刷新、用户确认另一次意图后携带version=2 | 200，最终12、version=3 | 重做的是新的已确认操作 |
-| 再发送旧version=1；另测不存在qid | 409且值不变；缺失资源404 | 冲突与缺失的响应和数据边界 |
+| A | qid=999999 不存在，提交 version=5 | 404 question_not_found；没有可更新资源 |
+| B | qid=101 存在且 version=6，提交旧 version=5 | 409 version_conflict；资源还在，状态已变化 |
+| C | 用户读到 101 的 version=5，教师在请求开始前已删除该无引用实验行 | 404 question_not_found；过去存在不代表现在存在 |
+| D | 101 存在且 version=5，提交不匹配的未来 version=99 | 409 version_conflict；不是“只有小于当前版本才冲突” |
 
-提交证据包含两份请求体、两份状态/错误code、SQL条件、最终新连接查库结果。请求使用不同request-id；id用于关联，不等于幂等键。初始数据由独立seed恢复，不覆盖学生唯一数据库。
+C 使用独立无引用样本，不对带回答／标签的 101 直接 DELETE 造成外键拒绝后还声称“删除成功”。教师在该情境的专用库预置一个 id=101、没有回答／关联的问题，完成删除并提交，再请求；不与第 6 课 seed 的有引用 101 混用。
 
-### 3.5 为什么不直接使用原子加一
+非法 version=0、null、true 或非整数 qid 属于 422，不是四情境中的 404／409 选择题。每次拒绝都查当前票数／版本或确认资源确实不存在，不能只保留一张错误截图。
 
-```sql
-UPDATE questions SET vote_count = vote_count + 1 WHERE id = :qid;
+## 五、机制：原子加一、版本条件、幂等分别保护什么
+
+**课堂 15 分钟。6 分钟三轨迹对照，5 分钟冲突／重试判断，4 分钟保证范围。**
+
+### 5.1 三种写法，同一个初值，不同承诺
+
+每一行使用新复位的独立副本，初始为 10／5，两次合法意图，无其他写者。条件版双方都提交 version=5；不把三个策略在同一库累加执行。
+
+| 写法 | 两次结果 | 最终状态 | 保护与不足 |
+|---|---|---|---|
+| 读旧值后写常量 | 两次成功 | 11／6 | 未保护并发读—改—写，丢失增量 |
+| 原子增量，不判断旧版本 | 两次成功 | 12／7 | 两个独立增量都保留；重复请求仍算另一次增量 |
+| 原子增量 + 旧版本条件 | 成功／冲突各一次 | 11／6 | 拒绝陈旧状态的写入，不表示两个意图都接受 |
+
+隔离原子增量对照也递增 version，避免在同一资源定义中展示一个悄悄绕过修订号的写者；它不是主项目可选公开策略。
+
+```python
+# lesson08: atomic_demo
+
+def vote_atomic_demo_service(session, qid):
+    try:
+        statement = (
+            update(Question).where(Question.id == qid)
+            .values(vote_count=Question.vote_count + 1, version=Question.version + 1)
+            .returning(Question.id, Question.vote_count, Question.version)
+            .execution_options(synchronize_session=False)
+        )
+        row = session.execute(statement).mappings().one_or_none()
+        if row is None:
+            raise QuestionNotFound()
+        result = VoteOut(qid=row["id"], vote_count=row["vote_count"], version=row["version"])
+        session.commit()
+        return result
+    except Exception:
+        session.rollback()
+        raise
 ```
 
-对于“不依赖旧状态、每个独立请求都应计数”的业务，原子加一往往更合适，两个并发成功可以得到12。**它仍会把网络重试当成另一次加一。** 本课用投票教授条件写入，不把乐观锁说成计数器唯一正确方案；它更典型地用于“基于我看到的旧内容编辑”。下一单元正好将同一思想用于改帖。
+如果产品要求“每个独立加一都接受”，原子增量可以是正确选择；本课程明确选择**基于所见版本确认一次写入**的协议，用它学习条件更新，随后用于改帖。不要说“任何投票系统都必须乐观锁”，也不要把条件更新称作前端乐观 UI。
 
-## 四、PUT/PATCH：缺省、清空和覆盖不是一回事
+### 5.2 冲突不是成功回执，重试不是免费动作
 
-**课堂 10 分钟；代码细节课后参考。** A 档落地PATCH标题/正文；PUT做契约判据与模型对照，不要求再造一个全量编辑端点。
+幂等指重复请求的**预期效果**与一次相同，不要求响应、状态或日志条数相同。GET 用于读取；不能用 GET 实现业务投票，浏览器预取等可能触发它。
 
-### 4.1 定义本课 PATCH
+- 原请求成功提交但响应丢失，重发相同旧 version 可以得到 409；这不能证明前一次一定成功，也可能有其他写者先改了版本。
+- 刷新详情只能看当前状态，不一定知道哪一次意图造成变化。request-id 用于关联日志，不是认证身份或幂等键。
+- 事务保证内部原子性；版本条件拒绝不匹配状态；标题唯一规则保护标题；PRG 减少成功页面刷新重发；它们都不是“重放第一次业务结果”的完整协议。
+- 本课不自动重试任何结果未知的写请求；也不通过更换 version 绕过冲突。已知业务 409、输入 422与基础设施 500／结果未知分别判断。
+
+客户端收到与本次请求对应的 200，且服务遵守先提交后响应的契约，便可确认本次条件写入已接受；没有收到成功响应，不能反推未接受。`UPDATE ... RETURNING` 返回一行本身还不等于事务已提交。
+
+### 5.3 版本保护成立的范围
+
+本课投票和 PATCH 都给同一问题的 version 加一，所以一次投票也可能使同时进行的正文编辑变成陈旧版本，这是本课固定的**整行修订号**语义。即使 PATCH 提交的文本与当前值相同，只要匹配并接受该补丁，本课也递增一次版本；不另外设计无变化优化。
+
+所有主线修改问题的写入口都须遵守版本协议。第 7 课的无条件正文修改演示退出主线，只保留在隔离实验；其他脚本直接 UPDATE、复位版本或重用已删除 id 都可能破坏保证。教师复位发生在无并发写入的可丢弃库，不当成真实业务操作。
+
+数据库 INTEGER 和应用数值有范围边界，不承诺无限加一。计数／版本溢出属于未识别数据库错误时回滚并走安全 500，不一律翻为版本 409；本课尚未增加新的计数上限产品规则。
+
+## 六、十分钟 PATCH：只改出现的字段
+
+**课堂 10 分钟。3 分钟省略／null 规格，4 分钟正确更新与回读，3 分钟三种失败对照。教师给输入模板与端点壳，学生课后补齐完整回归。**
+
+### 6.1 先定义本课补丁，不背新协议名
 
 ```json
-{"version": 3, "title": "修改后的有效标题"}
+{"version":6,"title":"修改后的有效问题标题"}
 ```
 
-本例是课程自定义JSON部分更新，不自称 JSON Patch 或 JSON Merge Patch：
+这是课程自定义 JSON 部分更新，不宣称实现了 JSON Patch 或 JSON Merge Patch。
 
-- version必须提交，只用于条件判断，不让客户端指定新版本。
-- title/body可省略，省略表示保持；显式null拒绝422，因为这两列不允许为空。
-- 空白值先strip，再按创建规则校验；至少提供title/body之一。
-- tags、author_id、vote_count等不属于此补丁，拒绝额外字段；本课不暗中改作者或标签。
-- 匹配版本时只更新提供字段并version+1；陈旧版本409；标题唯一约束仍翻译duplicate_title。
+| 输入 | 本课含义 |
+|---|---|
+| 不提交 body | 保持原正文 |
+| `body: null` | 422，不接受把非空正文清空，也不能静默当省略 |
+| 空白 title/body | 先 strip，按创建时的长度限制判断 |
+| 只有 version | 422，至少提交 title/body 一项 |
+| tags、author_id、vote_count 等额外键 | 422，不允许通过补丁改这些字段 |
+| version 不匹配／资源缺失 | 分别 409／404，不执行修改 |
 
-### 4.2 完整输入参考：可省略不等于可空
+### 6.2 输入模板：键可省略，出现时必须是有效字符串
 
-以下选择 TypedDict 表示“键可缺少，但出现时必须是字符串”，由Pydantic负责校验；这是配套模板，不要求初学者记忆 typing 的全部API。
+TypedDict／Annotated 是教师提供的校验接线，**要求会用，不考模板内部语法**；学生须解释上表。FastAPI 解析后给出只包含已提交键的字典。
 
 ```python
+# lesson08: patch_contract
 from typing import Annotated
 from typing_extensions import Required, TypedDict
-from pydantic import AfterValidator, BeforeValidator, ConfigDict, Field, with_config
+from pydantic import AfterValidator, BeforeValidator, with_config
 
-def strip_text(value):
+
+def strip_patch_text(value):
     return value.strip() if isinstance(value, str) else value
 
-Title = Annotated[str, BeforeValidator(strip_text), Field(min_length=5, max_length=200)]
-Body = Annotated[str, BeforeValidator(strip_text), Field(min_length=10, max_length=20000)]
+
+PatchTitle = Annotated[str, BeforeValidator(strip_patch_text), Field(min_length=5, max_length=200)]
+PatchBody = Annotated[str, BeforeValidator(strip_patch_text), Field(min_length=10, max_length=20000)]
+
 
 @with_config(ConfigDict(extra="forbid"))
 class QuestionPatch(TypedDict, total=False):
     version: Required[Annotated[int, Field(ge=1, strict=True)]]
-    title: Title
-    body: Body
+    title: PatchTitle
+    body: PatchBody
 
-def require_change(value):
+
+def require_patch_change(value):
     if not ({"title", "body"} & value.keys()):
-        raise ValueError("至少提供title或body")
+        raise ValueError("至少提供 title 或 body")
     return value
 
-PatchPayload = Annotated[QuestionPatch, AfterValidator(require_change)]
+
+PatchPayload = Annotated[QuestionPatch, AfterValidator(require_patch_change)]
 ```
 
-FastAPI端点参数写 `payload: PatchPayload`，得到已经清洗过的字典。OpenAPI中version必填、title/body非必填且非nullable；“至少一项修改”仍需在operation描述和运行测试中核对，普通AfterValidator不会自动生成全部业务约束。
+title/body 在 OpenAPI 中是非必填、非 nullable 字符串；version 必填。AfterValidator 的“至少一个字段”不自动完整变成 Schema 条件，operation 描述与运行测试必须一起保留。换用 BaseModel 也可以，但需保留“键是否提交”的信息，不能 dump 全部默认字段覆盖原记录。
+
+### 6.3 PATCH 沿用服务层事务
+
+下面的 read_versioned_question_dto 定义在 §9.2，使用 populate_existing 刷新已有对象，并按 position 取标签。它与列表的五字段 DTO 分开，不全局改掉列表输出。
 
 ```python
-# repository主体；复用第三单元未匹配时的404/409判断。
-changes = {name: payload[name] for name in ("title", "body") if name in payload}
-statement = (
-    update(Question)
-    .where(Question.id == qid, Question.version == payload["version"])
-    .values(**changes, version=Question.version + 1)
-    .returning(Question.id)
-    .execution_options(synchronize_session=False)
-)
-updated_id = session.scalar(statement)
-# updated_id为None时抛业务异常；匹配后用populate_existing重新读取详情与作者、构造DTO。
+# lesson08: patch_service
+from sqlalchemy.exc import IntegrityError
+
+
+def patch_once(session, qid, payload):
+    changes = {key: payload[key] for key in ("title", "body") if key in payload}
+    statement = (
+        update(Question)
+        .where(Question.id == qid, Question.version == payload["version"])
+        .values(**changes, version=Question.version + 1)
+        .returning(Question.id)
+        .execution_options(synchronize_session=False)
+    )
+    updated_id = session.scalar(statement)
+    if updated_id is None:
+        raise_unmatched(session, qid)
+    return updated_id
+
+
+def patch_question_service(
+    session, qid, payload, *, after_flush=no_fault, after_commit=no_fault,
+):
+    try:
+        updated_id = patch_once(session, qid, payload)
+        session.flush()
+        after_flush()
+        result = read_versioned_question_dto(session, updated_id)
+        if result is None:
+            raise RuntimeError("更新后的回读缺失")
+        session.commit()
+        after_commit()
+        return result
+    except IntegrityError as exc:
+        session.rollback()
+        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+        if getattr(exc.orig, "sqlstate", None) == "23505" and constraint == "questions_title_key":
+            raise DuplicateTitle() from exc
+        raise
+    except Exception:
+        session.rollback()
+        raise
 ```
 
-新版本与票数、既有详情字段一起返回。不可先 `get` 比较后无条件写，也不可把payload中的version直接写回旧值。所有修改同一资源的课程写路径都要遵守版本递增规则；绕过它的其他写者会使保护失效。
+只更新提交的 title/body，票数、标签、作者、created_at 不改，版本由数据库加一。标题精确唯一仍由 questions_title_key 裁决；已知冲突回滚整条更新，包括版本，不变成“文字没改但版本加了”。陈旧版本同时携带重复标题时，若没有行匹配 UPDATE，则先得到 version_conflict；不承诺先检查未被接受补丁的全部业务冲突。
 
-常见错误：把部分更新模型直接dump后覆盖全部列；或者一律过滤None，悄悄把非法null当成未提交。使用BaseModel方案时通常需要 `exclude_unset=True` 保留“有没有提交”的信息，但这并不自动定义null的业务含义。
+课堂对照：只改标题、正文不变；非法 null→422；匹配版本但与另一标题冲突→409 duplicate_title。课后再核对同时改两个字段、旧版本、缺失资源、空补丁与长度边界。使用已加载的旧对象运行 PATCH 时，返回正文和版本也必须是新值，不能只检查数据库正确。
 
-### 4.3 PUT 的替换边界
+## 七、收尾：常用写法卡与一页契约说明
 
-若另行设计PUT，先定义完整**可写表示**。例如title/body/tags全部必填；tags省略不是“保留旧标签”，空列表才是明确清空。id、作者身份、票数等服务端管理字段不由客户端覆盖；不存在目标时选创建还是404也须明文约定。本课程对照方案选择仅替换已有资源、缺失404。
+**课堂 8 分钟。3 分钟写法卡，3 分钟契约说明与 AI 判断，2 分钟作业交接。**
 
-```python
-# PUT设计参考，不作为A档新增端点。
-class QuestionReplace(QuestionCreate):
-    tags: list[str] = Field(max_length=5)  # 不继承创建时的省略默认值。
-    version: int = Field(ge=1, strict=True)
-```
+### 常用写法卡 #8
 
-若将它实现为条件PUT，同一个旧version的第二次请求可以409，不要求响应相同。服务端修订号、审计记录不是协议中“替换内容”的全部预期效果。不要用PUT/PATCH命名掩盖“增加余额/票数”这种增量语义。
-
-## 五、幂等、重试与提交结果未知
-
-**课堂 9 分钟；幂等键工程实现为B档。** 回收第二课方法矩阵、第五课PRG、第七课提交时断线。
-
-### 5.1 同一条时间线，三种不同问题
-
-```text
-客户端发POST → 数据库提交成功 → 响应在途中丢失
-客户端只看到超时 → 再发一次POST → 服务端如何识别同一意图？
-```
-
-| 手段 | 能解决 | 不能解决 |
+| 写法 | 数据库／框架替你做什么 | 常见错处与边界 |
 |---|---|---|
-| 事务 | 一个操作内部全部成功或回滚 | 不自动防止两个事务互相覆盖 |
-| 版本条件 | 拒绝基于陈旧状态的写入 | 不直接提供第一次成功的响应或身份防重 |
-| 原子加一 | 不丢独立增量 | 不识别相同意图重试 |
-| UNIQUE(title) | 执行业务标题唯一规则 | 不证明409对应的帖子就是刚才那次创建，也不重放结果 |
-| PRG/按钮禁用 | 减少刷新或交互重复 | 不替代服务端防重或并发控制 |
-| 幂等键/稳定操作ID | 在约定范围内识别同一意图 | 不自动提供授权或无限期“恰好一次” |
+| vote_count/version + 数据库默认 | 初始化合法计数与修订号 | 修改模型不替代迁移；客户端不能指定新版本 |
+| UPDATE SET 列=列+1 | 原子地保留每个匹配的增量 | 无条件增量不识别重复意图 |
+| WHERE id AND version | 将旧状态判断与写入合成一条语句 | Python 先比较再无条件写仍有竞争窗口 |
+| RETURNING／可靠 rowcount | 判断当前语句是否匹配 | 无匹配须区分缺失与不匹配；有返回行还不等于提交 |
+| 服务 commit／rollback | 统一业务事务，提交后再响应成功 | 确认提交后的故障不能靠 rollback 撤销 |
+| PATCH 只选择提交字段 | 部分更新，不覆盖未提交值 | 省略不等于 null；不能让客户端覆盖 version |
+| code 区分错误与重试 | 稳定表达缺失、版本冲突、标题冲突 | 409 不是成功，不自动换版本重发 |
 
-本课保留标题唯一约束，不能先删掉它来演示主项目“同标题重复发帖”。若展示重复记录，使用明确允许重名的隔离模型；主项目则展示超时后409仍无法仅靠状态确认第一次结果。
+一页《API 契约说明》直接复用 §一 的表，补一次正常报文、一次 404／409 说明与 PATCH 省略／null 例子；不要求抄完整底稿。错误仍是四字段，422 detail 为 loc/type/msg 列表，不写成 detail.fields，不投影数据库原始异常。
 
-A档规则：没有专门防重协议的POST，客户端不得在结果未知时自动循环重试。版本冲突先读最新状态并确认意图；不能收到409就自动刷新version不断加票。
+AI 对照：先完成自己的条件函数，再给 AI 固定契约和允许改动范围。检查它有没有把版本放入同一 UPDATE、如何判定 0 行、是否保留服务提交、如何回读新值。合理则接受并附证据，有问题才修；不要求必须找出错误或额外交一份长审计报告。
 
-### 5.2 幂等键的参考设计（课后B档）
+### A 档：只交一个作业包
 
-限定同一PostgreSQL事务中的创建，不牵涉支付、邮件等外部副作用。建议记录：
+1. 条件投票：正常 200、相同旧版本一成功一冲突、缺失 404；四情境判断与无误写证据。
+2. PATCH 标题／正文：省略保持、明确 null／空补丁／非法长度／额外键 422，旧版本／标题冲突 409，合法修改与新版本回读。
+3. 并发记录：固定初值、两连接身份、两个请求／结果、SQL 条件与独立查库；说明原子增量与条件更新各接受几次意图。
+4. 一页契约说明、卡片补一例、一次局部 AI 对照。课堂记录直接复用，不重复交截图套件。
 
-| 数据 | 作用 |
-|---|---|
-| principal + method + route + key 的唯一约束 | 防不同用户/不同操作串用，仲裁并发抢占 |
-| 规范化请求指纹 | 同键不同内容返回409，不能重放另一个请求的结果 |
-| 业务资源ID、状态与结果快照 | 同键同请求重放原结果；保留原Location等业务头 |
-| 创建时间、过期策略 | 明确有效期、容量与过期后重试边界 |
+教师包代办模型迁移、旧详情／创建接线、OpenAPI 生成和同步工具，学生执行并核对；不要求另写并发平台、全量接口、独立前端、类型生成或新 CI。本课还不是 M3 交付，第 9 课将这些验收变成至少八条关键路径测试。
 
-事务内先争取唯一键，再执行业务写入并保存结果，**同事务提交**；失败全部回滚。竞争者用唯一约束等待/判定，原事务提交后读取其已完成记录；不能先查内存字典再无条件插入。PostgreSQL可用 `INSERT ... ON CONFLICT DO NOTHING RETURNING`，后续读取的可见性按READ COMMITTED验证。
+## 八、选做与第 9 课交接
 
-同键同请求即使重试，也只产生一次业务写入；同键异请求拒绝。重放业务结果时当前请求的request-id仍须与本次日志一致，不盲目复制第一次的追踪头。只保存必要安全字段；过期、并发删除、跨资源副作用需要额外方案，不包装为通用分布式“恰好一次”。
+### 8.1 B 档：隔离的幂等键练习
 
-### 5.3 “一人一票”是另一条业务规格
+只针对同一 PostgreSQL 事务内的业务，不牵涉支付、邮件等外部副作用。可以研究“操作范围 + key”唯一约束、请求指纹、结果快照：同键同内容重放已完成结果，同键不同内容拒绝；业务写入和结果记录同事务提交。说明并发抢占、过期和结果未知的边界，不承诺无限期恰好一次。
 
-若以后规定每人每题最多一票，应建投票记录并加 `UNIQUE(question_id, user_id)`；身份来自服务端认证而非任意提交的user_id。可用 `PUT /questions/{qid}/my-vote` 表示当前用户投票状态，再选择聚合计数或同事务维护冗余计数。本课A档不增加第六张业务表，不宣称计数器已完成真实投票系统。
+本课没有认证 principal，隔离练习用教师明确分配的虚构调用者范围，不能把客户端随意提交 user_id 当可信身份。第 14 课后才绑定认证身份。重放业务结果也不照搬旧 request-id，当前请求仍有自己的日志关联。
 
-HTTP条件写入拓展：ETag/`If-Match`也能表达“仅在版本匹配时写入”，前置条件失败通常是412；本课JSON version冲突用409。它不同于第十二课前端“乐观UI更新”，不再把未安排的ETag教学承诺给后课。
+“一人一票”需要身份与投票记录的唯一关系，和本课的修订号计数器不是一个需求；不要求新增第六张业务表。ETag/If-Match 是另一种条件协议，失败通常用 412，本课 JSON version 固定 409，不混用。
 
-## 六、把 API 交付成能核对的契约
+### 8.2 下一课的明确输入
 
-**课堂 12 分钟；完整检查和类型生成留课后。** 单体描述部署/组织边界，前后端分离描述通信和交付方式；单体也可以用HTTP。Python函数调用不天然有编译期检查，TypeScript类型也不自动验证网络JSON。
+- 001_baseline → 002_question_version；数据库 body 不改名；五表约束、标签顺序和公开列表保持 M2 基线。
+- 列表五字段；详情／创建／PATCH 七字段；投票 qid/vote_count/version；创建输入仍不收新字段。
+- 版本正整数、PATCH 字段语义、404／两种 409 与四字段错误、request-id、200/201/303 提交时机。
+- 三种受控并发轨迹、四情境、同一旧版本重复写入拒绝、M2 两种故障位置；真实提交测试必须独立查库。
+- 教师提供 OpenAPI 导出／check 入口与最小类型消费者，分别标注要求会用／黑盒；学生本课不必先会 TypeScript。
 
-### 6.1 筛选、排序与分页
+第 9 课底稿已按 v4 重写：先写正确创建测试，使用独占 schema 与真实服务提交，再按固定 25 条数据定位分页缺陷；保留四件证据关联、四门禁／分支保护和 M3 一个作业包。已区分提交前／确认后同为 500 的数据结果，不将本课四情境变成额外工具考试。独立课程包、目标 PostgreSQL 16、真实 CI／保护与课堂断点证据仍须按第 9 课制作清单落地验收。
 
-新增公开参数：`sort`允许 `created_at/title/view_count`，默认created_at，均降序且id降序决胜；`status`允许 `open/closed`，默认open。deleted不在普通列表公开；这是批准的能力扩展，不把第七课实验参数误当成早已发布。
+## 九、教师附录：数据增量、DTO 与真实端点接线
+
+### 9.1 模型与 002 迁移
+
+以下完整 Question 定义**替换**第 7 课模型中的同名类，不与旧映射同时注册。Base、Mapped、relationship、其余四表及导入来自第 7 课模型模块，另外导入 Integer；所有外键与原约束保持。
 
 ```python
-SORTS = {"created_at": Question.created_at, "title": Question.title,
-         "view_count": Question.view_count}
-# router用Literal/枚举校验sort/status，service仅接收已验证值。
-conditions = [Question.status == status]
-if keyword:
-    pattern = literal_pattern(keyword)  # 沿用第六课 !/%/_ 的字面转义。
-    conditions.append(or_(Question.title.ilike(pattern, escape="!"),
-                          Question.body.ilike(pattern, escape="!")))
-stmt = (
-    select(Question).where(*conditions)
-    .options(selectinload(Question.author))
-    .order_by(SORTS[sort].desc(), Question.id.desc())
-    .offset((page - 1) * page_size).limit(page_size)
-)
-total_stmt = select(func.count()).select_from(Question).where(*conditions)
+# lesson08: question_model
+from sqlalchemy import Integer
+
+
+class Question(Base):
+    __tablename__ = "questions"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    title: Mapped[str] = mapped_column(Text(collation="C"))
+    body: Mapped[str] = mapped_column(Text)
+    author_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", name="questions_author_id_fkey"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    vote_count: Mapped[int] = mapped_column(Integer, server_default="0")
+    version: Mapped[int] = mapped_column(Integer, server_default="1")
+    answers: Mapped[list["Answer"]] = relationship(back_populates="question", passive_deletes="all")
+    tag_links: Mapped[list["QuestionTag"]] = relationship(
+        back_populates="question", order_by="QuestionTag.position", passive_deletes="all",
+    )
+    __table_args__ = (
+        UniqueConstraint("title", name="questions_title_key"),
+        CheckConstraint("char_length(title) BETWEEN 5 AND 200", name="questions_title_len"),
+        CheckConstraint("char_length(body) BETWEEN 10 AND 20000", name="questions_body_len"),
+        CheckConstraint("vote_count >= 0", name="questions_votes_nonneg"),
+        CheckConstraint("version >= 1", name="questions_version_positive"),
+    )
 ```
 
-对应新增参数签名 `sort: Literal["created_at", "title", "view_count"] = "created_at"`、`status: Literal["open", "closed"] = "open"`，非法值进入既有422处理器。
+迁移文件为固定版本代码，不 import 当前业务模型；保留第 7 课基线，不重写历史迁移。
 
-绑定参数用于**值**，列名/排序方向须映射受控表达式，不能任意getattr或拼接SQL。白名单缩小可用语法、便于维护，但不代替其他值参数化、LIKE转义或授权。
+```python
+# lesson08: migration
+from alembic import op
+import sqlalchemy as sa
 
-id决胜保证同一静态数据集有确定顺序；offset不是跨请求快照。翻页期间有插入/删除仍可能重复或漏项，同一请求的count与列表在READ COMMITTED下也可能看到不同已提交状态。A档用固定数据核对结果并说明这个边界；深分页与keyset为第六/七课拓展，不转嫁给讲React的第十一课。
+revision = "002_question_version"
+down_revision = "001_baseline"
+branch_labels = None
+depends_on = None
 
-### 6.2 错误声明和真实响应分开看
 
-既有422例子：
+def upgrade():
+    op.add_column("questions", sa.Column("vote_count", sa.Integer(), nullable=False, server_default="0"))
+    op.add_column("questions", sa.Column("version", sa.Integer(), nullable=False, server_default="1"))
+    op.create_check_constraint("questions_votes_nonneg", "questions", "vote_count >= 0")
+    op.create_check_constraint("questions_version_positive", "questions", "version >= 1")
 
-```json
-{"code":"validation_error","message":"请求参数不合法","detail":[{"loc":["body","title"],"type":"string_too_short","msg":"该字段不符合接口约束"}],"request_id":"l08-422"}
+
+def downgrade():
+    op.drop_constraint("questions_version_positive", "questions", type_="check")
+    op.drop_constraint("questions_votes_nonneg", "questions", type_="check")
+    op.drop_column("questions", "version")
+    op.drop_column("questions", "vote_count")
 ```
 
-客户端按 `detail` 列表与loc映射字段，不读不存在的 `detail.fields`。message可显示，code供分支；不要暴露原始input、数据库异常或SQL。未知500、业务404/409、框架405的Allow头、探针503和HTML错误仍保持第四/五课边界。
-
-| 层 | 本课证据 | 不能保证 |
-|---|---|---|
-| OpenAPI声明 | 每个operation的参数、成功与422/404/409/500模型 | 不自动推断所有异常或验证所有业务语义 |
-| 实际响应 | 请求样本＋状态/正文/头，与声明对照 | 几个样本不代表所有输入 |
-| 生成类型（B档） | 从已确认快照生成，消费者通过tsc | 不验证线上JSON、权限或防止XSS |
-| 业务验收 | 并发、边界和失败后查库 | 不能替代发布时版本协调 |
-
-`responses={422: {"model": ErrorOut}, ...}` 必须接到实际router，覆盖默认422声明；仅定义ErrorOut不会让它自动出现。直接JSONResponse会绕过成功response_model过滤，仍需真实响应检查。SSR不强制声明JSON response_model。
-
-### 6.3 可离线交付的快照
-
-教师配套 `scripts/export_openapi.py` 通过 `app.openapi()` 导出规范化JSON，`sort_keys=True`、固定缩进与末尾换行；`--check`时只比较，不自动覆盖。第九课提供参考实现并进入CI。
-
-学生工程根目录的预期入口：
+教师独立工程已安装锁定依赖、已完成第 7 课 Alembic 配置后，在备份副本执行：
 
 ```bash
-uv run python -m scripts.export_openapi
-uv run python -m scripts.export_openapi --check
+uv run --no-sync alembic current
+uv run --no-sync alembic upgrade head
+uv run --no-sync alembic current
 ```
 
-交付 `contracts/openapi.json` 与一页契约说明：公开端点、字段、错误语义、分页边界、version规则、哪些POST不承诺重试防重。应用导入不应启动服务器、自动迁移或联网；导出仍须具备后端依赖和合法配置。现场访问 `/openapi.json` 与离线快照应一致。
+核对 current 从 001 到 002；旧问题 id/title/body/created_at、作者、标签与关联不变，全部旧行初始为 0／1，新行省略两列也为 0／1。迁移不会把课堂指定 101 自动变成 10／5，实验复位是另一步。
 
-变更必须先有批准的语义说明，再改实现/测试/快照。自动生成意味着“和当前声明同步”，不意味着声明正确；不能看到差异就更新快照掩盖破坏性变更。
+升级后用新模型／路由，暂不并发混跑不维护版本的旧写者。普通 CHECK 不替代 NOT NULL，两者都核对。downgrade 会丢票数／版本，再升级只得到默认值，不能恢复历史投票；不在唯一数据上试。正式发布的锁等待、停机窗口与多版本兼容留给第 16 课，不用本地小库瞬时完成承诺线上无锁。
 
-### 6.4 类型生成与最小消费者（B档）
+### 9.2 详情／创建扩展，列表不跟着漂移
 
-使用教师预装并锁定依赖的 `contract-client` 小模板，不要求实现三个页面；其职责仅为契约消费者检查。`openapi-typescript`和TypeScript写入package-lock，脚本：
+```python
+# lesson08: detail_adapter
 
-```json
-{"scripts":{"gen":"openapi-typescript ../contracts/openapi.json -o src/api.d.ts","check":"tsc --noEmit"}}
+def read_versioned_question_dto(session, qid):
+    statement = (
+        select(Question).where(Question.id == qid).options(tag_load_option())
+        .execution_options(populate_existing=True)
+    )
+    question = session.scalar(statement)
+    if question is None:
+        return None
+    return QuestionDetailOut(
+        id=question.id, title=question.title, body=question.body,
+        tags=[link.tag.name for link in question.tag_links],
+        created_at=question.created_at,
+        vote_count=question.vote_count, version=question.version,
+    )
+
+
+def get_question_service(session, qid):
+    result = read_versioned_question_dto(session, qid)
+    if result is None:
+        raise QuestionNotFound()
+    return result
+
+
+def create_question_service(
+    session, payload, *, author_id, after_flush=no_fault, after_commit=no_fault,
+):
+    try:
+        question = write_question(session, payload, author_id=author_id)
+        session.flush()
+        after_flush()
+        result = read_versioned_question_dto(session, question.id)
+        if result is None:
+            raise RuntimeError("创建后的回读缺失")
+        session.commit()
+        after_commit()
+        return result
+    except IntegrityError as exc:
+        session.rollback()
+        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+        if getattr(exc.orig, "sqlstate", None) == "23505" and constraint == "questions_title_key":
+            raise DuplicateTitle() from exc
+        raise
+    except Exception:
+        session.rollback()
+        raise
 ```
 
-```typescript
-import type { components } from "./api";
-type Question = components["schemas"]["QuestionOut"];
+write_question、tag_load_option 直接复用第 7 课；服务接收的 Session 不含别的业务待提交工作。populate_existing 负责刷新之前已加载的对象，本例不存在需要保留的未刷写编辑；不要拿它无条件覆盖其他未完成操作的内存状态。列表仍调用旧 list_questions_orm／question_to_dto，输出 QuestionListOut 中的原五字段。
 
-export function renderTitle(q: Question, node: HTMLElement) {
-  node.textContent = q.title;
-}
+### 9.3 端点与 OpenAPI 声明一起接
+
+本段替换原创建／详情注册，并新增投票／PATCH；不能留下两个同路径同方法的端点，也不把正文数据库列改名。router 挂载到已注册第 4 课处理器／中间件的 FastAPI 应用，SessionDep 来自第 7 课，固定虚构作者来自教师配置（示例为 1）。
+
+```python
+# lesson08: routes
+from fastapi import Response
+
+
+ERROR_RESPONSES = {status: {"model": ErrorOut} for status in (404, 409, 422, 500)}
+
+
+@router.get("/questions/{qid}", response_model=QuestionDetailOut, responses=ERROR_RESPONSES)
+def get_question(qid: int, session: SessionDep):
+    return get_question_service(session, qid)
+
+
+@router.post("/questions", status_code=201, response_model=QuestionDetailOut, responses=ERROR_RESPONSES)
+def create_question(payload: QuestionCreate, response: Response, session: SessionDep):
+    result = create_question_service(session, payload, author_id=1)
+    response.headers["Location"] = f"/questions/{result.id}"
+    return result
+
+
+@router.post("/questions/{qid}/votes", response_model=VoteOut, responses=ERROR_RESPONSES)
+def vote_question(qid: int, payload: VoteIn, session: SessionDep):
+    return vote_question_service(session, qid, payload)
+
+
+@router.patch(
+    "/questions/{qid}", response_model=QuestionDetailOut, responses=ERROR_RESPONSES,
+    description="version 必填；title/body 至少提供一个，省略保持，显式 null 拒绝；仅版本匹配时修改。",
+)
+def patch_question(qid: int, payload: PatchPayload, session: SessionDep):
+    return patch_question_service(session, qid, payload)
 ```
 
-实际schema名以生成产物为准；不手写生成文件。试一次字段拼写错误，并记录tsc是否发现；`any`、断言、未纳入tsconfig的文件会削弱检查。没用类型生成也能做契约/运行测试，不把它们贬成“只能人肉grep”。
+成功响应模型必须实际换成 QuestionDetailOut；只在 ORM 加列却仍按旧模型过滤，会把 version 丢掉。ERROR_RESPONSES 是声明，不负责运行时翻译；VersionConflict 必须继承并接入既有 AppError 映射。新接口 422 声明覆盖默认 FastAPI 错误模型，实际 detail 仍按旧处理器脱敏。
 
-必填不等于非null；输入放宽与输出放宽对兼容性的影响不同。新增输出字段通常可兼容忽略未知字段的客户端，不保证所有严格消费者都兼容。改名、删除、输出可空化、收紧输入等需审查消费者与发布顺序，不能靠“生成后全绿”批准。
+教师复用导出入口以 `app.openapi()` 生成规范化 JSON，固定键排序、缩进、末尾换行；check 只比较、不自动覆盖。正式脚本由第 9 课提供并接门禁，本课只按模板读 `/openapi.json` 与报文、在一页说明中登记增量。导出不应启动服务器、自动迁移或要求访问数据库；新增声明不能自动证明所有业务约束。
 
-保留第二课四态和错误分类：HTTP错误、正文解析失败、网络异常、渲染异常不能都叫网络断开。任何用户标题、正文、作者名和错误信息都用textContent或安全模板渲染，不拼进innerHTML。联合类型若要检查switch穷尽，需显式 `never` 断言；单独声明联合类型并不强制处理所有分支。
+## 十、制作与验证状态
 
-## 七、作业、小测与 M3 交接
+本轮底稿与最终课程包分开验收，不沿用旧第 8／9 课合计的 SQLite 检查结果。
 
-**课堂 7 分钟。** 基础作业按教师提供迁移、并发runner和契约导出模板复做，预估3—4小时。不是从零实现通用事务/防重框架。
+- **本轮实测完成**：提取本稿 11 个 Python 围栏，复用第 3 课真实输入／输出模型、第 4 课错误／追踪代码、第 6 课 seed 和第 7 课模型／服务／迁移。完成 420 项检查（包含 11 项围栏语法、3 项课时检查），专用数据库正常停机再启动后另通过 2 项独立回读，累计 **422 项**；重复执行不累加计数。
+- **环境与隔离**：Python 3.12.12、FastAPI 0.141.1、Pydantic 2.13.5、SQLAlchemy 2.0.54、psycopg 3.3.6、PostgreSQL **18.6**／UTF-8，测试会话为 UTC／READ COMMITTED。复用前课工作区专用集群，仅新建 l08 独立 schema；仅监听权限 0700 的本地 Unix socket，不连接既有业务库。复用 `.build-check/lesson07-tools` 中 Alembic 1.20.0 等临时依赖，本课没有新增安装或修改项目锁文件／原虚拟环境；核验后已停库。
+- **正常路径与输入实测**：新旧行默认值、创建七字段与原列表五字段／字面搜索／排序、严格正整数版本、PATCH 省略／null／长度／额外键、标签保序；核对缺失、陈旧、删除后请求、未来版本的业务分类与拒绝后无误写。删除用独立无引用问题，不绕过主 seed 外键。
+- **真实并发实测**：两独立连接读取相同 10／5 后放行，常量覆盖得到两成功与 11／6，原子增量得到两成功与 12／7，条件版得到一成功一冲突与 11／6；逐次核对返回值。另观察实际等锁后重检旧版本失败，以及投票／PATCH 共用版本时只接受一个写者。这些是服务级受控实验，不称为网络压测。
+- **PATCH 与故障实测**：单字段／双字段／相同文本补丁、旧 ORM 对象刷新、命名标题冲突连版本一同回滚；计数／版本溢出及输出校验错误不冒充业务 409／输入 422。服务与最小 HTTP 装配均覆盖提交前故障无本次更新、提交确认后故障仍有更新，以独立连接回读，不用外层事务回滚替代提交证据。
+- **最小 HTTP／OpenAPI 实测**：真实路由、资源依赖与服务经过临时 FastAPI 装配，核对 201+Location、投票／PATCH 200、404／409／422／500、GET 投票 405 与 Allow、错误四字段及 422 的 loc/type/msg、request-id 起止日志和资源关闭、commit 早于响应。两个 TestClient 先读取相同版本再投票，得到 200／409 和独立库状态；这属于进程内 HTTP 链，不经过真实端口。OpenAPI 导出时零数据库 SQL，列表／详情字段分开，PATCH 必填／非 nullable 和错误响应声明正确；跨字段规则仍由说明与运行测试补足。
+- **真实 Alembic 实测**：从本稿和第 7 课提取固定 001／002 与在线 env 主体，通过 Alembic 命令 API 核对带 seed 的 001 升级保留五表旧数据、旧行／新行默认 0／1、002 版本与新增 CHECK／NOT NULL；另一个空 schema 完整升级、重复升级、check 通过。迁移目标没有预先 create_all；普通服务 fixture 与迁移实验分开。只在可丢弃副本回退再升级，确认票数／版本历史不能恢复。
+- **正常重启回读**：核对并发最终 11／6 和提交确认后故障留下的 PATCH 正文仍在。首次启动因沙箱共享内存权限失败，按原本地隔离参数恢复启动后完成回读；不将启动权限问题或正常重启当成提交期间断连／崩溃恢复实验。
+- **正式素材待制作**：独立第 8 课起点／完成版、正常／缺陷隔离应用、教师迁移与 DTO 接线、四情境数据、连接身份／同步超时／复位工具、故障入口、契约说明模板与备用记录。不得将临时核验脚本称为已交付教学工具。
+- **目标环境与全工程待验收**：PostgreSQL 16、真实 M2 数据升级、完整 JSON／HTML／探针回归、浏览器与 Uvicorn 网络链、正式命令／锁文件。未做的内容逐项保留，不用模型编译或服务测试代替。
+- **试讲负荷待验收**：学生能否在 25 分钟内完成条件更新并解释四情境；PATCH 模板能否支持 10 分钟正常讲解；不靠挤掉实践时间容纳工具内部细节。
 
-### 7.1 A 档必交
+临时复核入口（依赖上述临时工具目录与已启动的专用数据库 socket，不是学生启动命令）：
 
-| 交付 | 验收证据 |
-|---|---|
-| 保留M2核心能力 | 三个旧JSON端点、SSR和探针回归；body/page_size等名称不漂移 |
-| 投票条件写入 | 003迁移与模型；两个独立连接；200/409、最终值与版本；原子加一对照说明 |
-| PATCH标题/正文 | 缺省保持、null/空补丁/非法长度422、旧版本409、唯一标题409；其他字段不被改坏 |
-| 列表契约 | sort/status白名单；同时间数据的id决胜；筛选与total条件一致；保留page_size边界 |
-| 契约交付 | OpenAPI快照＋一页《API契约说明》；错误实例与声明对照 |
-| 一次AI协作记录 | 给出规格和可改范围、保留原输出；依据证据决定修复或保留，不要求固定错误数 |
+```bash
+uv run --offline --project snippets/ch01/m0-tracer --no-sync python .build-check/validate_lesson08.py
+```
 
-幂等键实现、完整PUT、一人一票、类型生成和发布兼容实验均为B档，任选一项不超过一小时。不将B档变成M3隐形前提；第九课类型门禁的小消费者由教师统一提供。
+本轮 TestClient 仍有 Starlette 对 httpx 适配的弃用提示，未为消除提示升级依赖；IDE 语言服务未就绪，不声称 lint 全绿。最终 Slidev、视觉／导出和真实课堂试讲未在本轮进行。
 
-### 7.2 提示词约束骨架
-
-> 在现有同步FastAPI/SQLAlchemy项目中补全条件投票。保持body、page_size、SSR和healthz契约；version条件必须进入同一UPDATE，失败不改变票数；service不处理HTTP，沿用统一错误和函数作用域事务。先列验收表与改动范围，再给最小diff。禁止取消唯一约束、关闭检查或将同步点暴露到生产。请说明原子加一、版本冲突与幂等重试的区别，并列出尚未验证的条件。
-
-评分看能否说明“哪层保证什么、失败如何观察”，不按文件数量、生成行数或代码速度评分。
-
-### 7.3 20 分钟诊断小测
-
-| 题目 | 分钟 | 核心判据 |
-|---|---:|---|
-| 两请求读取10各写11，画执行序列 | 6 | 找出丢失更新；事务不等于无竞争 |
-| 选择GET/POST/PUT/PATCH并说明重试效果 | 5 | 安全、幂等与相同响应分开 |
-| 修读版本更新与PATCH代码 | 5 | 条件写入、缺省/null、409后不能盲重试 |
-| 比较OpenAPI与一份422响应 | 4 | detail列表、声明不等于实际保证 |
-
-采用课堂已讲机制的诊断题，不考TypedDict语法、幂等表完整实现或尚未讲授的React。
-
-## 八、素材、验证边界与后课衔接
-
-制作阶段必须补齐：
-
-- 独立第八课工程与锁文件；002→003迁移、无数据丢失的前向检查及回退风险说明。
-- 缺陷/修复两个隔离应用、Barrier超时、两个连接身份记录、seed复位和四组并发证据；不假定已有v8 tag。
-- PATCH真实路由、共享长度规则、统一异常、详情DTO与version接线；原有JSON/SSR/探针回归。
-- 离线快照导出、真实OpenAPI/错误响应、可选类型消费者；无网络备用为标明环境的预录证据。
-
-本轮使用现有Python 3.12、FastAPI 0.141.1、Pydantic 2.13.5、SQLAlchemy 2.0.54环境，对两课合计完成71项语法/机制/时长检查：直接提取正文输入代码，验证PATCH缺省、null、长度、额外字段和OpenAPI形状；用内存SQLite验证条件更新成功、旧版本冲突、缺失资源及最终值，并编译核对PostgreSQL条件UPDATE形态。另有13项实际课时表、JSON、YAML与门禁命令接线检查通过。
-
-完整PostgreSQL并发、Alembic迁移及HTTP配套工程尚未执行，不能把上文预期表写成实测报告。SQLite验证不替代PostgreSQL锁与隔离行为；本轮未安装新依赖。临时检查脚本执行后清理，不作为已经交付的第八课配套工程。
-
-第九课接手这些验收表并转成至少八条关键路径测试、四门禁和AI规约；第十课为所有学生提供Vite/React/TS模板，不能假定人人已完成类型生成或独立前端页面。原第十课底稿的相应前置假设应在后续修订时同步。第十二课复用错误契约处理数据获取失败；版本冲突界面可作为后续适配点，不承诺新增ETag强制实验；第十四课补身份与对象授权，第十六课讨论迁移和发布顺序。
-
-参考：RFC 9110（安全、幂等、条件请求）、RFC 5789（PATCH）、PostgreSQL Transaction Isolation、SQLAlchemy UPDATE/RETURNING、FastAPI Additional Responses与Advanced Dependencies、Pydantic TypedDict校验。以锁定版本和配套实测为准。
+参考：PostgreSQL 16 Transaction Isolation／UPDATE、SQLAlchemy 2.0 ORM UPDATE 与 populate_existing、RFC 9110 的安全／幂等定义、Pydantic TypedDict／校验器、FastAPI Additional Responses。制作最终 Slidev 时，教师时间、应急切换与制作待办放备注，学生所需规则、操作前提与证据边界留正文。
