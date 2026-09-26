@@ -1,0 +1,45 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "第 1 课：列表起始版",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["main:app", "--host", "127.0.0.1", "--port", "8000"],
+      "cwd": "${workspaceFolder}/starter",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "第 1 课：我的详情练习",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["main:app", "--host", "127.0.0.1", "--port", "8000"],
+      "cwd": "${workspaceFolder}/exercise",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "第 1 课：M0 参考与整数断点",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["main:app", "--host", "127.0.0.1", "--port", "8000"],
+      "cwd": "${workspaceFolder}/reference",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "教师对照：未声明整数",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["main:app", "--host", "127.0.0.1", "--port", "8000"],
+      "cwd": "${workspaceFolder}/experiments/untyped",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}

@@ -38,11 +38,11 @@ layout: section
 </div>
 </div>
 
-<div class="mt-5 p-3 rounded-lg bg-amber-500/10 text-sm">第一课会继续使用这些工具，观察真实搜索请求，并核对不同位置留下的证据。</div>
+<div class="mt-5 p-3 rounded-lg bg-amber-500/10 text-sm">新版第一课使用独立 first-api 包：正常列表、补详情、看参数断点；不要求旧搜索、SQL 或四处取证。</div>
 
 <!--
 教学单元：讲一导读；本页：区分必须操作与参考内容，不另加课时。
-第一课不重做整套课前练习，课堂时间留给真实搜索请求的观察与取证。
+第一课不重做整套课前练习，课堂时间留给正确列表、学生详情任务和参数断点。
 详细材料保留在本讲。熟悉的语法和查表页可快进，但停点、切帧与请求工具要亲手验证；遇到困难先回看对应工具页，不提前要求设计框架。
 -->
 
@@ -370,7 +370,7 @@ Cookie 在此只认读请求头的含义，完整机制留第 13 次课。
 <div class="flex gap-2 px-3 py-1.5 border-b border-gray-400/15"><code class="w-16 shrink-0 font-bold text-amber-600 dark:text-amber-400">PATCH</code><span class="opacity-85">局部修改一个资源</span></div>
 <div class="flex gap-2 px-3 py-1.5"><code class="w-16 shrink-0 font-bold text-rose-600 dark:text-rose-400">DELETE</code><span class="opacity-85">删除一个资源</span></div>
 </div>
-<div class="mt-2 text-xs opacity-70">第 1 次课对照查询用 POST 与 GET；第 2 次课用 HTTP 判据处理搜索页，第 8 次课系统设计资源 API。</div>
+<div class="mt-2 text-xs opacity-70">新版第 1 次课先用 GET 读取列表与详情；第 2 次课用 HTTP 判据处理页面，其他方法按后续任务学习。</div>
 </div>
 
 <div>
@@ -382,7 +382,7 @@ Cookie 在此只认读请求头的含义，完整机制留第 13 次课。
 <div class="flex gap-2 items-baseline"><span class="w-9 shrink-0 font-mono font-bold text-rose-600 dark:text-rose-400">5xx</span><span class="opacity-85">服务端未能完成</span><span class="font-mono text-xs opacity-55">500</span></div>
 </div>
 <div class="mt-3 p-2.5 rounded-lg bg-gray-500/8 text-xs">
-<b>先记三个</b>：<code>200</code> 成功、<code>404</code> 没找到、<code>500</code> 服务端错误。第一课还会观察 <code>422</code> 参数不合法和 <code>503</code> 暂时不可用；不是背状态码大全。
+<b>先记三个</b>：<code>200</code> 成功、<code>404</code> 没找到、<code>500</code> 服务端错误。新版第一课另观察 <code>422</code> 参数解析失败；不实现数据库探针或 <code>503</code>，不是背状态码大全。
 </div>
 </div>
 
@@ -391,7 +391,7 @@ Cookie 在此只认读请求头的含义，完整机制留第 13 次课。
 <!--
 报文起始行里先找方法和状态码。本页作参考表，不逐项背诵或演示。
 
-左边认常见方法用途，不把 POST 等同于只能新建。第一课只用搜索案例对照 POST 和 GET；第二课按搜索页需要运用判据，完整资源设计留第 8 次课。
+左边认常见方法用途，不把 POST 等同于只能新建。新版第一课只用 GET 读取固定列表与详情；第二课按页面需要运用判据，其他方法留后续任务。
 
 右边状态码报告 HTTP 结果。先识别大类，再看响应体和服务端证据；不能只凭 4xx / 5xx 断定是谁写错了代码。第一课聚焦错误 200 为什么误导诊断，不承诺逐个复现所有状态码。
 -->
@@ -514,7 +514,7 @@ class: text-center
 
 第二，看请求头和响应头。Request Headers 里是你发过去的，Cookie、Authorization 都在这；Response Headers 里是服务端回过来的，Set-Cookie、Cache-Control 在这。
 
-第三，看请求载荷和响应体。载荷不一定是 JSON，也可能是查询参数或表单。第一课 POST 搜索参数就在查询串中；422 默认响应中的 detail 也在 Response 里读取。
+第三，看请求载荷和响应体。载荷不一定是 JSON，也可能是查询参数或表单。新版第一课的 qid 在路径中；422 默认响应中的 detail 在 Response 里读取。
 
 第四，看耗时。Timing 标签把一次请求拆成 DNS、连接、等待、下载几段——用户说"慢"，你要能说出慢在哪一段。
 

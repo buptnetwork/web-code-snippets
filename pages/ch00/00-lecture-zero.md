@@ -833,7 +833,7 @@ def delete_post(post_id: int, db: Session = Depends(get_db)):
 
 ---
 
-# 教学内容 · 后端九课（第 1–9 次）
+# 教学内容 · 后端九课（历史路线待同步）
 
 <div class="-mt-2 mb-3 flex items-center gap-2 text-xs">
 <span class="px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 font-bold">后端主线</span>
@@ -850,8 +850,8 @@ def delete_post(post_id: int, db: Session = Depends(get_db)):
 
 <div class="flex gap-3 py-[7px] border-b border-gray-400/12">
 <div class="w-10 shrink-0 font-mono font-bold text-teal-700 dark:text-teal-300">1</div>
-<div class="w-[135px] shrink-0 font-bold">请求全链路</div>
-<div class="flex-1 opacity-85">同一个 request-id，在 DevTools / 日志 / 栈帧 / SQL 四处串起一个请求</div>
+<div class="w-[135px] shrink-0 font-bold">第一个 Web 接口</div>
+<div class="flex-1 opacity-85">新版：固定列表 → 补详情 → 参数断点 → 五框图；不要求四处取证</div>
 </div>
 
 <div class="flex gap-3 py-[7px] border-b border-gray-400/12">
@@ -905,9 +905,9 @@ def delete_post(post_id: int, db: Session = Depends(get_db)):
 </div>
 
 <!--
-这九次课全在后端，我按课次过一遍。注意右边这一列——每节课都有一个「翻车现场」，你亲眼看着它发生，再亲手把它修好。
+本页除第一课交接外仍是旧路线，仅作历史参考；不按右栏旧故障顺序布置v4任务。当前七章映射见course-conventions，第一课以ch01成稿为准。
 
-第 1 课建立坐标系：一个请求从浏览器到数据库再回来，经过哪些环节，每个环节谁负责、失败什么样、在哪观察——以后所有定位问题都从这张图出发。第 2 课把协议变成判据：你改了代码，用户还看到旧页面——不是代码的问题，是哪一层缓存在作怪。第 3 课看一个最典型的 AI 事故：少了 response_model，密码哈希跟着响应就漏出去了。第 4 课先让你痛——路由里到处是重复的会话、分页、异常处理——痛完再抽依赖注入和分层。第 5 课，一个同步阻塞调用塞进 async 端点，并发一上来吞吐直接塌方，我们用数据说话——这里交付 M1。
+新版第1课先建立正常列表，由学生补详情，再观察参数断点和五框链路，不接数据库。以下第2课起为历史讲法，待另行同步。第 2 课把协议变成判据：你改了代码，用户还看到旧页面——不是代码的问题，是哪一层缓存在作怪。第 3 课看一个最典型的 AI 事故：少了 response_model，密码哈希跟着响应就漏出去了。第 4 课先让你痛——路由里到处是重复的会话、分页、异常处理——痛完再抽依赖注入和分层。第 5 课，一个同步阻塞调用塞进 async 端点，并发一上来吞吐直接塌方，我们用数据说话——这里交付 M1。
 
 下半段进数据层。第 6 课：一个 NULL 就能让你的查询静默地少几行数据。第 7 课：遍历关系刷出 N+1，几十条 SQL 变一条，条数和耗时前后对照——交付 M2。第 8 课两个并发请求同时投票，丢失更新，上乐观锁返回 409。第 9 课是这门课的总闸：CI 架起四道门禁，拿一段 AI 的「能跑」提交去撞——被挡下，再逐条修绿——交付 M3。
 

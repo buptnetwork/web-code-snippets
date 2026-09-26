@@ -5,7 +5,7 @@ class: lecture-two lecture-opening
 
 <div class="eyebrow">讲二 · PYTHON 阅读基础</div>
 
-# 读懂第 1 次课<br>要出现的 <span class="key">Python 写法</span>
+# 为 Web 接口准备<br><span class="key">Python 阅读基础</span>
 
 <div class="pt-3 text-sm opacity-80 leading-loose">
 0.7 类型注解 · 0.8 对象与常见表达式 · 0.9 异常与执行顺序<br>
@@ -13,16 +13,16 @@ class: lecture-two lecture-opening
 </div>
 
 <div class="mt-8 text-sm key">
-读懂代码，不要求从零设计框架
+本讲保留旧搜索示例作语法参考；新版第一课用 first-api，<br>不要求 SQL、request-id 或四处取证。
 </div>
 
 <!--
-课前讲二只为读懂第 1 次课的单文件搜索案例。学生已经练过启动程序、读报文和切换栈帧；这一讲补上函数签名、对象访问和执行顺序。
+本讲尚未整课按v4同步，旧搜索源码只作语法参考，不再定义第一课前置任务。学生已经练过启动程序、读报文和切换栈帧；这一讲补上函数签名、对象访问和执行顺序。
 教学预算：讲解约 60 分钟，暂停跟做另计；不是已核对的录播时长。
 
 节奏建议：注解 6 分钟、对象与表达式 14 分钟、异常 8 分钟、装饰器 16 分钟、async 4 分钟、启动与 import 5 分钟、阅读边界与自检 7 分钟。暂停跟做单独计时。
 
-使用第一课真实源码和已有 mini 示例，结构示意明确标注。不预讲依赖注入、分层、统一异常契约，也不提前给出 request-id 的解决方案；把发现问题的过程留给第一课。
+使用历史搜索源码和已有 mini 示例，结构示意明确标注。新版第一课使用独立first-api固定列表，不要求SQL或request-id；本讲整课替换留后续。
 -->
 
 ---
@@ -50,7 +50,7 @@ class: lecture-two
 
 <!--
 教学单元：讲二导读；本页：主线与阅读深度，不另加课时。
-讲一已练过的工具不重做整套，把日志关联与四处取证留给第一课。
+讲一已练过的工具不重做整套；新版第一课只观察最小日志与参数断点，不安排日志关联与四处取证。
 原有 60 分钟包含教师演示与思路导读，不要求学生同步写完示例。包装器和 MiniApp 是阅读材料，不变成独立编码作业；代码阅读自检仍覆盖装饰器登记时机。
 
 [click] 展示教师导读与课后回看的范围。
@@ -140,7 +140,7 @@ class: lecture-two
 </div>
 
 <div v-click="2">
-<div class="text-xs tracking-widest opacity-75 mb-2">第 1 次课真实签名 · v1_ai_raw.py</div>
+<div class="text-xs tracking-widest opacity-75 mb-2">历史示例签名 · v1_ai_raw.py（非新版 M0）</div>
 
 ```python
 # 路由装饰器在 0.10 解释
@@ -165,7 +165,7 @@ def get_questions(keyword: str = "", page: int = 1):
 
 [click] 框架也会读取注解，并据此处理 HTTP 输入。这不是 Python 自己突然开始检查函数实参。
 
-[click] 对照第一课的真实函数签名，逐个读出参数名、类型和默认值。传 page=abc 的 HTTP 请求会在进入函数体前被拒绝；整数负数却不受这个签名限制。今天先能读懂这种区别，第 3 次课再学校验规则。
+[click] 对照历史搜索函数签名，逐个读出参数名、类型和默认值。传 page=abc 的 HTTP 请求会在进入函数体前被拒绝；整数负数却不受这个签名限制。今天先能读懂这种区别，第 3 次课再学校验规则。
 -->
 
 ---
@@ -239,7 +239,7 @@ print(message)
 ```
 
 <div class="mt-3 text-sm">前缀 <code>f</code> ＋花括号中的表达式。<b class="key">先计算，再放进字符串</b>。</div>
-<div v-click="3" class="mt-3 p-3 rounded-lg bg-amber-500/10 text-sm">第一课反例用它拼 SQL。<b class="caution">读懂语法不代表认可安全性</b>，仅限本地虚构数据；第 3 次用参数化模板，第 6 次解释原理。</div>
+<div v-click="3" class="mt-3 p-3 rounded-lg bg-amber-500/10 text-sm">历史搜索反例用它拼 SQL（非新版第一课任务）。<b class="caution">读懂语法不代表认可安全性</b>，仅限本地虚构数据；第 3 次用参数化模板，第 6 次解释原理。</div>
 </div>
 </div>
 
@@ -286,7 +286,7 @@ logger.info("query keyword=%s page=%s",
 </div>
 </div>
 
-<LessonLink v-click="3">先能逐行读懂搜索代码。第一课再问：这些记录足够判断一次请求经历了什么吗？</LessonLink>
+<LessonLink v-click="3" label="历史示例">搜索与日志展开只作阅读参考；新版第一课先在固定列表中按编号查找。</LessonLink>
 
 <!--
 教学单元：0.8；本页：结果转换与日志调用。
@@ -294,7 +294,7 @@ logger.info("query keyword=%s page=%s",
 
 [click] 高亮展开后的循环，对照取行、转换、收集三个动作。
 [click] 恢复完整代码，转向日志模板与参数。
-[click] 补充参数的收集与展开，再连接第一课的观察问题。
+[click] 补充参数的收集与展开，说明历史搜索示例与新版第一课的区别。
 -->
 
 
@@ -348,7 +348,7 @@ class: lecture-two
 
 <div grid="~ cols-[1.2fr_0.8fr] gap-6" class="mt-5">
 <div>
-<div class="text-xs tracking-widest key mb-2">第一课 v1 详情接口的分支 · return</div>
+<div class="text-xs tracking-widest key mb-2">历史 v1 详情分支 · return（非新版 M0）</div>
 
 ```python
 if row is None:
@@ -358,7 +358,7 @@ if row is None:
 <div v-click="1" class="mt-3 text-sm step-row">函数<b class="key">正常返回</b>了一个字典。<code>False</code> 只是其中的值，<b class="caution">不会自动抛出异常</b>，也不会自动改变 HTTP 状态。</div>
 </div>
 <div>
-<div class="text-xs tracking-widest error mb-2">第一课 v2 的故意失败语句 · raise</div>
+<div class="text-xs tracking-widest error mb-2">历史 v2 故意失败语句 · raise</div>
 
 ```python
 raise RuntimeError("故意触发")
@@ -368,14 +368,14 @@ raise RuntimeError("故意触发")
 </div>
 </div>
 
-<LessonLink v-click="3">第一课观察 /boom：已有记录中，哪些留下了，哪些没有？请根据 return / raise 的执行顺序预测，再与实际输出核对。</LessonLink>
+<LessonLink v-click="3" label="历史示例">/boom 仅属旧包；新版第一课用 HTTPException 报告不存在的编号，不要求复现 /boom。</LessonLink>
 
 <div v-click="3" class="mt-4 text-sm opacity-80">回想 mini 的退出码：机器也需要可识别的失败信号。HTTP 应怎样表达失败，在第一课用实际报文核对。</div>
 
 <!--
 教学单元：0.9；本页：正常返回与异常传播。
 课前只提供预测执行顺序的工具，不提前补全异常处理。
-先区分语言层面的 return 与 raise，再引出第一课的观察问题。不能把返回值方式一概判错，也不能声称抛异常就自动得到正确的业务状态码。mini 只是运行练习，不承诺第一课把它原封不动改成 Web 分层项目。
+先区分语言层面的 return 与 raise；旧 /boom 不再是新版第一课的观察任务。不能把返回值方式一概判错，也不能声称抛异常就自动得到正确的业务状态码。mini 只是运行练习，不承诺第一课把它原封不动改成 Web 分层项目。
 
 [click] return 正常返回字典，False 是数据。
 [click] raise 中断正常路径，异常向外传播。

@@ -62,6 +62,25 @@
 .slidev-layout.l01 .url .fragment { border-color: #c98716; background: #fff5e3; color: #a16207; }
 .slidev-layout.l01.lesson-opening { background: linear-gradient(125deg, #eaf6f3, #fbfcfd 70%); }
 .slidev-layout.l01 .slidev-vclick-target { transition: opacity 180ms ease; }
+.slidev-layout.l01 .browser-card { border: 1px solid #bfd4de; border-radius: 10px; background: white; }
+.slidev-layout.l01 .browser-bar { border-bottom: 1px solid #bfd4de; background: #edf3f6; padding: 10px 16px; border-radius: 10px 10px 0 0; font-size: 15px; color: #536d7a; }
+.slidev-layout.l01 .browser-body { padding: 18px; min-height: 176px; font-size: 17px; }
+.slidev-layout.l01 .mock-selected { color: #087b76; border-bottom: 1px solid #a8d9d2; padding-bottom: 12px; font-weight: 650; }
+.slidev-layout.l01 .mock-selected span { float: right; }
+.slidev-layout.l01 .three-system { display: grid; grid-template-columns: 1fr 90px 1fr 90px 1fr; align-items: center; }
+.slidev-layout.l01 .system-box { border: 1px solid #c9dde2; border-top: 4px solid #12958e; border-radius: 8px; background: #eff6f7; padding: 20px; }
+.slidev-layout.l01 .system-box .step { display: block; font-family: inherit; font-size: 15px; line-height: 1.5; color: #597281; }
+.slidev-layout.l01 .system-arrows { color: #087b76; font-size: 17px; text-align: center; }
+.slidev-layout.l01 .command-strip { font-family: monospace; font-size: 19px; background: #edf5f6; border-left: 4px solid #12958e; padding: 12px 16px; margin: 18px 0; overflow-wrap: anywhere; }
+.slidev-layout.l01 .change-line { font-size: 26px; margin: 14px 0; }
+.slidev-layout.l01 .change-line del { color: #607782; }
+.slidev-layout.l01 .plain-output { font-family: monospace; font-size: 17px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; background: #e8f0f4; padding: 12px; border-radius: 6px; }
+.slidev-layout.l01 .experiment-condition { border-left: 4px solid #c98716; background: #fff5e3; padding: 12px 16px; margin-top: 18px; font-size: 18px; }
+.slidev-layout.l01 .exit-question { display: flex; align-items: baseline; gap: 24px; border-bottom: 1px solid #c9dde2; padding: 20px 0; font-size: 23px; }
+.slidev-layout.l01 .exit-question b { font-family: monospace; color: #087b76; }
+.slidev-layout.l01 .contract-table td { padding: 8px 10px; }
+.slidev-layout.l01 .contract-table th:first-child { width: 38%; }
+.slidev-layout.l01 .course-map td { padding: 7px 10px; }
 
 /* 课前讲二：限定作用域，保留其他次课的主题与排版。 */
 .slidev-layout.lecture-two {

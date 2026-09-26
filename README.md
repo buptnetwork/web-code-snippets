@@ -14,58 +14,63 @@ pnpm build                  # 整站构建到 dist/（部署前缀见 scripts/bu
 pnpm export                 # 导出 PDF（需先装 playwright-chromium）
 ```
 
-## 第一次课：请求全链路
+## 第一次课：第一个 Web 接口
 
-成稿入口为 `ch01.md`，正文与备注在 `pages/ch01/01.md`，包含教学正文、作业工具卡与准备附录。课前课聚焦“运行工具与代码阅读”，第一课保持“观察与取证”；分层和框架设计留后续课。节奏为 95 分钟＋5 分钟缓冲，作业工具卡供课后查阅，不挤占现场取证；底稿已归档，后续只修改最终工程。
+新版按 [v4 大纲](docs/syllabus-v4.md) 组织为 **7 章／16 次课**，另保留 ch00 课前准备；完整映射见[课程约定](docs/course-conventions.md)。当前仅启用 ch01 中的第 1 次课，第 2 次课与 ch02–ch07 尚未制作，不提供空入口。
+
+成稿入口 [ch01.md](ch01.md)，正文与备注 [pages/ch01/01.md](pages/ch01/01.md)，课后卡片 [01-reference.md](pages/ch01/01-reference.md)。当前 45 页：3 页章节定位＋35 页正文＋7 页参考。路线为正确列表 → 学生独立补详情 → 参数与失败位置 → 五框请求图 → M0；95 分钟教学＋5 分钟缓冲。底稿只保留归档快照，后续修改最终工程。
 
 ```bash
 pnpm exec slidev ch01.md --port 3031
 pnpm exec slidev build ch01.md --base /web-2026b/ch01/ --out .build-check/ch01
 ```
 
-### 单文件演示与阶段切换
+### 新版独立课堂包
 
-示例是按底稿在本工程重建的，不是外部 `m0-tracer` 仓库的 Git tags。三个阶段各保留独立单文件；`v3_m0.py` 是课后参考，不被导入 slides 或复制到 public。发布学生材料时，只选取对应阶段，不能把整个目录当作课前包分发。
-
-以下在 **`snippets/ch01/m0-tracer` 目录**执行，要求 Python 3.12 与 uv：
+以下在 **`snippets/ch01/first-api` 目录**执行，要求 Python 3.12 与 uv。使用本包独立环境，不启动旧 m0-tracer，不初始化数据库：
 
 ```bash
 uv sync --frozen
-uv run python seed.py
-uv run uvicorn v1_ai_raw:app --host 127.0.0.1 --port 8000
+source .venv/bin/activate     # macOS / Linux
+cd exercise
+python -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-- `v1_ai_raw:app`：能运行的反例，POST 查询、拼接 SQL、详情不存在仍返回 200。
-- `v2_traceable:app`：课堂目标。先设 `TRACE_MODE=plain DEMO_DELAY_MS=80`，再切 `TRACE_MODE=trace DEMO_DELAY_MS=80`；第二终端执行 `uv run python bench.py`，同时手动发一次请求。
-- 四处合流：停止并发，启动 `TRACE_MODE=trace SQL_ECHO=1 uv run uvicorn v2_traceable:app`。不再设置人为延迟，使用一次性的合法 id（1–64 个字母、数字、点、下划线或连字符）。
-- 学生从同目录的 `v2_traceable.py` 复制为 `student_app.py` 读改：搜索迁移 `GET /questions`，详情改为 `GET /questions/{qid}`，增加 `GET /healthz`。保留日志、中间件与静态页面；允许查文档和 AI 辅助，但须解释改动并提交检查结果，不要求从零写框架。
-- `v3_m0:app`：以上任务的课后参考；新 API 提示与完整验收约定已放入第一课作业页。
-- 每次切换先停止上一个服务，避免端口冲突。每次启动重建 `server.log`，先保存必要证据；80ms 延迟仅用于日志交织，不是性能基准。
-- 复制 `.env.example` 为 `.env` 后，使用 `uv run --env-file .env ...` 显式加载；仅创建文件不会自动加载。`.env` 已忽略，不能提交真实凭据。
-- shell 内联环境变量是 macOS / Linux 写法；PowerShell 使用 `$env:TRACE_MODE='trace'` 等赋值。
+PowerShell 激活命令为 `.venv\Scripts\Activate.ps1`；其余命令相同。教师课前完成安装，学生不在课堂首次下载。目录职责：
+- `starter/main.py`：正确列表，供教师示范。
+- `exercise/main.py`：学生补详情、最小日志与探针；未完成时自检失败正常。
+- `reference/main.py`：完整 M0 参考，独立尝试后再看。
+- `experiments/`、`verify_examples.py`：教师类型／缺失分支对照与验证设施，不是额外学生作业。
 
-默认 SQLite：`sqlite:///./demo.db`。结构在 `seed.sql`，`seed.py` 写入固定的 30 个问题、15 个回答、5 个标签；全部虚构。需要复位时先停服务，再执行 `uv run python seed.py --reset`。初始化工具只允许名为 `demo.db` 的 SQLite 文件，或本机库名以 `m0_` 开头的 PostgreSQL 教学库。
+三个阶段都以 `main:app` 启动，靠工作目录区分；切换或修改后 **Ctrl+C 停止，再启动**，不用 `--reload`。不随意关闭未知端口进程。
 
-PostgreSQL 16 / 17 可通过 `DATABASE_URL` 配置：事先创建隔离教学库并给测试账号授权；不连接生产数据。本轮未获得可用 PostgreSQL 服务，**PostgreSQL 未验证**，默认 SQLite 为已验证备用路径。
+### 调试、自检与边界
 
-### 调试、验收与证据
-
-用 VS Code **直接打开 m0-tracer 目录**，安装 Python / Python Debugger 扩展；选附带 `.vscode/launch.json` 的配置，在 `v2_traceable.py` 的 `rows = conn.execute(...)` 处下断点。关闭 reload、`justMyCode=false`；Windows 将解释器路径改为 `.venv/Scripts/python.exe`。先截 Call Stack 与 Variables 中的 rid，继续后再截响应与日志。多行表达式可能再次命中，取证后可移除断点。
+第二终端激活同一环境、进入 `exercise`，保持第一个终端的服务运行：
 
 ```bash
-uv run python verify_m0.py --all       # 三个阶段的隔离 SQLite 验证
-uv run python verify_m0.py --app student_app
-make verify                          # 默认检查 v3_m0 参考答案
-uv run python capture_evidence.py     # 重采 HTTP、并发日志、debugpy 停点与 SQL
+python ../check_m0.py
+# 若自己改过端口，可显式指定：
+python ../check_m0.py --base-url http://127.0.0.1:8001
 ```
 
-验证器要求待测单文件暴露 `app`、`engine`，从 `DATABASE_URL` / `LOG_FILE` 环境变量读取测试配置；在临时 SQLite 中检查响应、数据、配对日志、SELECT 1、断连后的 503 和恢复。`/boom` 是特意保留的异常路径缺陷，由 v2/v3 阶段测试单独检查，不纳入学生模块的配对日志验收。凭据扫描只是有限 AST 规则，不等于安全审计。当前锁定的 Starlette 使用 HTTPX TestClient 时会发出弃用提示，测试仍通过。
+自检是标准库黑盒 HTTP 客户端，只向本机发送 GET，默认每请求超时 3 秒。检查固定三条记录及顺序、列表／详情／两种 404／422／存活探针，共 10 条；失败退出非零，不限定函数名和查找写法，不据此证明断点已验。
 
-证据采集只使用自身的 `.capture/demo.db` 与回环服务；停止自己启动的进程，不影响已有应用。原始记录与版本在 `public/images/ch01/evidence.json`；页面仅做时间前缀省略、节选和高亮。单次合流来自同一个 HTTP 请求和真实 debugpy 停点，**不是手写模拟数据，也不是 IDE / 终端界面截图**。用相同 id 重发四次不能冒充同一次执行。
+VS Code **直接打开 first-api 文件夹**，安装 Python／Python Debugger 扩展并选中本包 `.venv` 解释器，运行附带配置“第 1 课：我的详情练习”。在自己加入的 `print` 行下断点，访问 `/questions/3`，观察 `qid` 值和类型，截图后继续。PyCharm 等价设置：模块 `uvicorn`、参数 `main:app --host 127.0.0.1 --port 8000`、cwd 为 exercise、本包解释器，无 reload。配置不写死机器路径；真实 IDE 停点仍需授课前补验。
 
-已验证环境：Python 3.12.12、FastAPI 0.141.1、Starlette 1.6.0、SQLAlchemy 2.0.54、uvicorn 0.53.0、debugpy 1.8.22；准确锁定版本以 `uv.lock` 为准。SQL echo 本身无 request-id，四处合流在暂停并发后采集；计时含调试暂停，不用作性能证据。
+教师在 first-api 包根复跑：
 
-**授课前缺项**：DevTools / 终端 / IDE 原始界面截图及 40 秒 IDE 备用录像待补；当前以真实协议与日志输出重排作有限备用。`/docs` 默认依赖 CDN 脚本，离线可用 curl。PDF 与教室投影未验证，网页可用不代表这些交付形式已验收。
+```bash
+uv run --frozen python verify_examples.py
+```
+
+独立版本：Python 3.12.12、FastAPI 0.141.1、Starlette 1.6.0、Uvicorn 0.53.0、debugpy 1.8.22；精确依赖以本包 `uv.lock` 为准。具体验证、浏览器状态及缺口见[本轮移交记录](docs/lesson-draft-rewrite-handover.md#12-第-1-课-slidev-与最小配套移交)。代码完整说明见 [snippets/README.md](snippets/README.md)。
+
+新版 M0 不含数据库、搜索分页、request-id 或前端。第 2 课 SQLite 与页面起点包尚未制作；网页与源码是本次交付，PDF 非必交，投影与 25 分钟学生任务试讲仍待教师实测。
+
+### 历史材料
+
+`snippets/ch01/m0-tracer/`、`public/images/ch01/evidence.json` 和旧取证图保持原样，仅供历史参考；它们的数据库、SQL、四处取证与旧 M0 自检不再是新版第一课要求。旧包运行见 [snippets 说明](snippets/README.md#历史资产m0-tracer)，历史验证见 [slides 修订交接](docs/slides-revision-handover.md)。ch00 仅同步版本提示和直接交接，其余旧路线仍待更新，不能将历史任务叠加给学生。
 
 ## 课堂互动（课件端已集成）
 
@@ -102,7 +107,7 @@ pnpm typecheck                         # 课堂集成代码类型检查
 ```
 .
 ├── ch00.md            # 各章入口（必须放在仓库根，Slidev 的约定目录相对入口解析）
-├── ch01.md            # 第 1 章 绪论
+├── ch01.md            # 第 1 章 Web 入门：接口与页面（现含第1课）
 ├── pages/
 │   ├── ch00/          # 课程导论，章内分节，一次课一个文件，用 src: 引入
 │   │   └── 00-lecture-zero.md        # 导论第0讲
@@ -163,7 +168,7 @@ git subtree push --prefix=snippets snippets main
 
 ## 当前工程约定
 
-- 新增一章：在根目录建 `chXX.md`，章内按次课拆到 `pages/chXX/*.md`，入口用 `src: ./pages/chXX/01-xxx.md` 引入；具体目录与代码资产约定见[课程约定](docs/course-conventions.md)。
+- 新增一章：在根目录建 `chXX.md`，章内按次课拆到 `pages/chXX/*.md`，入口用 `src: ./pages/chXX/NN.md` 引入（NN 为全课程课次）；具体目录与代码资产约定见[课程约定](docs/course-conventions.md)。
 - 章节封面、背景和徽标以[课程约定](docs/course-conventions.md)为准，不再分散维护。
 - `pnpm build` 自动扫描根目录全部章节入口；新增章节后同步 `netlify.toml` / `vercel.json` 的路由，详见上方部署说明。
 - 资源放 `public/`；绝对路径引用、备注、代码 region 及 UnoCSS/SVG 避坑统一见[Slidev 实施指南](docs/slidev-authoring-guide.md)。
