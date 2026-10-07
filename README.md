@@ -10,37 +10,25 @@
 | `ch01/first-api/` | 第 1 课 | 从列表接口到补详情，含 M0 自检 |
 | `ch01/search-page/` | 第 2 课 | 搜索分页接口 ＋ 同源四态搜索页，含黑盒自检 |
 
-## 环境准备（每个工程一次）
+## 环境准备
 
-1. 安装 Python 3.12 与 [uv](https://docs.astral.sh/uv/)。
-2. 进入工程目录，执行下面命令按 `uv.lock` 装好依赖，并生成 `.venv`：
+只需安装 [uv](https://docs.astral.sh/uv/)（它会按各工程的 `.python-version` 自动准备 Python 3.12）。之后所有命令都加 `uv run --frozen ...` 前缀：uv 会依据 `uv.lock` 自动创建并同步工程的 `.venv`，**不用手动 `uv sync`、也不用激活虚拟环境**，macOS／Linux／Windows 命令完全一致。
 
-   ```bash
-   uv sync --frozen
-   ```
-
-3. 激活虚拟环境：
-
-   ```bash
-   source .venv/bin/activate        # macOS / Linux
-   .venv\Scripts\Activate.ps1       # Windows PowerShell
-   ```
-
-   如果 Windows 执行策略阻止激活，可不激活，直接把后面命令里的 `python` 换成 `.venv\Scripts\python.exe`。
-
-> 每个工程的 `.python-version` 已固定为 3.12.12。运行时只依赖 FastAPI／Uvicorn，不需要额外安装数据库服务，也不需要 Node 环境。
+> `--frozen` 表示严格按已提交的 `uv.lock` 安装、不改锁文件，保证课堂环境可复现。各工程运行时只依赖 FastAPI／Uvicorn，不需要额外安装数据库服务，也不需要 Node 环境。
+>
+> 想在 IDE 里调试、或想在一个终端里连续敲多条命令时，也可以先 `uv sync --frozen` 生成 `.venv` 再激活它（macOS／Linux：`source .venv/bin/activate`；Windows PowerShell：`.venv\Scripts\Activate.ps1`），IDE 的解释器就选这个 `.venv`。
 
 ---
 
 ## 第 1 课 · first-api
 
-进入 `ch01/first-api/`，完成上面的[环境准备](#环境准备每个工程一次)。
+进入 `ch01/first-api/`，确保已按上面的[环境准备](#环境准备)装好 uv。
 
 ### 启动
 
 ```bash
 cd exercise
-python -m uvicorn main:app --host 127.0.0.1 --port 8000
+uv run --frozen uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
 浏览器打开 <http://127.0.0.1:8000/questions>。改完代码后**先停止再重启**（不要用 `--reload`）；切换目录前也要先停掉旧服务。
@@ -58,12 +46,12 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000
 
 ### 自检 M0
 
-保持服务运行，**另开一个终端**，激活同一环境并进入 `exercise`：
+保持服务运行，**另开一个终端**，在 `first-api` 目录下：
 
 ```bash
-python ../check_m0.py
+uv run --frozen python check_m0.py
 # 若服务开在别的端口：
-python ../check_m0.py --base-url http://127.0.0.1:8001 --timeout 3
+uv run --frozen python check_m0.py --base-url http://127.0.0.1:8001 --timeout 3
 ```
 
 自检只发本地 GET，全部通过退出码为 0，否则为 1。**`exercise` 还没补完时自检不通过是正常的。** 期望行为：
@@ -84,12 +72,12 @@ python ../check_m0.py --base-url http://127.0.0.1:8001 --timeout 3
 
 ## 第 2 课 · search-page
 
-进入 `ch01/search-page/`，完成上面的[环境准备](#环境准备每个工程一次)。
+进入 `ch01/search-page/`，确保已按上面的[环境准备](#环境准备)装好 uv。
 
 ### 启动
 
 ```bash
-python -m uvicorn server:app --host 127.0.0.1 --port 8000
+uv run --frozen uvicorn server:app --host 127.0.0.1 --port 8000
 ```
 
 浏览器打开 <http://127.0.0.1:8000/> 就是同源搜索页（页面和接口是同一个地址）。首次启动会自动建库并播种 `questions.db`（已被 `.gitignore` 忽略）。改完代码**先停止再重启**（不要用 `--reload`）。
@@ -115,12 +103,12 @@ python -m uvicorn server:app --host 127.0.0.1 --port 8000
 
 ### 自检
 
-保持服务运行，**另开一个终端**，激活同一环境、在 `search-page` 目录下：
+保持服务运行，**另开一个终端**，在 `search-page` 目录下：
 
 ```bash
-python check_page.py
+uv run --frozen python check_page.py
 # 若服务开在别的端口：
-python check_page.py --base-url http://127.0.0.1:8001 --timeout 3
+uv run --frozen python check_page.py --base-url http://127.0.0.1:8001 --timeout 3
 ```
 
 自检会先把故障模式复位为 `normal`，共 11 项，全部通过退出码为 0，否则为 1。
