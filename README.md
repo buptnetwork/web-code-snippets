@@ -12,7 +12,6 @@
 | `lesson00/` | 课前课 Python 素材:注解/装饰器演示、调用栈与 traceback、`mini/` 迷你分层示例、`demo_server.py` |
 | `ch01/first-api/` | **当前第 1 课**：列表起始版、详情骨架、M0 参考、黑盒自检与教师对照 |
 | `ch01/m0-tracer/` | 历史「请求全链路」示例与取证脚本；不作为新版 M0 |
-| `external.ts` | Slidev 代码外置导入(`<<<`)的 TypeScript region 示例 |
 
 ## first-api：当前第 1 课
 
