@@ -11,7 +11,6 @@
 |---|---|
 | `lesson00/` | 课前课 Python 素材:注解/装饰器演示、调用栈与 traceback、`mini/` 迷你分层示例、`demo_server.py` |
 | `ch01/first-api/` | **当前第 1 课**：列表起始版、详情骨架、M0 参考、黑盒自检与教师对照 |
-| `ch01/m0-tracer/` | 历史「请求全链路」示例与取证脚本；不作为新版 M0 |
 
 ## first-api：当前第 1 课
 
@@ -43,7 +42,7 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000
 | `check_m0.py` | 学生会运行、会读结果；内部为黑盒 |
 | `verify_examples.py` | 教师真实回环 HTTP 验证器，不要求学生编写或解释 |
 
-所有阶段均用 `main:app`，由工作目录区分。切换前停止旧服务；**不用 `--reload`，修改后停止、重启再访问**。不关闭未知端口进程。教师切入实验目录时也先激活本包环境，不从旧 m0-tracer 导入任何实现。
+所有阶段均用 `main:app`，由工作目录区分。切换前停止旧服务；**不用 `--reload`，修改后停止、重启再访问**。不关闭未知端口进程。教师切入实验目录时也先激活本包环境。
 
 ### M0 契约与自检
 
@@ -80,27 +79,6 @@ uv run --frozen python verify_examples.py
 验证器仅启停自己的回环子进程，临时构造的缺陷不修改学生文件。10 个测试覆盖参考与 CLI、起始版、骨架失败、无注解、两种404与422入口、null／{}错误200、写死详情、改值重启恢复、自检边界与调试配置。配置静态检查不替代 IDE、浏览器视觉或课堂试讲。
 
 第 2 课 SQLite／搜索分页／同源页面起点包**尚未制作**，不算 M0 欠账。当前源码与课件用同一份 region；本轮尚未同步到远端 snippets 仓库。
-
-## 历史资产：m0-tracer
-
-以下只用于重现旧课堂，不是新版第一课任务。旧数据库／SQL／request-id／四处取证与旧自检，不能叠加到 first-api 的 M0。
-
-在 `ch01/m0-tracer/` 目录下执行,要求 Python 3.12 与 [uv](https://docs.astral.sh/uv/):
-
-```bash
-uv sync --frozen
-uv run python seed.py                                   # 初始化演示用 SQLite
-uv run uvicorn v1_ai_raw:app --host 127.0.0.1 --port 8000
-```
-
-- `v1_ai_raw:app`:能运行的反例(拼接 SQL、详情不存在仍返回 200)。
-- `v2_traceable:app`:旧课堂目标,支持 `TRACE_MODE=plain|trace`、`SQL_ECHO=1` 等开关。
-- `v3_m0:app`:旧 M0 参考实现。
-- `verify_m0.py` / `bench.py` / `capture_evidence.py`:验收、并发与取证脚本;`make verify` 为默认检查。
-
-复制 `.env.example` 为 `.env` 后,用 `uv run --env-file .env ...` 显式加载。默认数据库为
-`sqlite:///./demo.db`,结构与固定虚构数据见 `seed.sql` / `seed.py`;复位执行
-`uv run python seed.py --reset`。
 
 ## 说明
 
