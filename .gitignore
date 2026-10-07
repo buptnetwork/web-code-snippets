@@ -16,6 +16,10 @@ ch01/m0-tracer/.capture/
 # 课前课代码素材运行产物
 lesson00/todos.json
 
+# 第二次课起点包运行产物（SQLite 数据库与服务日志）
+ch01/search-page/*.db
+ch01/search-page/*.log
+
 # IDE / 系统
 .idea/
 .DS_Store

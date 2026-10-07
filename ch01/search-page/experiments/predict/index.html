@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>预测实验 · 拿掉 HTTP 判断</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="./predict.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>预测实验：先暂时拿掉 HTTP 判断</h1>
+    <p>隔离实验页，与最终搜索页分开。片段<b>不检查 <code>res.ok</code>、不检查数据结构、不渲染列表</b>。</p>
+    <p>先在纸上写下预测，再切换教师故障模式，然后点击运行对照：</p>
+    <ol>
+      <li>后端返回 <b>500 ＋ 合法 JSON</b>：会进入 <code>catch</code> 吗？状态文字是什么？</li>
+      <li>后端返回 <b>500 ＋ HTML</b>：结果如何变化？失败发生在获得响应之前，还是读取／解析正文时？</li>
+    </ol>
+    <button id="run" type="button">运行预测片段</button>
+    <p id="predict-status" role="status">尚未运行</p>
+    <p class="hint">结果同时打印到 Console。本页只证明「同样的 500，正文格式不同会走不同分支」，不能据此说 fetch 会自动拒绝 500。</p>
+  </main>
+</body>
+</html>

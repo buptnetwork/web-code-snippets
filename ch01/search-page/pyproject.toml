@@ -1,0 +1,15 @@
+[project]
+name = "search-page"
+version = "1.0.0"
+description = "第 2 课：SQLite 搜索分页接口与同源四态搜索页起点包"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.141.1",
+  "uvicorn==0.53.0",
+]
+
+[dependency-groups]
+dev = ["debugpy==1.8.22"]
+
+[tool.uv]
+package = false
