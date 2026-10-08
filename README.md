@@ -9,6 +9,7 @@
 | `lesson00/` | 课前课 | Python 注解／装饰器演示、调用栈与 traceback 样本、`mini/` 迷你分层示例、`demo_server.py` |
 | `ch01/first-api/` | 第 1 课 | 从列表接口到补详情，含 M0 自检 |
 | `ch01/search-page/` | 第 2 课 | 搜索分页接口 ＋ 同源四态搜索页，含黑盒自检 |
+| `ch02/question-api/` | 第 3 课 | 用 Pydantic 声明输入／输出模型，补一个带校验的创建接口，含黑盒自检 |
 
 ## 环境准备（每个工程一次）
 
@@ -149,6 +150,57 @@ curl -X POST http://127.0.0.1:8000/__teacher/fault \
 | `struct200` | 200 ＋ `{"items":null}` | error |
 
 一次只开一种，练完记得复位 `normal`。也可用环境变量覆盖：`FAULT_MODE`（启动即生效）、`DELAY_SECONDS`、`DB_PATH`。「网络失败」这一种用浏览器的 Offline 制造，不在上面的模式里。
+
+---
+
+## 第 3 课 · question-api
+
+进入 `ch02/question-api/`，完成上面的[环境准备](#环境准备每个工程一次)。
+
+### 启动
+
+```bash
+python -m uvicorn server:app --host 127.0.0.1 --port 8000
+```
+
+浏览器打开 <http://127.0.0.1:8000/> 是第 2 课的同源搜索页，本课用它回归读取接口没有退化。首次启动会自动建库、给旧库补 `tags`／`created_at` 两列并播种 `questions.db`（已被 `.gitignore` 忽略）。改完代码**先停止再重启**（不要用 `--reload`）。
+
+### 文件说明
+
+| 目录／文件 | 怎么用 |
+|---|---|
+| `server.py` | **你的工作文件**：列表／详情／存活探针／同源页面已给好；只在 `region task` 内按字段契约补齐 `QuestionCreate`，并把 `create_question` 接线到服务层 |
+| `models.py` | 输出模型 `QuestionOut`／`QuestionListOut`，课堂要求解释，不用改 |
+| `question_db.py` | 数据层（连接、建库升级、参数化查询与插入骨架），课堂当黑盒或按讲解阅读 |
+| `service.py` | 创建服务模板 `create_question_service`（先验证再显式 commit，重复标题映射为 `DuplicateTitle`），本课要求会用，别把 commit 挪走 |
+| `reference/server.py` | 完整答案（`QuestionCreate` 与创建接线都补齐），自己写完再对照 |
+| `experiments/output_probe.py` | 课堂输出对照实验，用 `PROBE_MODE` 选 normal／missing／extra／direct 四模式 |
+| `static/` | 同源页面骨架、样式与脚本，直接用 |
+| `check_api.py` | 自检脚本，你会运行并读它的结果 |
+
+### 接口
+
+- `GET /questions?keyword=...&page=1&page_size=20` → `{"items":[...],"total":N,"page":N}`，记录在第 2 课基础上新增 `tags`（列表）与 `created_at`（带时区时间字符串）。
+- `GET /questions/{qid}` → 命中 200、不存在 404、路径不是整数 422；`/healthz` → `{"status":"ok"}`。
+- `POST /questions`（你要补的接口）→ 合法输入 201，返回记录并带指向详情的 `Location` 头；标题重复 409；字段越界或缺必填 422。
+
+创建输入的字段契约：`title` 去首尾空白后长度 5–200、`body` 去首尾空白后长度 10–20000、`tags` 可省默认空列表且最多 5 个；`id`／`created_at` 由服务端生成，客户端填写会被拒绝。
+
+### 自检
+
+保持服务运行，**另开一个终端**，激活同一环境、在 `question-api` 目录下：
+
+```bash
+python check_api.py
+# 若服务开在别的端口：
+python check_api.py --base-url http://127.0.0.1:8001 --timeout 3
+```
+
+自检前会先调用教师复位端点把库还原成固定三条，可重复运行，共 23 项，全部通过退出码为 0，否则为 1。**`region task` 还没补齐时，创建类检查不通过是正常的。**
+
+### 在 IDE 里调试
+
+打开 `question-api` 文件夹，解释器选本工程的 `.venv`，`.vscode/launch.json` 已给好三条配置：起点包服务（`server:app`）、完整参考对照（`reference.server:app`）、输出对照实验（`experiments.output_probe:app`，默认 `PROBE_MODE=missing`）。在 `server.py` 的列表或创建函数第一行下断点，先发一次合法请求确认断点有效，再发 `page=0` 观察 422 时函数第一行不执行。启动调试前先停掉占用同端口的终端服务。
 
 ---
 
