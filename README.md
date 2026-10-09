@@ -10,6 +10,7 @@
 | `ch01/first-api/` | 第 1 课 | 从列表接口到补详情，含 M0 自检 |
 | `ch01/search-page/` | 第 2 课 | 搜索分页接口 ＋ 同源四态搜索页，含黑盒自检 |
 | `ch02/question-api/` | 第 3 课 | 用 Pydantic 声明输入／输出模型，补一个带校验的创建接口，含黑盒自检 |
+| `ch02/lesson-04/question-api/` | 第 4 课 | 把连接收进 `yield` 依赖、服务层显式提交，统一四字段错误出口与 request-id，分 R／E 两阶段，含黑盒自检 |
 
 ## 环境准备（每个工程一次）
 
@@ -201,6 +202,83 @@ python check_api.py --base-url http://127.0.0.1:8001 --timeout 3
 ### 在 IDE 里调试
 
 打开 `question-api` 文件夹，解释器选本工程的 `.venv`，`.vscode/launch.json` 已给好三条配置：起点包服务（`server:app`）、完整参考对照（`reference.server:app`）、输出对照实验（`experiments.output_probe:app`，默认 `PROBE_MODE=missing`）。在 `server.py` 的列表或创建函数第一行下断点，先发一次合法请求确认断点有效，再发 `page=0` 观察 422 时函数第一行不执行。启动调试前先停掉占用同端口的终端服务。
+
+---
+
+## 第 4 课 · question-api（依赖注入与统一错误）
+
+进入 `ch02/lesson-04/question-api/`，完成上面的[环境准备](#环境准备每个工程一次)。
+
+第 4 课在第 3 课的真实 SQLite 三端点之上，把重复的连接获取收进一个 `yield` 依赖，并把约定范围内的错误迁到统一出口。分两个阶段：**R（资源重构）**保持第 3 课已验收契约不变，**E（错误与观测升级）**才把错误正文改成四字段并加 request-id 与数据库探针。
+
+### 启动
+
+```bash
+# R 阶段：你的工作文件（连接依赖 + 服务层显式提交）
+python -m uvicorn server:app --host 127.0.0.1 --port 8000
+
+# E 阶段：完整参考对照（统一错误出口 + request-id + 升级探针）
+python -m uvicorn reference.server:app --host 127.0.0.1 --port 8000
+```
+
+浏览器打开 <http://127.0.0.1:8000/> 仍是第 2 课的同源搜索页，用于回归读取接口没有退化。首次启动会自动建库、给旧库补 `tags`／`created_at` 两列并播种 `questions.db`（已被 `.gitignore` 忽略）。改完代码**先停止再重启**（不要用 `--reload`）。
+
+### 文件说明
+
+| 目录／文件 | 怎么用 |
+|---|---|
+| `server.py` | **你的工作文件（R 阶段）**：`get_conn` 连接依赖已给好；把列表／创建／详情三端点接到依赖与服务层，保持第 3 课的状态码、字段与 `{"detail": ...}` 错误正文 |
+| `models.py` | 输入／输出模型沿用第 3 课；新增 `AppError` 家族、集中的 `BUSINESS_HTTP` 映射与四字段 `ErrorOut`，课堂要求解释，不用改 |
+| `service.py` | `create_question_service`（沿用第 3 课，先验证再显式 commit）与 `get_question_service`（找不到抛 `QuestionNotFound`）；别把 commit 挪走 |
+| `service_fault.py` | 教师隔离故障副本 `create_with_fault`，黑盒，用来对照提交前后失败的数据去留 |
+| `question_db.py` | 数据层，与第 3 课逐字一致，课堂当黑盒或按讲解阅读 |
+| `reference/server.py` | E 阶段完整答案（统一错误处理器、request-id 中间件、升级 `healthz`、`make_application` 装配），自己写完再对照 |
+| `experiments/dependency_probe.py` | 依赖生命周期探针，用日志显示连接何时开／用／关、依赖何时退出 |
+| `static/` | 同源页面骨架、样式与脚本，直接用 |
+| `check_api.py` | 自检脚本（第 3 课 23 项契约回归），你会运行并读它的结果 |
+
+### 接口
+
+- **R 阶段**：三端点的方法、路径、参数、校验、成功字段与第 3 课完全一致；404／409 仍是 `{"detail": ...}`，`/healthz` 仍是 200 `{"status":"ok"}`（不查数据库）。
+- **E 阶段（reference）**：普通 JSON 错误统一为四字段 `{"code","message","detail","request_id"}`；响应带 `X-Request-ID` 头（客户端可传合法 id，否则框架生成）；`/healthz` 增加数据库检查，可用 200 `status=ok`、数据库不可用 503 `status=degraded`（正文仍只含 `status`）。
+
+### 自检
+
+保持 **R 阶段** 服务运行，**另开一个终端**，激活同一环境、在 `question-api` 目录下：
+
+```bash
+python check_api.py
+# 若服务开在别的端口：
+python check_api.py --base-url http://127.0.0.1:8001 --timeout 3
+```
+
+自检前会先调用教师复位端点把库还原成固定三条，可重复运行，共 23 项，全部通过退出码为 0，否则为 1。**R 阶段只重构资源与职责，第 3 课契约必须全过**；四字段错误是 E 阶段（reference）才引入的、经批准的破坏性变更，不用它来要求 R 阶段。
+
+### 课堂练习：切换事务故障
+
+故障开关在教师副本上，一次只开一种模式，用另开连接查本次标题核对数据去留：
+
+```bash
+# 提交前失败：500，且查不到本次记录
+curl -X POST 'http://127.0.0.1:8000/__teacher/fault-create?fault=before_commit' \
+  -H 'Content-Type: application/json' -d '{"title":"提交前故障样本","body":"0123456789"}'
+
+# 提交确认后失败：500，但本次记录仍在
+curl -X POST 'http://127.0.0.1:8000/__teacher/fault-create?fault=after_commit' \
+  -H 'Content-Type: application/json' -d '{"title":"提交后故障样本","body":"0123456789"}'
+```
+
+| fault | 注入点 | HTTP | 另开连接查本次标题 |
+|---|---|---|---|
+| `normal` | 不注入 | 201 | 一条完整记录 |
+| `before_commit` | INSERT／回读成功、commit 尚未调用 | 500 | 没有本次记录 |
+| `after_commit` | commit 已确认返回后 | 500 | 本次记录仍在 |
+
+标题不能与已有记录重复；**不能用同一事务内能看见数据来证明提交**，必须独立连接核对。
+
+### 在 IDE 里调试
+
+打开 `question-api` 文件夹，解释器选本工程的 `.venv`，`.vscode/launch.json` 已给好三条配置：R 阶段服务（`server:app`）、E 阶段完整参考（`reference.server:app`）、依赖生命周期探针（`experiments.dependency_probe:app`，端口 8002）。在 `server.py` 的 `get_conn` 获取处、`yield` 之后的 `finally`、以及服务层 `commit` 前后分别下断点，发一次合法创建，核对「获取连接 → 端点 → 服务提交 → 发送响应 → 依赖 finally 关闭」的顺序。启动调试前先停掉占用同端口的终端服务。
 
 ---
 

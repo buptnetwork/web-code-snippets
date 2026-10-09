@@ -1,0 +1,22 @@
+/* 第 2 课给定样式（要求会用）：只保证可读与四态可辨，不考 CSS 布局。 */
+:root { color-scheme: light; }
+body { margin: 0; font: 16px/1.6 system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; color: #173344; background: #fbfcfd; }
+main { max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; }
+h1 { font-size: 26px; margin: 0 0 20px; }
+
+#search-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+#search-form label { font-weight: 650; }
+#keyword { flex: 1 1 220px; padding: 9px 12px; font-size: 16px; border: 1px solid #c8dce0; border-radius: 8px; }
+button { padding: 9px 18px; font-size: 16px; border: 0; border-radius: 8px; background: #12958e; color: #fff; cursor: pointer; }
+button:disabled, #keyword:disabled { opacity: .55; cursor: not-allowed; }
+
+#status { margin: 20px 0 8px; font-size: 15px; color: #465e6a; }
+#status[data-state="loading"] { color: #0369a1; }
+#status[data-state="success"] { color: #087b76; }
+#status[data-state="empty"] { color: #a16207; }
+#status[data-state="error"] { color: #be123c; }
+
+#results { list-style: none; margin: 0; padding: 0; }
+#results li { border: 1px solid #dce5e9; border-radius: 10px; padding: 14px 16px; margin: 10px 0; background: #fff; }
+#results h2 { font-size: 18px; margin: 0 0 6px; }
+#results p { margin: 0; color: #465e6a; }
