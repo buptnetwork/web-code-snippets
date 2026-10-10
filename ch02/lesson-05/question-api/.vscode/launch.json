@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "第 5 课：SSR 服务（你的工作文件）",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["ssr:app", "--host", "127.0.0.1", "--port", "8000"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "第 5 课：SSR 完整参考（reference）",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["reference.ssr:app", "--host", "127.0.0.1", "--port", "8000"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "第 5 课：三种等待对照（单 worker，端口 8001）",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["wait_lab:app", "--host", "127.0.0.1", "--port", "8001", "--workers", "1"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}

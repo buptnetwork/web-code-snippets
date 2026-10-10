@@ -1,0 +1,30 @@
+<!-- #region list -->
+{% extends "base.html" %}
+{% block title %}问题列表{% endblock %}
+{% block content %}
+<h1>问题列表</h1>
+<form method="get" action="/ui/questions">
+  <label for="keyword">关键词</label>
+  <input id="keyword" name="keyword" value="{{ keyword }}">
+  <input type="hidden" name="page" value="1">
+  <input type="hidden" name="page_size" value="{{ page_size }}">
+  <button type="submit">搜索</button>
+</form>
+<p>共 {{ result.total }} 条，第 {{ result.page }} 页</p>
+<ul>
+{% for q in result.items %}
+  <li><a href="/ui/questions/{{ q.id }}">{{ q.title }}</a><p class="body">{{ q.body }}</p></li>
+{% else %}
+  <li>没有找到相关问题</li>
+{% endfor %}
+</ul>
+<nav aria-label="分页">
+{% if result.page > 1 %}
+  <a href="/ui/questions?{{ {'keyword': keyword, 'page': result.page - 1, 'page_size': page_size} | urlencode }}">上一页</a>
+{% endif %}
+{% if result.page * page_size < result.total %}
+  <a href="/ui/questions?{{ {'keyword': keyword, 'page': result.page + 1, 'page_size': page_size} | urlencode }}">下一页</a>
+{% endif %}
+</nav>
+{% endblock %}
+<!-- #endregion list -->

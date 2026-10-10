@@ -1,0 +1,16 @@
+<!-- #region detail -->
+{% extends "base.html" %}
+{% block title %}{{ q.title }}{% endblock %}
+{% block content %}
+<article>
+  <h1>{{ q.title }}</h1>
+  <p>问题编号：{{ q.id }}</p>
+  <p class="body">{{ q.body }}</p>
+  <ul aria-label="标签">
+  {% for tag in q.tags %}<li>{{ tag }}</li>
+  {% else %}<li>暂无标签</li>{% endfor %}
+  </ul>
+  <time datetime="{{ q.created_at.isoformat() }}">{{ q.created_at.isoformat() }}</time>
+</article>
+{% endblock %}
+<!-- #endregion detail -->

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ q.title }}{% endblock %}
+{% block content %}
+{# 学生任务（底稿 4.4）：完成详情页，替换本 block 内的占位。context 已给 q（QuestionOut）。
+   固定规格：显示 id、标题、完整正文（用 .body 保留换行）、标签与带时区创建时间；标签为空给「暂无标签」。
+   要点：正文不能漏；不重新引入作者字段；不能用固定一条问题冒充详情查询；时间用 q.created_at.isoformat()。
+   继承与布局可自主组织，完整参考见 reference/templates/question_detail.html。 #}
+<h1>{{ q.title }}</h1>
+{% endblock %}

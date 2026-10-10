@@ -1,0 +1,18 @@
+<!-- #region base -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}问答墙{% endblock %}</title>
+  <style>.body { white-space: pre-wrap; }</style>
+</head>
+<body>
+  <nav aria-label="主导航">
+    <a href="/ui/questions">问题列表</a>
+    <a href="/ui/questions/new">发布问题</a>
+  </nav>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>
+<!-- #endregion base -->

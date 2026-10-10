@@ -28,6 +28,10 @@ ch02/question-api/*.log
 ch02/lesson-04/question-api/*.db
 ch02/lesson-04/question-api/*.log
 
+# 第五次课起点包运行产物（SQLite 数据库与服务日志）
+ch02/lesson-05/question-api/*.db
+ch02/lesson-05/question-api/*.log
+
 # IDE / 系统
 .idea/
 .DS_Store

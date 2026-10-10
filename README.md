@@ -11,6 +11,7 @@
 | `ch01/search-page/` | 第 2 课 | 搜索分页接口 ＋ 同源四态搜索页，含黑盒自检 |
 | `ch02/question-api/` | 第 3 课 | 用 Pydantic 声明输入／输出模型，补一个带校验的创建接口，含黑盒自检 |
 | `ch02/lesson-04/question-api/` | 第 4 课 | 把连接收进 `yield` 依赖、服务层显式提交，统一四字段错误出口与 request-id，分 R／E 两阶段，含黑盒自检 |
+| `ch02/lesson-05/question-api/` | 第 5 课 | 在第 4 课 JSON 基线上加 SSR 表单闭环：补校验失败回填函数与列表／详情模板，含黑盒自检与并发对照实验 |
 
 ## 环境准备（每个工程一次）
 
@@ -279,6 +280,86 @@ curl -X POST 'http://127.0.0.1:8000/__teacher/fault-create?fault=after_commit' \
 ### 在 IDE 里调试
 
 打开 `question-api` 文件夹，解释器选本工程的 `.venv`，`.vscode/launch.json` 已给好三条配置：R 阶段服务（`server:app`）、E 阶段完整参考（`reference.server:app`）、依赖生命周期探针（`experiments.dependency_probe:app`，端口 8002）。在 `server.py` 的 `get_conn` 获取处、`yield` 之后的 `finally`、以及服务层 `commit` 前后分别下断点，发一次合法创建，核对「获取连接 → 端点 → 服务提交 → 发送响应 → 依赖 finally 关闭」的顺序。启动调试前先停掉占用同端口的终端服务。
+
+---
+
+## 第 5 课 · question-api（SSR 表单闭环）
+
+进入 `ch02/lesson-05/question-api/`，完成上面的[环境准备](#环境准备每个工程一次)。
+
+第 5 课在第 4 课 E 阶段的 JSON 基线（`api.py`）之上加一层 HTML 表现：同一套 `QuestionCreate` 与创建服务，既服务 JSON 接口，也服务浏览器表单。你的任务是补齐校验失败回填函数与列表／详情两个模板，让「填表 → 发布 → 详情」闭环跑通，并理解一个请求占用了服务器的什么（线程还是事件循环）。本课额外用到 Jinja2 模板与 python-multipart（表单解析），都已在 `uv.lock` 锁定，`uv sync` 会一并装好。
+
+### 启动
+
+```bash
+# 你的工作文件（SSR 表单闭环；补齐前校验失败会落到安全 500）
+python -m uvicorn ssr:app --host 127.0.0.1 --port 8000
+
+# 完整参考对照（校验失败回填 + 列表／详情模板都补齐）
+python -m uvicorn reference.ssr:app --host 127.0.0.1 --port 8000
+
+# JSON 基线回归（第 4 课 E 阶段应用工厂，不挂 HTML 路由）
+python -m uvicorn api:app --host 127.0.0.1 --port 8000
+```
+
+浏览器打开 <http://127.0.0.1:8000/ui/questions> 是问题列表页，`/ui/questions/new` 是发布表单。首次启动会自动建库并播种 `questions.db`（已被 `.gitignore` 忽略）。改完代码**先停止再重启**（不要用 `--reload`）。
+
+### 文件说明
+
+| 目录／文件 | 怎么用 |
+|---|---|
+| `ssr.py` | **你的工作文件**：模板入口、Form 适配、创建端点、读取路由、HTML 错误处理器都已给好；只在 `region task` 内按底稿补齐 `render_validation_failure`（校验失败带原值回填） |
+| `templates/question_list.html`、`templates/question_detail.html` | **你要完成的两个模板**：已给继承骨架与任务注释，按固定规格补齐列表循环／空态与详情五字段 |
+| `templates/base.html`、`templates/question_form.html` | 共同骨架与创建表单，教师提供，直接用，不用改 |
+| `reference/ssr.py`、`reference/templates/` | 完整答案（回填函数与两个模板都补齐），自己写完再对照，用 `reference.ssr:app` 启动 |
+| `api.py` | 第 4 课 E 阶段完整应用工厂（`make_application` 与 `ConnDep`），SSR 在它之上装配；也可单独用 `api:app` 回归 JSON |
+| `models.py`、`question_db.py`、`service.py`、`service_fault.py` | 与第 4 课逐字一致，课堂当黑盒，别把 commit 挪出服务层 |
+| `wait_lab.py`、`concurrency.py` | 并发对照实验：`wait_lab` 三个各等 1 秒的端点，`concurrency.py` 打六组真实 HTTP 看等待能否重叠（教师设施） |
+| `static/` | 同源页面骨架、样式与脚本，直接用 |
+| `check_ssr.py` | 自检脚本，你会运行并读它的结果 |
+| `verify_examples.py` | 教师设施：起临时服务把上面几项一次性回环验证，学生不用改 |
+
+### 页面与接口
+
+- `GET /ui/questions`：200 列表页，支持 `keyword`／`page`／`page_size`，无匹配也是 200（不是 404）。
+- `GET /ui/questions/new`：200 创建表单，三项输入为空。
+- `GET /ui/questions/{qid}`：200 详情页（五个公开字段），不存在 404、非整数 422，都是 HTML 安全页。
+- `POST /ui/questions`：成功 303，`Location` 指向详情（PRG）；输入非法 422 带原值回填；标题重复 409 回填。
+- JSON 路径（`/questions`、`/questions/{qid}`、`/healthz`）与第 4 课 E 阶段一致，不因浏览器 `Accept` 变 HTML；本课按 `/ui` 路径边界区分表现。
+
+### 自检
+
+保持 SSR 服务运行，**另开一个终端**，激活同一环境、在 `question-api` 目录下：
+
+```bash
+python check_ssr.py
+# 若服务开在别的端口：
+python check_ssr.py --base-url http://127.0.0.1:8001 --timeout 3
+```
+
+自检前会先调用教师复位端点把库还原成固定三条，可重复运行，共 16 项，全部通过退出码为 0，否则为 1。**`region task` 与两个模板还没补齐时，回填／列表／详情相关检查不通过是正常的**；对 `reference.ssr:app` 应全部通过。
+
+### 课堂练习：三种等待方式对照
+
+`wait_lab` 是教师本地隔离实验应用，不挂到 M1 公开工程。**另开一个终端**、单 worker 起在别的端口：
+
+```bash
+python -m uvicorn wait_lab:app --host 127.0.0.1 --port 8001 --workers 1
+# 再回到本目录跑六组（三个端点 × 并发 1／10，每组 10 请求）
+python concurrency.py
+```
+
+| 端点 | 写法 | 并发 10、总数 10 |
+|---|---|---|
+| `/lab/blocking` | `async def` 里直接 `time.sleep` | 约 10 秒（阻塞事件循环，等待不重叠） |
+| `/lab/awaiting` | `await asyncio.sleep` | 约 1 秒（可挂起，等待重叠） |
+| `/lab/threaded` | 普通 `def` 里 `time.sleep` | 约 1 秒（框架放线程池，须有足够容量） |
+
+数据只验证「等待能否在同一进程里重叠」，不是生产吞吐或容量报告。
+
+### 在 IDE 里调试
+
+打开 `question-api` 文件夹，解释器选本工程的 `.venv`，`.vscode/launch.json` 已给好三条配置：SSR 工作文件（`ssr:app`）、完整参考（`reference.ssr:app`）、并发实验（`wait_lab:app`，单 worker）。在 `ssr.py` 的 `submit_question_page` 第一行、以及你要补的 `render_validation_failure` 内下断点，先发一次合法创建确认断点有效，再发一次「三字段同时非法」观察 422 回填路径。启动调试前先停掉占用同端口的终端服务。
 
 ---
 

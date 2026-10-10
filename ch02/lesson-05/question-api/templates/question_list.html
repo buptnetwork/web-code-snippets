@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}问题列表{% endblock %}
+{% block content %}
+{# 学生任务（底稿 4.3）：完成列表页，替换本 block 内的占位。
+   context 已给：result（QuestionListOut，含 items/total/page）、keyword、page_size。
+   固定规格：查询关键词输入框、「共 N 条，第 M 页」、每条标题链接到 /ui/questions/<id> 与正文、
+   空结果显示「没有找到相关问题」（200，不是异常）；id 顺序与查询行为与 JSON 对齐。
+   要点：搜索表单用 method="get" action="/ui/questions"；循环用
+   for q in result.items … else … endfor；result.items 是声明的列表字段，不是字典的 items 方法；
+   查询串用 urlencode，分页 nav 由教师提供（完整参考见 reference/templates/question_list.html）。 #}
+<h1>问题列表</h1>
+{% endblock %}
