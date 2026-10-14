@@ -1,0 +1,18 @@
+/* 第 5 课 SSR 页面样式（教师提供 · 要求会用，不考 CSS 布局）。
+   由 base.html 通过 <link rel="stylesheet" href="/static/ui.css"> 引入：
+   HTML 由模板在服务器渲染，本文件是浏览器随后发起的另一次同源请求。
+   数据库、私有配置和上传临时文件都不能放进这个公开静态目录。 */
+:root { color-scheme: light; }
+body { margin: 0; font: 16px/1.6 system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; color: #173344; background: #fbfcfd; }
+nav[aria-label="主导航"] { display: flex; gap: 16px; padding: 12px 20px; border-bottom: 1px solid #e3ebee; background: #fff; }
+nav[aria-label="主导航"] a { color: #0369a1; text-decoration: none; }
+main { max-width: 720px; margin: 0 auto; padding: 24px 20px 64px; }
+h1 { font-size: 24px; margin: 0 0 16px; }
+form { margin: 12px 0; }
+label { display: block; font-weight: 650; margin-top: 8px; }
+input, textarea, select { padding: 8px 10px; font-size: 15px; border: 1px solid #c8dce0; border-radius: 8px; }
+textarea { width: 100%; box-sizing: border-box; min-height: 120px; }
+button { margin-top: 12px; padding: 8px 18px; font-size: 15px; border: 0; border-radius: 8px; background: #12958e; color: #fff; cursor: pointer; }
+[role="alert"] { color: #be123c; }
+ul { padding-left: 22px; }
+.body { white-space: pre-wrap; }
