@@ -1,0 +1,38 @@
+<!-- #region preferences-page -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>显示偏好实验</title>
+  <link rel="stylesheet" href="/static/lab.css">
+</head>
+<body data-theme="{{ theme }}">
+  <main>
+    <h1>显示偏好实验 · /lab/preferences</h1>
+    <div class="result">
+      <p>当前主题：<b>{{ theme }}</b></p>
+      {% if raw is none %}
+      <p>Cookie <code>course_lab_theme</code> 缺失，回退 <code>light</code>。</p>
+      {% elif raw != theme %}
+      <p>Cookie 原始值 <code>{{ raw }}</code> 未知，回退 <code>light</code>（读取端不用严格枚举提前拦截）。</p>
+      {% else %}
+      <p>Cookie 原始值 <code>{{ raw }}</code>，与渲染一致。</p>
+      {% endif %}
+    </div>
+    <form method="post" action="/lab/preferences">
+      <label for="theme">选择主题</label>
+      <select id="theme" name="theme">
+        <option value="light" {% if theme == "light" %}selected{% endif %}>light</option>
+        <option value="dark" {% if theme == "dark" %}selected{% endif %}>dark</option>
+      </select>
+      <button type="submit">保存偏好（303 回本页）</button>
+    </form>
+    <form method="post" action="/lab/preferences/reset">
+      <button type="submit">重置（删除同名同 Path 的 Cookie）</button>
+    </form>
+    <p class="note">Cookie：名称 <code>course_lab_theme</code>，Path=<code>/lab</code>，不设 Domain；HttpOnly、SameSite=Lax、Max-Age=3600，本地 HTTP 用 Secure=False。观察 Network 响应头、Application 存储与后续请求头三处证据。</p>
+  </main>
+</body>
+</html>
+<!-- #endregion preferences-page -->

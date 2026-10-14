@@ -1,0 +1,23 @@
+<!-- #region upload-form -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>文件检查实验</title>
+  <link rel="stylesheet" href="/static/lab.css">
+</head>
+<body>
+  <main>
+    <h1>文件检查实验 · POST /lab/uploads/inspect</h1>
+    <p>同样是 Body，<code>enctype="multipart/form-data"</code> 与 JSON 不是同一种编码：文件与文本在同一次提交里分成多个部分。</p>
+    <form method="post" action="/lab/uploads/inspect" enctype="multipart/form-data">
+      <p><label for="file">选择文件</label><input id="file" type="file" name="file"></p>
+      <p><label for="description">描述（可选）</label><input id="description" type="text" name="description" value=""></p>
+      <button type="submit">上传并检查</button>
+    </form>
+    <p class="note">上限 1 MiB = 1,048,576 字节：恰好上限接受，超过返回 413，缺文件返回 422。服务器只限量读取、计数、关闭，不长期保存、不执行、不开放下载。</p>
+  </main>
+</body>
+</html>
+<!-- #endregion upload-form -->

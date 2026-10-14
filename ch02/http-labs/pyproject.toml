@@ -1,0 +1,17 @@
+[project]
+name = "http-labs"
+version = "1.0.0"
+description = "第 3—5 课隔离教学实验：参数/普通依赖、嵌套输入、文件检查、偏好 Cookie（不接主线数据库，不注册到 M1）"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.141.1",
+  "uvicorn==0.53.0",
+  "jinja2==3.1.6",
+  "python-multipart==0.0.32",
+]
+
+[dependency-groups]
+dev = ["debugpy==1.8.22"]
+
+[tool.uv]
+package = false
