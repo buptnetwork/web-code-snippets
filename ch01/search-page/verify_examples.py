@@ -1,6 +1,6 @@
 """教师设施：真实回环 HTTP 验证第 2 课起点包；不要求学生解释或编写本文件。
 
-覆盖：搜索契约（空/react/无匹配）、详情与 404、参数 422、静态同源页面、
+覆盖：搜索契约（空/react/无匹配）、详情与 404、参数 422、静态与隔离实验页同源、
 六种故障模式、有界延迟、复位、种子幂等与搜索规则、参考页源码结构、调试配置。
 运行（包根，已激活本包环境）：
     python verify_examples.py
@@ -142,6 +142,10 @@ class SearchContractTests(unittest.TestCase):
             p_status, p_media, p_raw = fetch(base, "/experiments/predict/")
             self.assertEqual((p_status, p_media), (200, "text/html"))
             self.assertIn("predict.js", p_raw.decode("utf-8"))
+            # 安全渲染对照页同源可访问
+            r_status, r_media, r_raw = fetch(base, "/experiments/render-safe/")
+            self.assertEqual((r_status, r_media), (200, "text/html"))
+            self.assertIn("render-safe.js", r_raw.decode("utf-8"))
 
 
 class FaultModeTests(unittest.TestCase):
@@ -244,6 +248,14 @@ class FrontendSourceTests(unittest.TestCase):
         self.assertIn("已完成 JSON 解析", predict)
         self.assertIn("进入 catch", predict)
         self.assertNotIn(".ok", code_only(predict))  # 代码故意不检查 res.ok
+
+    def test_render_safe_demo_compares_both_writes(self):
+        demo = (ROOT / "experiments" / "render-safe" / "render-safe.js").read_text(encoding="utf-8")
+        # 对照页故意同时用两种写入方式，且只写无害标签样本
+        self.assertIn("innerHTML", code_only(demo))
+        self.assertIn("textContent", code_only(demo))
+        self.assertIn("<strong>", demo)
+        self.assertNotIn("<script", demo)
 
 
 class ConfigTests(unittest.TestCase):

@@ -26,6 +26,7 @@ import question_store
 ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
 PREDICT_DIR = ROOT / "experiments" / "predict"
+RENDER_DIR = ROOT / "experiments" / "render-safe"
 
 FaultMode = Literal[
     "normal", "delay", "http500_json", "http500_html", "json200_html", "struct200"
@@ -139,7 +140,9 @@ def index():
 
 
 # region mounts
-# 脚本与样式在 /static/*；预测实验页在 /experiments/predict/。
+# 脚本与样式在 /static/*；预测实验页在 /experiments/predict/，
+# 安全渲染对照页在 /experiments/render-safe/。
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/experiments/predict", StaticFiles(directory=PREDICT_DIR, html=True), name="predict")
+app.mount("/experiments/render-safe", StaticFiles(directory=RENDER_DIR, html=True), name="render_safe")
 # endregion mounts

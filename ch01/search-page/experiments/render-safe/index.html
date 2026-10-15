@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>安全渲染对照 · innerHTML 与 textContent</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    h2 { font-size: 17px; margin: 22px 0 6px; }
+    .box { border: 1px solid #dce5e9; border-radius: 10px; padding: 14px 16px; background: #fff; min-height: 24px; }
+  </style>
+  <script src="./render-safe.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>安全渲染对照：同一段字符串，两种写法</h1>
+    <p>隔离演示页，与最终搜索页分开。样本是<b>无害标签</b>，只用来观察浏览器怎么解释它，不是攻击脚本。</p>
+    <p>先说出你预期的差别，再点击运行，然后到 DevTools 里核对：</p>
+    <ol>
+      <li><b>Elements</b>：比较两个容器的子节点，一个是元素节点，一个是文本节点。</li>
+      <li><b>Console</b>：查看两个容器第一个子节点的类型与内容。</li>
+    </ol>
+    <button id="run" type="button">运行对照</button>
+    <p id="render-status" role="status">尚未运行</p>
+    <h2>htmlBox（用 <code>innerHTML</code> 写入）</h2>
+    <div id="html-box" class="box"></div>
+    <h2>textBox（用 <code>textContent</code> 写入）</h2>
+    <div id="text-box" class="box"></div>
+    <p class="hint">本页只证明「写入方式决定浏览器如何解释字符串」。正式搜索页始终把标题与正文写进文本节点；富文本清洗、XSS 攻防不在本课范围。</p>
+  </main>
+</body>
+</html>
