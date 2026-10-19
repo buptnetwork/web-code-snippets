@@ -20,6 +20,7 @@ def create_with_fault(conn, payload, mode):
     if mode not in {"normal", "before_commit", "after_commit"}:
         raise ValueError("未知实验模式")
     try:
+        # region fault-points
         qid = insert_question(conn, payload)
         result = QuestionOut.model_validate(find_question(conn, qid))
         if mode == "before_commit":
@@ -27,6 +28,7 @@ def create_with_fault(conn, payload, mode):
         conn.commit()
         if mode == "after_commit":
             raise RuntimeError("教师实验：提交确认后失败")
+        # endregion fault-points
     except sqlite3.IntegrityError as exc:
         conn.rollback()
         if exc.sqlite_errorcode == sqlite3.SQLITE_CONSTRAINT_UNIQUE:

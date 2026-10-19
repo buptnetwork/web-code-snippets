@@ -110,6 +110,7 @@ class Page:
         return rows[self.offset : self.offset + self.page_size]
 
 
+# region page-provider
 def get_page(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=50),
@@ -119,6 +120,7 @@ def get_page(
 
 
 PageDep = Annotated[Page, Depends(get_page)]
+# endregion page-provider
 # endregion page-dep
 
 

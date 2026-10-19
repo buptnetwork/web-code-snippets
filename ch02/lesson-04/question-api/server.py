@@ -55,6 +55,7 @@ from typing import Annotated, Iterator
 from fastapi import Depends
 
 
+# region conn-provider
 def get_conn() -> Iterator[sqlite3.Connection]:
     # 镜像 open_connection 的三项设置，另加 check_same_thread=False：连接在依赖里获取，
     # 却可能在另一个线程（线程池执行端点、依赖退出）被使用或关闭。
@@ -68,6 +69,7 @@ def get_conn() -> Iterator[sqlite3.Connection]:
 
 
 ConnDep = Annotated[sqlite3.Connection, Depends(get_conn)]
+# endregion conn-provider
 # endregion get-conn
 
 
@@ -84,6 +86,7 @@ def list_questions(
 
 
 # region write-endpoints
+# region r-create
 @app.post("/questions", status_code=201, response_model=QuestionOut,
           responses={409: {"description": "标题已存在"}})
 def create_question(payload: QuestionCreate, response: Response, conn: ConnDep):
@@ -93,8 +96,10 @@ def create_question(payload: QuestionCreate, response: Response, conn: ConnDep):
         raise HTTPException(status_code=409, detail="标题已存在") from exc
     response.headers["Location"] = f"/questions/{result.id}"
     return result
+# endregion r-create
 
 
+# region r-detail
 @app.get("/questions/{qid}", response_model=QuestionOut,
          responses={404: {"description": "问题不存在"}})
 def get_question(qid: int, conn: ConnDep):
@@ -102,6 +107,7 @@ def get_question(qid: int, conn: ConnDep):
     if result is None:
         raise HTTPException(status_code=404, detail="问题不存在")
     return result
+# endregion r-detail
 # endregion write-endpoints
 
 

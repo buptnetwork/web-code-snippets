@@ -94,6 +94,7 @@ def error_response(request, status, code, message, detail=None, headers=None):
 
 # region register-handlers
 def register_handlers(app):
+    # region unexpected-handler
     @app.exception_handler(Exception)
     async def unexpected(request: Request, exc: Exception):
         # 只记录异常类型，不把可能含请求正文的异常字符串投影给客户端。
@@ -101,7 +102,9 @@ def register_handlers(app):
                                  "request_id": getattr(request.state, "request_id", "-")},
                                 ensure_ascii=False))
         return error_response(request, 500, "internal_error", "服务暂时不可用")
+    # endregion unexpected-handler
 
+    # region business-handler
     @app.exception_handler(AppError)
     async def business(request: Request, exc: AppError):
         mapping = BUSINESS_HTTP.get(type(exc))
@@ -109,22 +112,28 @@ def register_handlers(app):
             return await unexpected(request, exc)
         status, code, message = mapping
         return error_response(request, status, code, message)
+    # endregion business-handler
 
+    # region validation-handler
     @app.exception_handler(RequestValidationError)
     async def validation(request: Request, exc: RequestValidationError):
         details = [{"loc": list(error["loc"]), "type": error["type"],
                     "msg": "该字段不符合接口约束"} for error in exc.errors()]
         return error_response(request, 422, "validation_error", "请求参数不合法", details)
+    # endregion validation-handler
 
+    # region framework-handler
     @app.exception_handler(StarletteHTTPException)
     async def framework_http(request: Request, exc: StarletteHTTPException):
         # 覆盖框架未知路径 404 与方法不符 405；保留 Allow 等必要响应头。
         return error_response(request, exc.status_code, f"http_{exc.status_code}",
                               str(exc.detail), headers=getattr(exc, "headers", None))
+    # endregion framework-handler
 # endregion register-handlers
 
 
 # region register-trace
+# region trace-enter
 def register_trace(app):
     @app.middleware("http")
     async def trace(request: Request, call_next):
@@ -135,6 +144,8 @@ def register_trace(app):
         outcome = "error"
         logger.info(json.dumps({"event": "request_start", "request_id": rid,
                                 "method": request.method}, ensure_ascii=False))
+        # endregion trace-enter
+        # region trace-leave
         try:
             response = await call_next(request)
             outcome = response.status_code
@@ -145,6 +156,7 @@ def register_trace(app):
                 "event": "request_end", "request_id": rid, "outcome": outcome,
                 "duration_ms": round((time.perf_counter() - started) * 1000, 1),
             }, ensure_ascii=False))
+        # endregion trace-leave
 # endregion register-trace
 
 
