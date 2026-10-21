@@ -1,7 +1,7 @@
 """教师设施：真实回环 HTTP 验证第 3 课起点包；不要求学生解释或编写本文件。
 
 覆盖：完整参考应用的列表／详情／创建契约、三组边界、SQL 字面匹配与注入样本、
-四种输出对照模式、种子幂等与升级、起点留白与参考源码结构、调试配置。
+四种输出对照模式、Pydantic 字段语义与 OpenAPI 文档、种子幂等与升级、起点留白与参考源码结构、调试配置。
 默认验证 reference.server:app（完整答案）；学生 server.py 的创建接口在补齐前不通过自检属正常。
 运行（包根，已激活本包环境）：
     python verify_examples.py
@@ -22,6 +22,8 @@ import unittest
 from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import ProxyHandler, Request, build_opener
+
+from pydantic import BaseModel, Field, ValidationError, create_model
 
 from check_api import (
     ALL_RECORDS,
@@ -207,6 +209,112 @@ class CreateContractTests(unittest.TestCase):
             self.assertEqual(request(base, "/questions?keyword=" + quote(injection))[2]["total"], 0)
             _, _, listing, _ = request(base, "/questions?keyword=")
             self.assertEqual(listing["total"], 3)
+
+
+class ModelBackgroundTests(unittest.TestCase):
+    """核对正文新增背景页的模型实例、序列化、默认值和清洗语义。"""
+
+    def test_model_instance_and_serialization(self):
+        class QuestionTitle(BaseModel):
+            title: str = Field(min_length=5, max_length=200)
+
+        data = {"title": "FastAPI 参数从哪里来"}
+        payload = QuestionTitle.model_validate(data)
+        self.assertIsInstance(payload, QuestionTitle)
+        self.assertEqual(payload.title, data["title"])
+        self.assertEqual(payload.model_dump(), data)
+        self.assertIsInstance(payload.model_dump_json(), str)
+        self.assertEqual(json.loads(payload.model_dump_json()), data)
+        with self.assertRaises(ValidationError):
+            QuestionTitle.model_validate({"title": "abcd"})
+
+    def test_missing_and_null_are_independent(self):
+        cases = (
+            ("title", str, ..., False, False),
+            ("tags", list[str], Field(default_factory=list), True, False),
+            ("note", str | None, ..., False, True),
+            ("note", str | None, None, True, True),
+        )
+        for name, annotation, default, missing_ok, null_ok in cases:
+            model = create_model("FieldExample", **{name: (annotation, default)})
+            for data, accepted in (({}, missing_ok), ({name: None}, null_ok)):
+                with self.subTest(name=name, data=data, missing_ok=missing_ok):
+                    if accepted:
+                        value = getattr(model.model_validate(data), name)
+                        self.assertEqual(value, [] if name == "tags" else None)
+                    else:
+                        with self.assertRaises(ValidationError):
+                            model.model_validate(data)
+            if name == "tags":
+                self.assertIsNot(model().tags, model().tags)
+
+    def test_cleaning_precedes_constraints(self):
+        from reference.server import QuestionCreate
+
+        for title, error_type in (("  abcd  ", "string_too_short"),
+                                  (12345, "string_type"), (None, "string_type")):
+            with self.subTest(title=title), self.assertRaises(ValidationError) as raised:
+                QuestionCreate.model_validate({"title": title, "body": "0123456789"})
+            error = raised.exception.errors()[0]
+            self.assertEqual((error["loc"], error["type"]), (("title",), error_type))
+        payload = QuestionCreate.model_validate({"title": "  abcde  ", "body": "  0123456789  "})
+        self.assertEqual((payload.title, payload.body, payload.tags), ("abcde", "0123456789", []))
+
+
+class DeclarationEvidenceTests(unittest.TestCase):
+    """以真实 HTTP 和生成的文档核对声明，而不依赖文档 UI。"""
+
+    def test_query_four_inputs_and_endpoint_log(self):
+        with server() as (base, log_path):
+            for suffix, page in (("", 1), ("?page=2", 2)):
+                status, _, body, _ = request(base, "/questions" + suffix)
+                self.assertEqual((status, body["page"]), (200, page))
+            for value, error_type in (("abc", "int_parsing"), ("0", "greater_than_equal")):
+                status, _, body, _ = request(base, "/questions?page=" + value)
+                self.assertEqual(status, 422)
+                error = body["detail"][0]
+                self.assertEqual(error["loc"], ["query", "page"])
+                self.assertEqual(error["type"], error_type)
+                self.assertEqual(error["input"], value)
+                if value == "0":
+                    self.assertEqual(error["ctx"], {"ge": 1})
+            self.assertEqual(log_path.read_text(encoding="utf-8").count("进入列表端点"), 2)
+
+    def test_openapi_query_parameter(self):
+        from reference.server import app
+
+        document = app.openapi()
+        self.assertEqual(document["openapi"], "3.1.0")
+        parameters = document["paths"]["/questions"]["get"]["parameters"]
+        page = next(item for item in parameters if item["name"] == "page")
+        self.assertEqual(page["in"], "query")
+        self.assertIs(page["required"], False)
+        schema = page["schema"]
+        self.assertEqual((schema["type"], schema["minimum"], schema["default"]), ("integer", 1, 1))
+
+    def test_openapi_model_references_and_runtime_default(self):
+        from reference.server import app, QuestionCreate
+
+        document = app.openapi()
+        post = document["paths"]["/questions"]["post"]
+        request_schema = post["requestBody"]["content"]["application/json"]["schema"]
+        response_schema = post["responses"]["201"]["content"]["application/json"]["schema"]
+        self.assertEqual(request_schema["$ref"], "#/components/schemas/QuestionCreate")
+        self.assertEqual(response_schema["$ref"], "#/components/schemas/QuestionOut")
+        self.assertEqual(post["responses"]["409"]["description"], "标题已存在")
+        schemas = document["components"]["schemas"]
+        model = schemas["QuestionCreate"]
+        self.assertEqual(model["required"], ["title", "body"])
+        self.assertIs(model["additionalProperties"], False)
+        title = model["properties"]["title"]
+        self.assertEqual((title["type"], title["minLength"], title["maxLength"]), ("string", 5, 200))
+        tags = model["properties"]["tags"]
+        self.assertEqual((tags["type"], tags["maxItems"]), ("array", 5))
+        self.assertNotIn("default", tags)
+        payload = QuestionCreate.model_validate({"title": "合法标题足够长", "body": "0123456789"})
+        self.assertEqual(payload.tags, [])
+        items = schemas["QuestionListOut"]["properties"]["items"]
+        self.assertEqual(items["items"]["$ref"], "#/components/schemas/QuestionOut")
 
 
 class OutputProbeTests(unittest.TestCase):
