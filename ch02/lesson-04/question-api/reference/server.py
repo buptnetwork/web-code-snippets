@@ -5,6 +5,7 @@
 - 错误正文迁移为四字段 ErrorOut（批准的对第 3 课 {"detail": ...} 的破坏性变更）；
 - register_trace 中间件生成／透传 request-id，并记录 request_start／request_end 结构化日志；
 - healthz 升级为真实探针：数据库可用 ok，不可用 degraded + 503，与业务共享同一捕获范围；
+- 路由用 @router.get / @router.post 装饰器声明，make_application 通过 include_router 接入新应用；
 - make_application 新建实例替换 R 应用：处理器 → trace → 路由 → 静态挂载。
 
 运行对照（包根，已激活本包环境）：
@@ -22,7 +23,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Annotated, Iterator, Literal
 
-from fastapi import Depends, FastAPI, Query, Request, Response
+from fastapi import APIRouter, Depends, FastAPI, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -46,10 +47,18 @@ logger = logging.getLogger("question_api")
 # OpenAPI 文档声明：所有响应都带 X-Request-ID 头，普通 JSON 错误统一为四字段 ErrorOut。
 REQUEST_ID_HEADER = {"schema": {"type": "string"}, "description": "关联本次请求的 id，可由客户端提供或框架生成"}
 API_ERROR_RESPONSES = {status: {"model": ErrorOut} for status in (404, 405, 409, 422, 500)}
+OK_RESPONSES = {200: {"headers": {"X-Request-ID": REQUEST_ID_HEADER}}}
+CREATED_RESPONSES = {
+    201: {"headers": {"X-Request-ID": REQUEST_ID_HEADER, "Location": {"schema": {"type": "string"}}}}
+}
 
 ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = ROOT / "static"
 # endregion imports
+
+
+# 装饰器先把端点注册到路由器，应用工厂再将路由器挂到新建的应用。
+router = APIRouter()
 
 
 # region logging
@@ -161,6 +170,8 @@ def register_trace(app):
 
 
 # region endpoints
+@router.get("/questions", response_model=QuestionListOut,
+            responses={**OK_RESPONSES, **API_ERROR_RESPONSES})
 def list_questions(
     conn: ConnDep,
     keyword: str = Query(""),
@@ -172,18 +183,23 @@ def list_questions(
 
 
 # region e-write-endpoints
+@router.post("/questions", status_code=201, response_model=QuestionOut,
+             responses={**CREATED_RESPONSES, **API_ERROR_RESPONSES})
 def create_question(payload: QuestionCreate, response: Response, conn: ConnDep):
     result = create_question_service(conn, payload)
     response.headers["Location"] = f"/questions/{result.id}"
     return result
 
 
+@router.get("/questions/{qid}", response_model=QuestionOut,
+            responses={**OK_RESPONSES, **API_ERROR_RESPONSES})
 def get_question(qid: int, conn: ConnDep):
     return get_question_service(conn, qid)
 # endregion e-write-endpoints
 
 
 # region fault-endpoint
+@router.post("/__teacher/fault-create", status_code=201, response_model=QuestionOut)
 def fault_create(payload: QuestionCreate, conn: ConnDep, fault: str = Query("normal")):
     return create_with_fault(conn, payload, fault)
 # endregion fault-endpoint
@@ -194,6 +210,8 @@ class HealthOut(BaseModel):
     status: Literal["ok", "degraded"]
 
 
+@router.get("/healthz", response_model=HealthOut,
+            responses={503: {"description": "数据库不可用", "model": HealthOut}})
 def healthz():
     try:
         with closing(open_connection()) as conn:
@@ -206,11 +224,13 @@ def healthz():
 
 
 # region teacher
+@router.post("/__teacher/reset")
 def reset():
     reset_db()
     return {"status": "reset", "count": 3}
 
 
+@router.get("/")
 def index():
     return FileResponse(STATIC_DIR / "index.html")
 # endregion teacher
@@ -223,25 +243,7 @@ def make_application() -> FastAPI:
     application = FastAPI(debug=False)
     register_handlers(application)
     register_trace(application)
-    ok = {200: {"headers": {"X-Request-ID": REQUEST_ID_HEADER}}}
-    application.add_api_route(
-        "/questions", list_questions, methods=["GET"],
-        response_model=QuestionListOut, responses={**ok, **API_ERROR_RESPONSES})
-    application.add_api_route(
-        "/questions/{qid}", get_question, methods=["GET"],
-        response_model=QuestionOut, responses={**ok, **API_ERROR_RESPONSES})
-    application.add_api_route(
-        "/questions", create_question, methods=["POST"], status_code=201,
-        response_model=QuestionOut,
-        responses={201: {"headers": {"X-Request-ID": REQUEST_ID_HEADER, "Location": {"schema": {"type": "string"}}}},
-                   **API_ERROR_RESPONSES})
-    application.add_api_route(
-        "/healthz", healthz, methods=["GET"], response_model=HealthOut,
-        responses={503: {"description": "数据库不可用", "model": HealthOut}})
-    application.add_api_route("/__teacher/reset", reset, methods=["POST"])
-    application.add_api_route("/__teacher/fault-create", fault_create, methods=["POST"],
-                              status_code=201, response_model=QuestionOut)
-    application.add_api_route("/", index, methods=["GET"])
+    application.include_router(router)
     application.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return application
 # endregion make-application

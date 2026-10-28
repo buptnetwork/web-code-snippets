@@ -185,6 +185,66 @@ class EStageErrorTests(unittest.TestCase):
             self.assertIn('"request_id": "verify-log-1"', text)
 
 
+class EStageRoutingTests(unittest.TestCase):
+    """装饰器注册后保留全部端点、响应文档与应用工厂的独立实例。"""
+
+    def test_routes_and_response_documentation(self):
+        with server() as (base, _):
+            status, _, schema, _ = request(base, "/openapi.json")
+            self.assertEqual(status, 200)
+            paths = schema["paths"]
+            operations = {(path, method) for path, methods in paths.items() for method in methods}
+            self.assertEqual(operations, {
+                ("/questions", "get"), ("/questions", "post"),
+                ("/questions/{qid}", "get"), ("/healthz", "get"),
+                ("/__teacher/reset", "post"), ("/__teacher/fault-create", "post"),
+                ("/", "get"),
+            })
+            for path, method, success, model in (
+                ("/questions", "get", "200", "QuestionListOut"),
+                ("/questions/{qid}", "get", "200", "QuestionOut"),
+                ("/questions", "post", "201", "QuestionOut"),
+            ):
+                responses = paths[path][method]["responses"]
+                self.assertEqual(responses[success]["content"]["application/json"]["schema"]["$ref"],
+                                 f"#/components/schemas/{model}")
+                self.assertIn("X-Request-ID", responses[success]["headers"])
+                for error in ("404", "405", "409", "422", "500"):
+                    self.assertEqual(responses[error]["content"]["application/json"]["schema"]["$ref"],
+                                     "#/components/schemas/ErrorOut")
+            self.assertIn("Location", paths["/questions"]["post"]["responses"]["201"]["headers"])
+            self.assertEqual(paths["/healthz"]["get"]["responses"]["503"]["content"]["application/json"]["schema"]["$ref"],
+                             "#/components/schemas/HealthOut")
+
+    def test_factory_creates_independent_applications(self):
+        ref = importlib.import_module("reference.server")
+        first = ref.make_application()
+        second = ref.make_application()
+        self.assertIsNot(first, second)
+        self.assertEqual(first.openapi(), ref.app.openapi())
+        self.assertEqual(second.openapi(), ref.app.openapi())
+        self.assertEqual(len(first.routes), len(ref.app.routes))
+        self.assertEqual(len(second.routes), len(ref.app.routes))
+        self.assertEqual(len(ref.router.routes), 7)
+        first.dependency_overrides[ref.get_conn] = lambda: None
+        self.assertNotIn(ref.get_conn, second.dependency_overrides)
+        self.assertNotIn(ref.get_conn, ref.app.dependency_overrides)
+
+    def test_created_location_and_static_routes(self):
+        with server() as (base, _):
+            payload = {"title": "装饰器注册创建测试", "body": "0123456789"}
+            status, _, body, headers = request(base, "/questions", "POST", payload)
+            self.assertEqual(status, 201)
+            self.assertTrue(record_fields_ok(body))
+            self.assertEqual(headers.get("location"), f"/questions/{body['id']}")
+            detail_status, _, detail, _ = request(base, headers["location"])
+            self.assertEqual(detail_status, 200)
+            self.assertEqual(detail, body)
+            self.assertEqual(request(base, "/")[0], 200)
+            self.assertEqual(request(base, "/static/app.js")[0], 200)
+            self.assertEqual(request(base, "/__teacher/reset", "POST")[0], 200)
+
+
 class EStageHealthTests(unittest.TestCase):
     def test_healthz_ok(self):
         with server() as (base, _):
