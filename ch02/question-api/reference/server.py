@@ -28,7 +28,7 @@ from question_db import (
 )
 from service import DuplicateTitle, create_question_service
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
 # endregion imports
 
