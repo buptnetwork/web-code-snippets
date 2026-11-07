@@ -5,11 +5,9 @@
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     display_name TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL
-        DEFAULT now(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT users_name_len
-        CHECK (char_length(display_name)
-               BETWEEN 2 AND 40)
+        CHECK (char_length(display_name) BETWEEN 2 AND 40)
 );
 -- #endregion users
 

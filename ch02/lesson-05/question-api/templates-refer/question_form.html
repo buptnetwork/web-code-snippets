@@ -1,0 +1,22 @@
+<!-- #region form -->
+{% extends "base.html" %}
+{% block title %}发布问题{% endblock %}
+{% block content %}
+<h1>发布问题</h1>
+{% if errors %}<p role="alert">发布未完成，请检查下方提示。</p>{% endif %}
+{% if errors.form %}<p role="alert">{{ errors.form }}</p>{% endif %}
+<form method="post" action="/ui/questions" novalidate>
+  <label for="title">标题</label>
+  <input id="title" name="title" value="{{ values.title }}" aria-describedby="title-error">
+  <p id="title-error">{{ errors.get('title', '') }}</p>
+  <label for="body">正文</label>
+  <textarea id="body" name="body" aria-describedby="body-error">
+{{ values.body }}</textarea>
+  <p id="body-error">{{ errors.get('body', '') }}</p>
+  <label for="tags">标签（用英文逗号分隔）</label>
+  <input id="tags" name="tags" value="{{ values.tags }}" aria-describedby="tags-error">
+  <p id="tags-error">{{ errors.get('tags', '') }}</p>
+  <button type="submit">发布</button>
+</form>
+{% endblock %}
+<!-- #endregion form -->
