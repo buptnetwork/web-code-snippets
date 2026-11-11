@@ -1,5 +1,7 @@
--- 教师逐段执行；只针对已提交初始化的隔离教学库。
--- UPDATE/DELETE 示例均主动回滚，保持后续讲解的固定数据。
+-- 第 5 步 · 修改与回滚：update／delete 区段自带 BEGIN…ROLLBACK，可整段执行，跑完数据不变。
+-- 这两个区段在两表阶段和五表阶段都适用（只动 questions 与 answers）。
+-- duplicate 区段是五表阶段的预期失败：必须单独 BEGIN，捕获错误后 ROLLBACK，不能整文件盲跑。
+-- 运行入口：examples/ex02_update_delete.py（两表）与 examples/ex04_constraints.py（五表）。
 
 -- #region update
 BEGIN;

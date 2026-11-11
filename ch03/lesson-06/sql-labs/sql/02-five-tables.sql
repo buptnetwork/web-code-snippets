@@ -1,4 +1,6 @@
--- 五表阶段：独立的空 schema，不能叠加执行在两表阶段上。
+-- 第 2 步 · 五表结构：users、questions、answers、tags、question_tags。
+-- 只建结构，不导入数据；固定数据在 03-seed.sql。
+-- 需要另一个空 schema，不能叠加在两表阶段上；examples/ex03_five_tables.py 会自动新建一个。
 -- 教学基线：PostgreSQL 16+、UTF-8、UTC；本文件不迁移 M1 数据。
 
 -- #region users

@@ -1,4 +1,7 @@
--- 下列查询使用完整五表种子，不改变数据。
+-- 第 4 步 · 只读查询：需要五表固定数据（02 + 03），不改变任何数据。
+-- 每个区段是一条独立 SELECT，可以单独执行；区段名与课件引用一致。
+-- q1–q4 是课件主线，其余区段用于观察 NULL、标签顺序、LEFT JOIN 行数、计数与排序。
+-- 运行入口：examples/ex03_five_tables.py（NULL）与 ex05–ex07（Q1、关联与计数、排序分页）。
 
 -- #region unknown-author
 SELECT id, question_id

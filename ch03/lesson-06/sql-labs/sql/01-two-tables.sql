@@ -1,5 +1,7 @@
--- 两表阶段：仅在教师提供的空 schema 中执行，与五表阶段隔离。
--- 初始化由调用者开启事务；成功后提交，失败则回滚。
+-- 第 1 步 · 两表阶段初始化：只有 questions 与 answers，还没有作者和完整业务约束。
+-- 可以整文件执行：建表、插入固定数据、读回、校准序列。
+-- 必须在空 schema 中执行，不能与五表阶段叠加；examples/ex01_two_tables.py 会自动新建一个。
+-- psql 手工执行：psql -v ON_ERROR_STOP=1 -1 -f sql/01-two-tables.sql
 
 -- #region questions-ddl
 CREATE TABLE questions (

@@ -1,0 +1,20 @@
+[project]
+name = "sql-labs"
+version = "0.6.0"
+description = "第 6 课：在 PostgreSQL 上学表、约束、查询与事务，SQL 与 Python 示例都可直接运行"
+requires-python = ">=3.12"
+dependencies = [
+  "psycopg[binary]==3.3.6",
+]
+
+[dependency-groups]
+dev = [
+  "pytest==9.1.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
