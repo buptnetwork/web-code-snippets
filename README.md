@@ -12,6 +12,8 @@
 | `ch02/question-api/` | 第 3 课 | 用 Pydantic 声明输入／输出模型，补一个带校验的创建接口，含黑盒自检 |
 | `ch02/lesson-04/question-api/` | 第 4 课 | 把连接收进 `yield` 依赖、服务层显式提交，统一四字段错误出口与 request-id，分 R／E 两阶段，含黑盒自检 |
 | `ch02/lesson-05/question-api/` | 第 5 课 | 在第 4 课 JSON 基线上加 SSR 表单闭环：补校验失败回填函数与列表／详情模板，含黑盒自检与并发对照实验 |
+| `ch03/lesson-06/sql-labs/` | 第 6 课 | 在 PostgreSQL 上学表、约束、查询与事务；SQL 与 ex01–ex07 编号示例可直接跑，含 pytest 自检。**运行说明见工程内 [README](ch03/lesson-06/sql-labs/README.md)** |
+| `ch03/lesson-07/question-api/` | 第 7 课 | SQLAlchemy 2.0 ORM 读写五表并接入 FastAPI；Alembic 基线迁移、ex01–ex07 与 pytest。**运行说明见工程内 [README](ch03/lesson-07/question-api/README.md)** |
 
 ## 环境准备（每个工程一次）
 
@@ -31,7 +33,9 @@
 
    如果 Windows 执行策略阻止激活，可不激活，直接把后面命令里的 `python` 换成 `.venv\Scripts\python.exe`。
 
-> 每个工程的 `.python-version` 已固定为 3.12.12。运行时只依赖 FastAPI／Uvicorn，不需要额外安装数据库服务，也不需要 Node 环境。
+> 第 1–5 课工程的 `.python-version` 已固定为 3.12.12，运行时只依赖 FastAPI／Uvicorn，不需要额外安装数据库服务，也不需要 Node 环境。
+>
+> **第 6、7 课不同**：需要自备 PostgreSQL 16+ 与一个可丢弃的教学库，连接写在各自的 `.env`（不提交）；两课都没有 `.python-version`，以 `pyproject.toml` 的 `requires-python >=3.12` 为准。具体步骤看工程内 README：[第 6 课 sql-labs](ch03/lesson-06/sql-labs/README.md)、[第 7 课 question-api](ch03/lesson-07/question-api/README.md)。
 
 ---
 
