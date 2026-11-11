@@ -40,9 +40,12 @@ def isolated_schema(conn, *, keep=False):
         yield schema
     finally:
         if keep:
-            # 下面两行只是给人看的提示命令，schema 名由本脚本生成，不含用户输入。
+            # 下面几行只是给人看的提示命令，schema 名由本脚本生成，不含用户输入。
+            # 必须带 --env-file：PG* 变量只在 .env 里，直接敲 psql 会连到默认库。
             print(f"已保留 schema：{schema}")
-            print(f'查看：psql -c "SET search_path TO {schema}; SELECT id, title FROM questions ORDER BY id;"')
-            print(f"看完删除：psql -c 'DROP SCHEMA {schema} CASCADE'")
+            print("在 sql-labs 目录执行：")
+            print(f'  uv run --env-file .env psql -c "SET search_path TO {schema}; '
+                  f'SELECT id, title FROM questions ORDER BY id;"')
+            print(f"  uv run --env-file .env psql -c 'DROP SCHEMA {schema} CASCADE'")
         else:
             conn.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))
