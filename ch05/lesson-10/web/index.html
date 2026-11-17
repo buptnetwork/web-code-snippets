@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>问答列表 · JavaScript 入门</title>
+    <link rel="stylesheet" href="./src/style.css" />
+    <script type="module" src="./src/main.js"></script>
+  </head>
+  <body>
+    <main>
+      <h1>问答列表</h1>
+      <p>本区域使用固定教学数据，只在当前页面内筛选。</p>
+      <a href="#question-list">跳到问题列表</a>
+      <!-- #region form -->
+      <form id="search-form" class="search-bar">
+        <label for="keyword">关键词</label>
+        <input id="keyword" name="keyword" type="text" value="" />
+        <button type="submit">筛选</button>
+      </form>
+      <!-- #endregion form -->
+      <p id="summary" class="muted" role="status">尚未接入脚本</p>
+      <ul id="question-list">
+        <li class="question-card">
+          <h2>SQL 查询从哪里开始？</h2>
+          <p>希望先弄清表和记录再逐步学习查询语句。</p>
+        </li>
+      </ul>
+      <!-- #region api -->
+      <section>
+        <h2>后端列表演示</h2>
+        <button id="load-api" type="button">读取后端列表</button>
+        <p id="api-result" role="status">尚未请求后端</p>
+      </section>
+      <!-- #endregion api -->
+    </main>
+  </body>
+</html>
