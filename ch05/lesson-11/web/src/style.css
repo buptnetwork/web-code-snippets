@@ -1,0 +1,13 @@
+* { box-sizing: border-box; }
+body { margin: 0; padding: 1.5rem; font-family: system-ui, sans-serif; color: #172554; background: #f8fafc; }
+main { max-width: 60rem; margin: auto; }
+button, input, textarea { font: inherit; padding: .5rem; }
+button { margin: .35rem; }
+label { display: block; margin-top: .8rem; }
+input, textarea { width: 100%; }
+textarea { min-height: 6rem; }
+form, section { padding: 1rem; margin-top: 1rem; border: 1px solid #cbd5e1; background: white; }
+#question-list { padding: 0; list-style: none; }
+.question-card { padding: 1rem; border: 1px solid #cbd5e1; margin: 1rem 0; background: white; }
+[aria-invalid="true"] { border: 2px solid #b91c1c; }
+.preserve-text { white-space: pre-wrap; }

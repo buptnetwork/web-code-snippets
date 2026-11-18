@@ -1,0 +1,25 @@
+// #region all
+import { useState } from "react";
+import type { QuestionItem } from "./contracts";
+
+interface ClickCardProps {
+  question: QuestionItem;
+}
+
+export function ClickCard({ question }: ClickCardProps) {
+  const [expanded, setExpanded] = useState(false);
+  function toggle() {
+    setExpanded(!expanded);
+  }
+  return (
+    <article className="question-card" data-qid={question.id}>
+      <h2>{question.title}</h2>
+      <p>标签：{question.tags.join("、")}</p>
+      <button type="button" aria-expanded={expanded} onClick={toggle}>
+        {expanded ? "收起正文" : "展开正文"}
+      </button>
+      {expanded && <p>{question.body}</p>}
+    </article>
+  );
+}
+// #endregion all
